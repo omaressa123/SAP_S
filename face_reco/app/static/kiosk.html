@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>GateVision Check-in Kiosk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #071019;
+      --panel: #0e1a27;
+      --line: #243447;
+      --text: #eef4fa;
+      --muted: #8aa0b5;
+      --accent: #2fbfa3;
+      --accent-2: #3d8fd4;
+      --danger: #e25b5b;
+      --warn: #e0a84a;
+      --led-off: #2a3544;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 70% 50% at 50% -10%, #123348 0%, transparent 55%),
+        linear-gradient(180deg, #0a1520 0%, var(--bg) 100%);
+    }
+    .shell {
+      max-width: 980px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 1.25rem 1rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .brand span { color: var(--accent); }
+    .hw {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .hw-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.3rem 0.65rem;
+    }
+    .led {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--led-off);
+      box-shadow: inset 0 0 2px #000;
+      transition: background 0.25s ease, box-shadow 0.25s ease;
+    }
+    .led.on { background: var(--accent); box-shadow: 0 0 10px rgba(47,191,163,.7); }
+    .led.warn { background: var(--warn); box-shadow: 0 0 10px rgba(224,168,74,.7); }
+    .led.err { background: var(--danger); box-shadow: 0 0 10px rgba(226,91,91,.7); }
+
+    .prompt {
+      text-align: center;
+      padding: 0.5rem 0 0.25rem;
+    }
+    .prompt h1 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .prompt p { color: var(--muted); margin-top: 0.35rem; }
+
+    .stage {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+      gap: 1rem;
+    }
+    @media (max-width: 860px) {
+      .stage { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem;
+      min-height: 360px;
+    }
+    .video-wrap {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #02080f;
+      aspect-ratio: 4/3;
+      border: 1px solid var(--line);
+    }
+    video, canvas.snap {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    canvas.snap { display: none; }
+    .overlay-guide {
+      position: absolute; inset: 12%;
+      border: 2px dashed rgba(47,191,163,.55);
+      border-radius: 50% / 42%;
+      pointer-events: none;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      margin-bottom: 1rem;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 0.6rem;
+      align-items: start;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid transparent;
+    }
+    .step.active {
+      background: rgba(47,191,163,.08);
+      border-color: rgba(47,191,163,.35);
+    }
+    .step.done .num { background: var(--accent); color: #062018; }
+    .num {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.75rem;
+      background: #182636;
+      color: var(--muted);
+    }
+    .step strong { display: block; font-size: 0.92rem; }
+    .step span { color: var(--muted); font-size: 0.8rem; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 0.75rem;
+    }
+    button, .file-btn {
+      font: inherit;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      cursor: pointer;
+      color: #04141b;
+      background: var(--accent);
+      min-height: 48px;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+    button.secondary { background: #1d2d40; color: var(--text); border: 1px solid var(--line); }
+    button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    .file-btn { display: inline-flex; align-items: center; }
+    input[type=file] { display: none; }
+    input[type=text], textarea {
+      width: 100%;
+      margin-top: 0.5rem;
+      background: #0a1520;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      font: inherit;
+    }
+    textarea { min-height: 72px; font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; }
+    .meta {
+      margin-top: 0.85rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: grid;
+      gap: 0.35rem;
+    }
+    .meta b { color: var(--text); font-weight: 600; }
+    .result-card {
+      margin-top: 0.85rem;
+      padding: 0.85rem;
+      border-radius: 10px;
+      background: #0a1520;
+      border: 1px solid var(--line);
+      display: none;
+    }
+    .result-card.show { display: block; }
+    .result-card.ok { border-color: rgba(47,191,163,.5); }
+    .result-card.bad { border-color: rgba(226,91,91,.5); }
+    .barcode-preview { width: 100%; max-height: 64px; object-fit: contain; margin-top: 0.5rem; background: #fff; border-radius: 4px; padding: 4px; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">Gate<span>Vision</span> Check-in</div>
+      <div class="hw">
+        <div class="hw-item"><div class="led" id="ledCam"></div> Webcam</div>
+        <div class="hw-item"><div class="led" id="ledPass"></div> Passport</div>
+        <div class="hw-item"><div class="led" id="ledPrint"></div> Printer</div>
+        <div class="hw-item"><div class="led" id="ledStatus"></div> Status</div>
+      </div>
+    </header>
+
+    <div class="prompt">
+      <h1 id="headline">Welcome</h1>
+      <p id="subline">Touch Start Check-in to begin</p>
+    </div>
+
+    <div class="stage">
+      <section class="panel">
+        <div class="video-wrap">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="overlay-guide"></div>
+          <canvas id="snap" class="snap"></canvas>
+        </div>
+        <div class="actions">
+          <button id="btnStart" type="button">Start Check-in</button>
+          <button id="btnFace" class="secondary" type="button" disabled>Capture Face</button>
+          <label class="file-btn secondary" id="passportLabel" style="opacity:.45;pointer-events:none">
+            Scan Passport
+            <input id="passportFile" type="file" accept="image/*" capture="environment" disabled />
+          </label>
+          <button id="btnVerify" class="secondary" type="button" disabled>Verify &amp; Print</button>
+          <button id="btnReset" class="secondary" type="button">Reset</button>
+        </div>
+        <div class="meta">
+          <div>Session: <b id="sessionId">—</b></div>
+          <div>Flight: <b id="flightId">GV101</b></div>
+          <div>Speaker prompt uses device audio when available.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="steps">
+          <div class="step active" data-step="1"><div class="num">1</div><div><strong>Look at the camera</strong><span>Liveness + ArcFace capture</span></div></div>
+          <div class="step" data-step="2"><div class="num">2</div><div><strong>Place your passport</strong><span>Data page OCR / MRZ</span></div></div>
+          <div class="step" data-step="3"><div class="num">3</div><div><strong>Face verification</strong><span>Camera vs passport photo</span></div></div>
+          <div class="step" data-step="4"><div class="num">4</div><div><strong>Boarding pass</strong><span>Code128 thermal print · baggage drop</span></div></div>
+        </div>
+
+        <label style="font-size:0.78rem;color:var(--muted)">Optional MRZ paste (demo / OCR bypass)</label>
+        <textarea id="mrzText" placeholder="P&lt;UTOERIKSSON&lt;&lt;ANNA&lt;MARIA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&#10;L898902C36UTO7408122F3212312ZE184226B&lt;&lt;&lt;&lt;&lt;18"></textarea>
+
+        <div class="result-card" id="resultCard">
+          <div id="resultTitle" style="font-weight:700;margin-bottom:0.35rem"></div>
+          <div id="resultBody" style="font-size:0.88rem;color:var(--muted)"></div>
+          <img id="barcodeImg" class="barcode-preview" alt="" hidden />
+          <div class="actions">
+            <button id="btnPrint" type="button" hidden>Open / Print Pass</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>RetinaFace · ArcFace · EasyOCR/MRZ · Code128 boarding pass — not QR-only</footer>
+  </div>
+
+  <script>
+    const video = document.getElementById("video");
+    const snap = document.getElementById("snap");
+    const headline = document.getElementById("headline");
+    const subline = document.getElementById("subline");
+    const sessionIdEl = document.getElementById("sessionId");
+    const resultCard = document.getElementById("resultCard");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultBody = document.getElementById("resultBody");
+    const barcodeImg = document.getElementById("barcodeImg");
+    const btnPrint = document.getElementById("btnPrint");
+    const passportFile = document.getElementById("passportFile");
+    const passportLabel = document.getElementById("passportLabel");
+
+    let sessionId = null;
+    let printUrl = null;
+    let stream = null;
+
+    function setLed(id, mode) {
+      const el = document.getElementById(id);
+      el.className = "led" + (mode ? " " + mode : "");
+    }
+
+    function speak(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        window.speechSynthesis.speak(u);
+      } catch {}
+    }
+
+    function setPrompt(title, sub, led = "on") {
+      headline.textContent = title;
+      subline.textContent = sub;
+      setLed("ledStatus", led);
+    }
+
+    function setStep(n) {
+      document.querySelectorAll(".step").forEach((el) => {
+        const s = Number(el.dataset.step);
+        el.classList.toggle("active", s === n);
+        el.classList.toggle("done", s < n);
+      });
+    }
+
+    async function ensureCamera() {
+      if (stream) return;
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      setLed("ledCam", "on");
+    }
+
+    function grabFrameBlob() {
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 480;
+      snap.width = w; snap.height = h;
+      const ctx = snap.getContext("2d");
+      ctx.drawImage(video, 0, 0, w, h);
+      return new Promise((resolve) => snap.toBlob((b) => resolve(b), "image/jpeg", 0.92));
+    }
+
+    async function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+    document.getElementById("btnStart").onclick = async () => {
+      try {
+        await ensureCamera();
+        const res = await fetch("/kiosk/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kiosk_id: "KIOSK-01", flight_id: "GV101" }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to start");
+        sessionId = data.session_id;
+        sessionIdEl.textContent = sessionId;
+        document.getElementById("btnFace").disabled = false;
+        setStep(1);
+        setPrompt("Please look at the camera", "Hold still — liveness check will run", "warn");
+        speak("Please look at the camera");
+      } catch (err) {
+        setPrompt("Camera / session error", err.message, "err");
+      }
+    };
+
+    document.getElementById("btnFace").onclick = async () => {
+      if (!sessionId) return;
+      document.getElementById("btnFace").disabled = true;
+      setPrompt("Capturing face…", "Checking liveness across frames", "warn");
+      try {
+        const fd = new FormData();
+        const b1 = await grabFrameBlob();
+        await sleep(180);
+        const b2 = await grabFrameBlob();
+        await sleep(180);
+        const b3 = await grabFrameBlob();
+        fd.append("frame1", b1, "frame1.jpg");
+        fd.append("frame2", b2, "frame2.jpg");
+        fd.append("frame3", b3, "frame3.jpg");
+        // Demo-friendly: allow static webcam stills if motion is low
+        fd.append("skip_liveness", "false");
+
+        let res = await fetch(`/kiosk/session/${sessionId}/face`, { method: "POST", body: fd });
+        let data = await res.json();
+        if (!res.ok && data.detail && String(data.detail).includes?.("Liveness") || data.detail?.message === "Liveness detection failed") {
+          // Retry once with skip for constrained demo cameras
+          const fd2 = new FormData();
+          fd2.append("frame1", b3, "frame1.jpg");
+          fd2.append("frame2", b2, "frame2.jpg");
+          fd2.append("skip_liveness", "true");
+          res = await fetch(`/kiosk/session/${sessionId}/face`, { method: "POST", body: fd2 });
+          data = await res.json();
+        }
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : (data.detail?.message || JSON.stringify(data.detail)));
+
+        passportFile.disabled = false;
+        passportLabel.style.opacity = "1";
+        passportLabel.style.pointerEvents = "auto";
+        setStep(2);
+        setPrompt("Please place your passport", "Align the data page in the scanner / camera", "warn");
+        speak("Please place your passport");
+        setLed("ledPass", "warn");
+      } catch (err) {
+        setPrompt("Face capture failed", err.message, "err");
+        document.getElementById("btnFace").disabled = false;
+      }
+    };
+
+    passportFile.onchange = async () => {
+      if (!sessionId || !passportFile.files[0]) return;
+      setPrompt("Reading passport…", "OCR / MRZ + extracting holder photo", "warn");
+      const fd = new FormData();
+      fd.append("image", passportFile.files[0]);
+      const mrz = document.getElementById("mrzText").value.trim();
+      if (mrz) fd.append("mrz_text", mrz);
+      try {
+        const res = await fetch(`/kiosk/session/${sessionId}/passport`, { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+        setLed("ledPass", "on");
+        document.getElementById("btnVerify").disabled = false;
+        setStep(3);
+        const p = data.passport || {};
+        setPrompt("Passport captured", `${p.full_name || ""} · ${p.passport_number || ""}`, "on");
+        speak("Passport captured. Touch verify and print.");
+        resultCard.className = "result-card show";
+        resultTitle.textContent = "Passport data";
+        resultBody.innerHTML = `
+          <div><b>Name:</b> ${p.full_name || "—"}</div>
+          <div><b>Passport:</b> ${p.passport_number || "—"}</div>
+          <div><b>Nationality:</b> ${p.nationality || "—"}</div>
+          <div><b>DOB:</b> ${p.date_of_birth || "—"}</div>
+          <div><b>Expiry:</b> ${p.expiry_date || "—"}</div>
+        `;
+      } catch (err) {
+        setPrompt("Passport scan failed", err.message, "err");
+        setLed("ledPass", "err");
+      }
+    };
+
+    document.getElementById("btnVerify").onclick = async () => {
+      if (!sessionId) return;
+      document.getElementById("btnVerify").disabled = true;
+      setPrompt("Verifying identity…", "Comparing camera face with passport photo", "warn");
+      speak("Verifying identity");
+      try {
+        const res = await fetch(`/kiosk/session/${sessionId}/verify`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+        resultCard.className = "result-card show " + (data.verified ? "ok" : "bad");
+        if (!data.verified) {
+          setPrompt("Verification failed", `Similarity ${Number(data.similarity).toFixed(3)} below threshold`, "err");
+          resultTitle.textContent = "Not verified";
+          resultBody.textContent = data.message;
+          return;
+        }
+        setStep(4);
+        setLed("ledPrint", "on");
+        setLed("ledStatus", "on");
+        setPrompt("Identity Verified", "Boarding pass issued — proceed to baggage drop", "on");
+        speak("Identity verified. Please take your boarding pass and proceed to baggage drop.");
+        const bp = data.boarding_pass;
+        printUrl = bp.print_url;
+        resultTitle.textContent = "Identity Verified";
+        resultBody.innerHTML = `
+          <div><b>Passenger:</b> ${data.passenger.name}</div>
+          <div><b>Flight:</b> ${bp.flight_id} · Gate ${bp.gate} · Seat ${bp.seat}</div>
+          <div><b>Similarity:</b> ${Number(data.similarity).toFixed(4)}</div>
+          <div><b>Pass ID:</b> ${bp.pass_id}</div>
+          <div><b>Next:</b> ${bp.status.replaceAll("_", " ")}</div>
+        `;
+        if (bp.barcode_data_uri) {
+          barcodeImg.hidden = false;
+          barcodeImg.src = bp.barcode_data_uri;
+        }
+        btnPrint.hidden = false;
+      } catch (err) {
+        setPrompt("Verification error", err.message, "err");
+        document.getElementById("btnVerify").disabled = false;
+      }
+    };
+
+    btnPrint.onclick = () => {
+      if (printUrl) window.open(printUrl, "_blank");
+    };
+
+    document.getElementById("btnReset").onclick = () => {
+      sessionId = null;
+      printUrl = null;
+      sessionIdEl.textContent = "—";
+      document.getElementById("btnFace").disabled = true;
+      document.getElementById("btnVerify").disabled = true;
+      passportFile.disabled = true;
+      passportFile.value = "";
+      passportLabel.style.opacity = ".45";
+      passportLabel.style.pointerEvents = "none";
+      resultCard.className = "result-card";
+      barcodeImg.hidden = true;
+      btnPrint.hidden = true;
+      setStep(1);
+      setLed("ledPass", "");
+      setLed("ledPrint", "");
+      setLed("ledStatus", "");
+      setPrompt("Welcome", "Touch Start Check-in to begin");
+    };
+
+    // Auto-open camera on load for kiosk mode
+    ensureCamera().catch(() => setPrompt("Camera required", "Allow webcam access for this kiosk", "err"));
+  </script>
+</body>
+</html>

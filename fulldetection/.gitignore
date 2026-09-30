@@ -1,0 +1,23 @@
+# Local Python environments
+.venv/
+.venv312/
+
+# Python caches and crash artifacts
+__pycache__/
+*.py[cod]
+*.so
+core
+core.*
+
+# Local datasets and generated preprocessing outputs
+# Keep the training and source datasets local; the GitHub branch contains code and model assets.
+data/
+*.npy
+*.npz
+
+# Local runtime and editor files
+*.log
+.vscode/
+.DS_Store
+
+# Keep trained model assets intentionally tracked in models/

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+.DS_Store
+.env
+*.log
+data/airport.db
+data/faiss.index
+data/faiss_ids.npy
+data/boarding_passes/

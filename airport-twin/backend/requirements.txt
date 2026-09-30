@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2
+pyjwt
+alembic
+psycopg[binary]
+python-multipart
+prometheus_client
+pytest

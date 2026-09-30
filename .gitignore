@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv312/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Data / outputs / large binaries (excluded for GitHub limits)
+data/
+outputs/
+*.avi
+*.mp4
+*.mov
+*.mkv
+*.pt
+*.onnx
+*.bin
+*.safetensors
+*.zip
+*.tar.gz
+
+# Keep small model weights? Uncomment to allow .pt <100MB:
+# !smoke_fire_detection/yolo*.pt
+# !fulldetection/models/**
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Env / secrets - NEVER commit tokens
+.env
+.env.*
+*.pem
+*.key
+
+# Local git backups (nested repo history, must not push)
+.git.bak/
+*.git.bak
+**/.git.bak/**

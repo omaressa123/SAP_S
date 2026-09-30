@@ -1,0 +1,29 @@
+# Datasets — too large / private for git, keep the folder structure only
+data/raw/*/*
+data/train/*/*
+data/val/*/*
+data/test/*/*
+!data/raw/*/.gitkeep
+!data/train/*/.gitkeep
+!data/val/*/.gitkeep
+!data/test/*/.gitkeep
+
+# Training outputs
+outputs/*
+!outputs/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Ultralytics runtime files
+*.pt
+*.cache
+!yolov8*.pt.example
+
+# OS
+.DS_Store
+Thumbs.db
