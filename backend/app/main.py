@@ -1,0 +1,51 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from .utils.errors import AirportException
+from .utils.response_envelope import error_response
+
+# Import all controllers
+from .controllers import (
+    auth_controller, passenger_controller, kiosk_controller, baggage_drop_controller,
+    inspection_controller, baggage_tracking_controller, security_gate_controller,
+    boarding_gate_controller, monitoring_controller, k9_patrols_controller,
+    maintenance_controller, digital_twin_controller, flight_controller
+)
+
+app = FastAPI(title="Smart Airport System API", version="2.0.0")
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global Exception Handlers
+@app.exception_handler(AirportException)
+async def airport_exception_handler(request: Request, exc: AirportException):
+    return error_response(code=exc.code, message=exc.message, status_code=exc.status_code)
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    return error_response(code="INTERNAL_SERVER_ERROR", message=str(exc), status_code=500)
+
+# Register all 12 routers
+app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["1. Auth & User Management"])
+app.include_router(passenger_controller.router, prefix="/api/v1/passenger", tags=["2. Passenger Mobile App"])
+app.include_router(flight_controller.router, prefix="/api/v1/flights", tags=["System - Flights"])
+app.include_router(kiosk_controller.router, prefix="/api/v1/kiosk", tags=["3. Kiosk & Passport Smart Login"])
+app.include_router(baggage_drop_controller.router, prefix="/api/v1/baggage-drop", tags=["4. Smart Check-in & Baggage Drop"])
+app.include_router(inspection_controller.router, prefix="/api/v1/inspection", tags=["5. AI Baggage Inspection"])
+app.include_router(baggage_tracking_controller.router, prefix="/api/v1/baggage-tracking", tags=["6. Baggage Tracking"])
+app.include_router(security_gate_controller.router, prefix="/api/v1/security-gate", tags=["7. Biometric Security Gate"])
+app.include_router(boarding_gate_controller.router, prefix="/api/v1/boarding-gate", tags=["8. Biometric Boarding Gate"])
+app.include_router(monitoring_controller.router, prefix="/api/v1/monitoring", tags=["9. CCTV Monitoring"])
+app.include_router(k9_patrols_controller.router, prefix="/api/v1/k9-patrols", tags=["10. K9 Units"])
+app.include_router(maintenance_controller.router, prefix="/api/v1/maintenance", tags=["11. IoT Maintenance"])
+app.include_router(digital_twin_controller.router, prefix="/api/v1/digital-twin", tags=["12. Digital Twin"])
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    return {"status": "ok"}
