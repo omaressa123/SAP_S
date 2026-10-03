@@ -29,12 +29,12 @@ def register_passenger(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    passenger = AuthService.login_passenger(db, payload.email, payload.password)
+    account = AuthService.login_passenger(db, payload.email, payload.password)
     
     token = create_access_token({
-        "sub": passenger.email,
+        "sub": account.email,
         "role": "passenger",
-        "linkedPersonId": passenger.passenger_id
+        "linkedPersonId": account.linked_person_id
     })
     
     return success_response(data={
@@ -42,9 +42,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         "tokenType": "Bearer",
         "expiresInSeconds": 86400,
         "userAccount": {
-            "userAccountId": passenger.passenger_id,
+            "userAccountId": account.user_account_id,
             "role": "passenger",
-            "linkedPersonId": passenger.passenger_id,
+            "linkedPersonId": account.linked_person_id,
             "lastLogin": datetime.utcnow().isoformat() + "Z"
         }
     })

@@ -1,8 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, DECIMAL, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, DECIMAL, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime, date
 from decimal import Decimal
+import enum
 from ..database import Base
+
+class GenderEnum(str, enum.Enum):
+    MALE = "M"
+    FEMALE = "F"
+    UNSPECIFIED = "X"
 
 class Country(Base):
     __tablename__ = 'country'
@@ -20,14 +26,11 @@ class Passenger(Base):
     full_name = Column(String)
     date_of_birth = Column(Date)
     nationality_country_code = Column(String, ForeignKey('country.country_code'), index=True)
-    phone = Column(String)
-    email = Column(String, unique=True, index=True)
-    password_hash = Column(String, nullable=False)
+    gender = Column(Enum(GenderEnum, native_enum=False), nullable=True)
     biometric_consent = Column(Boolean)
     consent_date = Column(DateTime)
-    is_active = Column(Boolean)
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class TravelDocument(Base):

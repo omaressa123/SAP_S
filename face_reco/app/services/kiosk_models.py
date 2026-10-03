@@ -40,6 +40,7 @@ class CheckInSession(Base):
     nationality: Mapped[str | None] = mapped_column(String(8), nullable=True)
     date_of_birth: Mapped[str | None] = mapped_column(String(16), nullable=True)
     expiry_date: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(8), nullable=True)
     mrz_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     live_embedding: Mapped[str | None] = mapped_column(Text, nullable=True)
     passport_embedding: Mapped[str | None] = mapped_column(Text, nullable=True)

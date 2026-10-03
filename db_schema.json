@@ -1,0 +1,3194 @@
+{
+  "1. Identity & Face Recognition": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "Country",
+      "country_code",
+      "CHAR(2)",
+      "PK",
+      null,
+      "ISO 3166-1 alpha-2",
+      "Reference table for nationality/document country."
+    ],
+    [
+      null,
+      "country_name",
+      "VARCHAR(60)",
+      null,
+      null,
+      "NOT NULL",
+      "Full country name."
+    ],
+    [
+      "Passenger",
+      "passenger_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique passenger identifier \u2014 the anchor for everything else."
+    ],
+    [
+      null,
+      "full_name",
+      "VARCHAR(100)",
+      null,
+      null,
+      "NOT NULL \u2014 read from passport MRZ at enrollment",
+      "Passenger full name."
+    ],
+    [
+      null,
+      "date_of_birth",
+      "DATE",
+      null,
+      null,
+      "read from passport MRZ",
+      "Date of birth."
+    ],
+    [
+      null,
+      "nationality_country_code",
+      "CHAR(2)",
+      "FK",
+      "Country.country_code",
+      "read from passport MRZ",
+      "Passenger nationality."
+    ],
+    [
+      null,
+      "phone",
+      "VARCHAR(20)",
+      null,
+      null,
+      null,
+      "Contact phone."
+    ],
+    [
+      null,
+      "email",
+      "VARCHAR(100)",
+      "UQ",
+      null,
+      "UNIQUE \u2014 used as app login identifier",
+      "Contact email."
+    ],
+    [
+      null,
+      "biometric_consent",
+      "BOOLEAN",
+      null,
+      null,
+      "NOT NULL, DEFAULT FALSE \u2014 must be TRUE before FaceEnrollment can be created",
+      "Explicit opt-in before any face data is stored."
+    ],
+    [
+      null,
+      "consent_date",
+      "DATETIME",
+      null,
+      null,
+      "NULL until consent given",
+      "When biometric_consent was set true."
+    ],
+    [
+      null,
+      "is_active",
+      "BOOLEAN",
+      null,
+      null,
+      "DEFAULT TRUE \u2014 soft delete",
+      "False once a passenger requests data deletion."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "Record creation timestamp."
+    ],
+    [
+      null,
+      "updated_at",
+      "DATETIME",
+      null,
+      null,
+      "auto-update on row change",
+      "Last time this record changed."
+    ],
+    [
+      "TravelDocument",
+      "document_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A passenger can hold more than one passport over time \u2014 kept separate from Passenger."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Owner of this document."
+    ],
+    [
+      null,
+      "document_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "passport / national_id",
+      "Type of travel document."
+    ],
+    [
+      null,
+      "document_number",
+      "VARCHAR(20)",
+      "UQ",
+      null,
+      "UNIQUE per active document",
+      "Passport/ID number, read from MRZ."
+    ],
+    [
+      null,
+      "issuing_country_code",
+      "CHAR(2)",
+      "FK",
+      "Country.country_code",
+      null,
+      "Country that issued the document."
+    ],
+    [
+      null,
+      "expiry_date",
+      "DATE",
+      null,
+      null,
+      "flag for re-enrollment before this date",
+      "Document expiry date."
+    ],
+    [
+      null,
+      "mrz_hash",
+      "VARCHAR(255)",
+      null,
+      null,
+      "store a hash, not the raw MRZ string",
+      "One-way reference to the scanned MRZ data."
+    ],
+    [
+      null,
+      "is_primary",
+      "BOOLEAN",
+      null,
+      null,
+      "DEFAULT TRUE",
+      "Whether this is the passenger's active document."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "When this document was first scanned."
+    ],
+    [
+      "FaceEnrollment",
+      "enrollment_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "The one-time 'smart login' registration."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Who this enrollment belongs to."
+    ],
+    [
+      null,
+      "document_id",
+      "INT",
+      "FK",
+      "TravelDocument.document_id",
+      "which passport was used to enroll",
+      "Document scanned at enrollment."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      "which kiosk performed the enrollment",
+      "Smart-login kiosk used."
+    ],
+    [
+      null,
+      "face_embedding_ref",
+      "VARCHAR(255)",
+      null,
+      null,
+      "pointer into the vector store \u2014 never the raw photo",
+      "512-D ArcFace embedding reference."
+    ],
+    [
+      null,
+      "embedding_model",
+      "VARCHAR(30)",
+      null,
+      null,
+      "e.g. 'ArcFace-R100-v1'",
+      "Model used to generate the embedding."
+    ],
+    [
+      null,
+      "enrollment_time",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "When enrollment happened."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "active / superseded / revoked",
+      "Whether this enrollment is currently used for matching."
+    ],
+    [
+      "FaceVerificationLog",
+      "verification_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Every subsequent face check logs here."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Passenger being verified."
+    ],
+    [
+      null,
+      "enrollment_id",
+      "INT",
+      "FK",
+      "FaceEnrollment.enrollment_id",
+      null,
+      "Reference embedding used for the match."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Device that performed the check."
+    ],
+    [
+      null,
+      "checkpoint_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "bag_drop / security_gate / boarding_gate / lounge",
+      "Where this verification happened."
+    ],
+    [
+      null,
+      "cosine_similarity",
+      "DECIMAL(6,4)",
+      null,
+      null,
+      "raw score from your pipeline",
+      "Cosine similarity between live capture and enrolled embedding."
+    ],
+    [
+      null,
+      "match_threshold",
+      "DECIMAL(6,4)",
+      null,
+      null,
+      "threshold in effect at verification time",
+      "Similarity cut-off used to decide pass/fail."
+    ],
+    [
+      null,
+      "verification_status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "verified / failed / flagged_for_staff",
+      "Outcome of the check."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "When verification occurred."
+    ],
+    [
+      "PassengerDevice",
+      "device_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Registers each phone that installs the app."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Owner of this device."
+    ],
+    [
+      null,
+      "device_type",
+      "VARCHAR(10)",
+      null,
+      null,
+      "ios / android",
+      "Platform."
+    ],
+    [
+      null,
+      "push_token",
+      "VARCHAR(255)",
+      null,
+      null,
+      "APNs/FCM token",
+      "Push notification token."
+    ],
+    [
+      null,
+      "app_version",
+      "VARCHAR(20)",
+      null,
+      null,
+      null,
+      "App version installed."
+    ],
+    [
+      null,
+      "last_active",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Last time the app was opened."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "When the device was registered."
+    ]
+  ],
+  "2. Flights & Bookings": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "Airline",
+      "airline_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Reference table for airline names."
+    ],
+    [
+      null,
+      "name",
+      "VARCHAR(80)",
+      null,
+      null,
+      "NOT NULL",
+      "Airline name."
+    ],
+    [
+      null,
+      "iata_code",
+      "CHAR(2)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "2-letter IATA airline code."
+    ],
+    [
+      "Airport",
+      "airport_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Reference table for origin/destination airports."
+    ],
+    [
+      null,
+      "iata_code",
+      "CHAR(3)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "3-letter IATA airport code (e.g. DXB)."
+    ],
+    [
+      null,
+      "city",
+      "VARCHAR(60)",
+      null,
+      null,
+      null,
+      "City served."
+    ],
+    [
+      null,
+      "country_code",
+      "CHAR(2)",
+      "FK",
+      "Country.country_code",
+      null,
+      "Country the airport is in."
+    ],
+    [
+      "Flight",
+      "flight_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique flight identifier."
+    ],
+    [
+      null,
+      "flight_number",
+      "VARCHAR(10)",
+      null,
+      null,
+      "indexed",
+      "Airline flight number."
+    ],
+    [
+      null,
+      "airline_id",
+      "INT",
+      "FK",
+      "Airline.airline_id",
+      null,
+      "Operating airline."
+    ],
+    [
+      null,
+      "origin_airport_id",
+      "INT",
+      "FK",
+      "Airport.airport_id",
+      null,
+      "Departure airport."
+    ],
+    [
+      null,
+      "destination_airport_id",
+      "INT",
+      "FK",
+      "Airport.airport_id",
+      null,
+      "Arrival airport."
+    ],
+    [
+      null,
+      "scheduled_departure",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Scheduled departure time."
+    ],
+    [
+      null,
+      "actual_departure",
+      "DATETIME",
+      null,
+      null,
+      "NULL until wheels-up",
+      "Actual departure time."
+    ],
+    [
+      null,
+      "boarding_gate_id",
+      "INT",
+      "FK",
+      "BoardingGate.boarding_gate_id",
+      "nullable until assigned",
+      "Assigned boarding gate for this flight."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "scheduled / boarding / departed / delayed / cancelled",
+      "Flight status."
+    ],
+    [
+      "Booking",
+      "booking_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique booking / ticket id."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Ticket holder."
+    ],
+    [
+      null,
+      "flight_id",
+      "INT",
+      "FK",
+      "Flight.flight_id",
+      null,
+      "Booked flight."
+    ],
+    [
+      null,
+      "booking_reference",
+      "VARCHAR(10)",
+      "UQ",
+      null,
+      "UNIQUE \u2014 the PNR encoded in the ticket barcode",
+      "Airline booking reference (PNR)."
+    ],
+    [
+      null,
+      "seat_number",
+      "VARCHAR(5)",
+      null,
+      null,
+      null,
+      "Assigned seat."
+    ],
+    [
+      null,
+      "booking_class",
+      "VARCHAR(20)",
+      null,
+      null,
+      "economy / business / first",
+      "Cabin class."
+    ],
+    [
+      null,
+      "booking_status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "denormalized for fast app reads",
+      "confirmed / checked_in / boarded / cancelled."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "Booking creation timestamp."
+    ],
+    [
+      "Notification",
+      "notification_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Every push/SMS/email is a row here."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      "nullable \u2014 see staff_id",
+      "Recipient, if a passenger."
+    ],
+    [
+      null,
+      "staff_id",
+      "INT",
+      "FK",
+      "Staff.staff_id",
+      "nullable \u2014 new: staff can now be notified too (e.g. K9 alert assigned, low battery reserve)",
+      "Recipient, if a staff member."
+    ],
+    [
+      null,
+      "channel",
+      "VARCHAR(20)",
+      null,
+      null,
+      "push / sms / email",
+      "Delivery channel."
+    ],
+    [
+      null,
+      "notification_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "gate_change / bag_status / boarding_call / security_notice / staff_task / energy_alert",
+      "Notification category."
+    ],
+    [
+      null,
+      "content",
+      "VARCHAR(255)",
+      null,
+      null,
+      null,
+      "Message text."
+    ],
+    [
+      null,
+      "related_entity_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "nullable",
+      "What this notification is about."
+    ],
+    [
+      null,
+      "related_entity_id",
+      "INT",
+      null,
+      null,
+      "polymorphic \u2014 paired with related_entity_type",
+      "Which row it's about."
+    ],
+    [
+      null,
+      "sent_at",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "When it was sent."
+    ],
+    [
+      null,
+      "read_at",
+      "DATETIME",
+      null,
+      null,
+      "nullable",
+      "When it was read."
+    ]
+  ],
+  "3. Check-in & Baggage Tagging": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "CheckInRecord",
+      "checkin_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Created when the passenger scans their ticket at the check-in kiosk."
+    ],
+    [
+      null,
+      "booking_id",
+      "INT",
+      "FK",
+      "Booking.booking_id",
+      null,
+      "Booking being checked in."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Passenger checking in."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Check-in/bag-tag kiosk used."
+    ],
+    [
+      null,
+      "checkin_time",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Time of check-in."
+    ],
+    [
+      null,
+      "updated_at",
+      "DATETIME",
+      null,
+      null,
+      "auto-update on row change",
+      "Last time this record changed."
+    ],
+    [
+      "Bag",
+      "bag_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique bag identifier."
+    ],
+    [
+      null,
+      "booking_id",
+      "INT",
+      "FK",
+      "Booking.booking_id",
+      null,
+      "Booking the bag belongs to."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Bag owner."
+    ],
+    [
+      null,
+      "checkin_id",
+      "INT",
+      "FK",
+      "CheckInRecord.checkin_id",
+      null,
+      "Check-in that produced this bag."
+    ],
+    [
+      null,
+      "rfid_tag",
+      "VARCHAR(30)",
+      "UQ",
+      null,
+      "UNIQUE, indexed",
+      "RFID tag printed on the bag."
+    ],
+    [
+      null,
+      "qr_code",
+      "VARCHAR(100)",
+      "UQ",
+      null,
+      "UNIQUE \u2014 encodes bag_id + checksum only, never PII",
+      "QR code printed on the bag."
+    ],
+    [
+      null,
+      "weight_kg",
+      "DECIMAL(5,2)",
+      null,
+      null,
+      null,
+      "Bag weight."
+    ],
+    [
+      null,
+      "length_cm / width_cm / height_cm",
+      "DECIMAL(5,2)",
+      null,
+      null,
+      "3 separate columns",
+      "Bag dimensions."
+    ],
+    [
+      null,
+      "excess_charge",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Excess-weight fee for this bag."
+    ],
+    [
+      null,
+      "current_status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "moving / stationary / loaded / lost",
+      "Latest bag status."
+    ],
+    [
+      null,
+      "current_location",
+      "VARCHAR(50)",
+      null,
+      null,
+      "denormalized cache",
+      "Latest known checkpoint/zone."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "Bag record creation timestamp."
+    ],
+    [
+      null,
+      "updated_at",
+      "DATETIME",
+      null,
+      null,
+      "auto-update on row change",
+      "Last time this record changed."
+    ],
+    [
+      "BagCheckpointLog",
+      "checkpoint_log_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Every scan of the bag's QR/RFID appends a row here."
+    ],
+    [
+      null,
+      "bag_id",
+      "INT",
+      "FK",
+      "Bag.bag_id",
+      "indexed",
+      "Bag passing the checkpoint."
+    ],
+    [
+      null,
+      "checkpoint_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "checkin / security_scan / conveyor / loaded_on_aircraft",
+      "What kind of checkpoint this was."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      "nullable",
+      "Device that recorded this scan."
+    ],
+    [
+      null,
+      "location",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Checkpoint location."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "Time the bag passed this checkpoint."
+    ]
+  ],
+  "4. Baggage Security Screening": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "BaggageInspection",
+      "inspection_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per bag per scan \u2014 staff-facing, AI model."
+    ],
+    [
+      null,
+      "bag_id",
+      "INT",
+      "FK",
+      "Bag.bag_id",
+      null,
+      "Bag being scanned."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Scanner used."
+    ],
+    [
+      null,
+      "scan_time",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Time of the scan."
+    ],
+    [
+      null,
+      "ai_model_version",
+      "VARCHAR(30)",
+      null,
+      null,
+      "e.g. 'YOLOv8-baggage-v3'",
+      "Detection model used for this scan."
+    ],
+    [
+      null,
+      "result",
+      "VARCHAR(20)",
+      null,
+      null,
+      "SAFE / MANUAL_REVIEW",
+      "Outcome of the AI scan."
+    ],
+    [
+      null,
+      "reviewed_by_staff_id",
+      "INT",
+      "FK",
+      "Staff.staff_id",
+      "nullable \u2014 was 'SecurityStaff', now the general Staff table",
+      "Staff who reviewed a flagged bag."
+    ],
+    [
+      "DetectedItem",
+      "item_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique detected-item id."
+    ],
+    [
+      null,
+      "inspection_id",
+      "INT",
+      "FK",
+      "BaggageInspection.inspection_id",
+      null,
+      "Inspection this item belongs to."
+    ],
+    [
+      null,
+      "item_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "knife / gun / liquid / laptop / power_bank / battery / aerosol",
+      "Detected item category."
+    ],
+    [
+      null,
+      "confidence_score",
+      "DECIMAL(5,2)",
+      null,
+      null,
+      null,
+      "AI model detection confidence."
+    ]
+  ],
+  "5. Security & Boarding Gates": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "SecurityGate",
+      "gate_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A checkpoint into a controlled zone."
+    ],
+    [
+      null,
+      "location",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Physical location in terminal."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone this gate controls entry to."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Physical asset record."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "active / inactive / maintenance",
+      "Gate status."
+    ],
+    [
+      "SecurityGateLog",
+      "gate_log_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per passenger crossing \u2014 face-only."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Passenger passing the gate."
+    ],
+    [
+      null,
+      "gate_id",
+      "INT",
+      "FK",
+      "SecurityGate.gate_id",
+      null,
+      "Gate used."
+    ],
+    [
+      null,
+      "verification_id",
+      "INT",
+      "FK",
+      "FaceVerificationLog.verification_id",
+      null,
+      "The face verification event that authorized this crossing."
+    ],
+    [
+      null,
+      "authorization_result",
+      "VARCHAR(20)",
+      null,
+      null,
+      "authorized / denied",
+      "Final decision."
+    ],
+    [
+      null,
+      "gate_opened",
+      "BOOLEAN",
+      null,
+      null,
+      null,
+      "Whether the door opened automatically."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "Time of gate event."
+    ],
+    [
+      "BoardingGate",
+      "boarding_gate_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per physical gate stand."
+    ],
+    [
+      null,
+      "gate_number",
+      "VARCHAR(10)",
+      null,
+      null,
+      null,
+      "e.g. Gate 6."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone this gate is located in."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Physical asset record."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "closed / boarding / final_call / departed",
+      "Gate status."
+    ],
+    [
+      "BoardingLog",
+      "boarding_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per passenger boarding event."
+    ],
+    [
+      null,
+      "passenger_id",
+      "INT",
+      "FK",
+      "Passenger.passenger_id",
+      null,
+      "Boarding passenger."
+    ],
+    [
+      null,
+      "flight_id",
+      "INT",
+      "FK",
+      "Flight.flight_id",
+      null,
+      "Flight boarded."
+    ],
+    [
+      null,
+      "boarding_gate_id",
+      "INT",
+      "FK",
+      "BoardingGate.boarding_gate_id",
+      null,
+      "Gate used."
+    ],
+    [
+      null,
+      "verification_id",
+      "INT",
+      "FK",
+      "FaceVerificationLog.verification_id",
+      null,
+      "The face verification event that authorized boarding."
+    ],
+    [
+      null,
+      "boarding_status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "boarded / rejected / duplicate_attempt",
+      "Final outcome."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Time of boarding event."
+    ]
+  ],
+  "6. Wayfinding & Terminal Map": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "Zone",
+      "zone_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique terminal zone id."
+    ],
+    [
+      null,
+      "zone_name",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "e.g. Departures Hall, Gate Area B."
+    ],
+    [
+      null,
+      "terminal",
+      "VARCHAR(20)",
+      null,
+      null,
+      null,
+      "Terminal identifier."
+    ],
+    [
+      null,
+      "floor_level",
+      "INT",
+      null,
+      null,
+      null,
+      "Floor/level within the terminal."
+    ],
+    [
+      null,
+      "capacity",
+      "INT",
+      null,
+      null,
+      null,
+      "Max safe occupancy."
+    ],
+    [
+      null,
+      "current_occupancy",
+      "INT",
+      null,
+      null,
+      "denormalized live counter",
+      "Live occupancy count."
+    ],
+    [
+      "MapNode",
+      "node_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A routable point on the indoor map."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone this point is in."
+    ],
+    [
+      null,
+      "node_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "gate / security_gate / kiosk / amenity / junction",
+      "What kind of point this is."
+    ],
+    [
+      null,
+      "label",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Human-readable name shown on the map."
+    ],
+    [
+      null,
+      "x_coord",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Indoor map X coordinate."
+    ],
+    [
+      null,
+      "y_coord",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Indoor map Y coordinate."
+    ],
+    [
+      null,
+      "linked_entity_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "nullable \u2014 e.g. 'boarding_gate'",
+      "What real-world object this node represents."
+    ],
+    [
+      null,
+      "linked_entity_id",
+      "INT",
+      null,
+      null,
+      "polymorphic",
+      "Which row \u2014 e.g. the actual BoardingGate.boarding_gate_id."
+    ],
+    [
+      "MapEdge",
+      "edge_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A walkable connection between two nodes."
+    ],
+    [
+      null,
+      "from_node_id",
+      "INT",
+      "FK",
+      "MapNode.node_id",
+      null,
+      "Starting node."
+    ],
+    [
+      null,
+      "to_node_id",
+      "INT",
+      "FK",
+      "MapNode.node_id",
+      null,
+      "Ending node."
+    ],
+    [
+      null,
+      "distance_m",
+      "DECIMAL(6,2)",
+      null,
+      null,
+      null,
+      "Walking distance in meters."
+    ],
+    [
+      null,
+      "walk_time_sec",
+      "INT",
+      null,
+      null,
+      null,
+      "Estimated walk time."
+    ],
+    [
+      null,
+      "is_accessible",
+      "BOOLEAN",
+      null,
+      null,
+      "DEFAULT TRUE",
+      "Whether this segment is wheelchair-accessible."
+    ]
+  ],
+  "7. Staff & Permissions": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "Department",
+      "department_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "e.g. Security, Ground Operations, Baggage Handling, Customer Service, IT & Technical, Facilities & Energy."
+    ],
+    [
+      null,
+      "department_name",
+      "VARCHAR(60)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "Department name."
+    ],
+    [
+      null,
+      "description",
+      "VARCHAR(150)",
+      null,
+      null,
+      null,
+      "What the department covers."
+    ],
+    [
+      "Staff",
+      "staff_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Every employee, not only security \u2014 gate agents, baggage handlers, customer service, technicians, K9 handlers, management, all live here."
+    ],
+    [
+      null,
+      "full_name",
+      "VARCHAR(100)",
+      null,
+      null,
+      null,
+      "Staff member name."
+    ],
+    [
+      null,
+      "department_id",
+      "INT",
+      "FK",
+      "Department.department_id",
+      null,
+      "Department this staff member belongs to."
+    ],
+    [
+      null,
+      "job_title",
+      "VARCHAR(60)",
+      null,
+      null,
+      "e.g. 'Security Officer', 'Gate Agent', 'Solar Technician'",
+      "Job title."
+    ],
+    [
+      null,
+      "employment_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "full_time / part_time / contractor",
+      "Employment type."
+    ],
+    [
+      null,
+      "shift",
+      "VARCHAR(20)",
+      null,
+      null,
+      "morning / evening / night / rotating",
+      "Assigned shift."
+    ],
+    [
+      null,
+      "contact",
+      "VARCHAR(30)",
+      null,
+      null,
+      null,
+      "Phone/radio contact."
+    ],
+    [
+      null,
+      "hire_date",
+      "DATE",
+      null,
+      null,
+      null,
+      "Date hired."
+    ],
+    [
+      null,
+      "is_active",
+      "BOOLEAN",
+      null,
+      null,
+      "DEFAULT TRUE \u2014 soft delete",
+      "Whether this staff record is current."
+    ],
+    [
+      "Role",
+      "role_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A named job function \u2014 e.g. Security Officer, K9 Handler, Duty Manager, Ops Admin, Gate Agent."
+    ],
+    [
+      null,
+      "role_name",
+      "VARCHAR(60)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "Role name."
+    ],
+    [
+      null,
+      "description",
+      "VARCHAR(150)",
+      null,
+      null,
+      null,
+      "What this role is responsible for."
+    ],
+    [
+      "Permission",
+      "permission_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One discrete system capability \u2014 e.g. VIEW_CAMERA_FEED, OVERRIDE_SECURITY_GATE."
+    ],
+    [
+      null,
+      "permission_code",
+      "VARCHAR(50)",
+      "UQ",
+      null,
+      "UNIQUE, e.g. 'VIEW_CAMERA_FEED'",
+      "Machine-readable permission code, checked in application code."
+    ],
+    [
+      null,
+      "category",
+      "VARCHAR(30)",
+      null,
+      null,
+      "passenger_data / security / baggage / facilities / staff_admin / energy",
+      "Grouping for the admin permissions UI."
+    ],
+    [
+      null,
+      "description",
+      "VARCHAR(150)",
+      null,
+      null,
+      null,
+      "What this permission allows."
+    ],
+    [
+      "RolePermission",
+      "role_id",
+      "INT",
+      "PK, FK",
+      "Role.role_id",
+      "composite PK (role_id, permission_id)",
+      "One role has many permissions."
+    ],
+    [
+      null,
+      "permission_id",
+      "INT",
+      "PK, FK",
+      "Permission.permission_id",
+      "composite PK (role_id, permission_id)",
+      "One permission can belong to many roles."
+    ],
+    [
+      "StaffRole",
+      "staff_id",
+      "INT",
+      "PK, FK",
+      "Staff.staff_id",
+      "composite PK (staff_id, role_id)",
+      "A staff member can hold more than one role \u2014 e.g. a Duty Manager who is also a certified K9 handler."
+    ],
+    [
+      null,
+      "role_id",
+      "INT",
+      "PK, FK",
+      "Role.role_id",
+      "composite PK (staff_id, role_id)",
+      "One role can be held by many staff members."
+    ],
+    [
+      null,
+      "assigned_date",
+      "DATE",
+      null,
+      null,
+      null,
+      "When this role was assigned to this staff member."
+    ],
+    [
+      "K9Unit",
+      "k9_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A K9 unit is really 'a handler + their dog' \u2014 modeled here next to Staff rather than as a piece of equipment."
+    ],
+    [
+      null,
+      "dog_name",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Dog's name."
+    ],
+    [
+      null,
+      "breed",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Breed."
+    ],
+    [
+      null,
+      "specialty",
+      "VARCHAR(30)",
+      null,
+      null,
+      "explosives / narcotics / general_patrol",
+      "What the dog is trained/certified for."
+    ],
+    [
+      null,
+      "handler_staff_id",
+      "INT",
+      "FK",
+      "Staff.staff_id",
+      "the handler must hold the K9 Handler role via StaffRole",
+      "Assigned handler."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "active / resting / off_duty / retired",
+      "Current status."
+    ],
+    [
+      null,
+      "certification_expiry",
+      "DATE",
+      null,
+      null,
+      "flag for renewal before this date",
+      "Date the K9's certification must be renewed."
+    ]
+  ],
+  "8. Admin, Cameras & Twin": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "UserAccount",
+      "user_account_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Login identity for the app and every staff/admin console."
+    ],
+    [
+      null,
+      "username",
+      "VARCHAR(50)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "Login username."
+    ],
+    [
+      null,
+      "email",
+      "VARCHAR(100)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "Login email."
+    ],
+    [
+      null,
+      "password_hash",
+      "VARCHAR(255)",
+      null,
+      null,
+      "bcrypt/argon2 \u2014 never plaintext",
+      "Hashed password."
+    ],
+    [
+      null,
+      "linked_person_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "passenger / staff \u2014 was 'security_staff', now generalized",
+      "Which table linked_person_id points into."
+    ],
+    [
+      null,
+      "linked_person_id",
+      "INT",
+      null,
+      null,
+      "polymorphic",
+      "The Passenger/Staff this login belongs to."
+    ],
+    [
+      null,
+      "is_active",
+      "BOOLEAN",
+      null,
+      null,
+      "DEFAULT TRUE",
+      "Disable a login without deleting history."
+    ],
+    [
+      null,
+      "last_login",
+      "DATETIME",
+      null,
+      null,
+      "nullable",
+      "Most recent successful login."
+    ],
+    [
+      null,
+      "created_at",
+      "DATETIME",
+      null,
+      null,
+      "DEFAULT now()",
+      "Account creation timestamp."
+    ],
+    [
+      "Camera",
+      "camera_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Unique camera identifier."
+    ],
+    [
+      null,
+      "location",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Installed location."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone the camera covers."
+    ],
+    [
+      null,
+      "camera_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "identity / security / monitoring",
+      "What this camera is used for."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      null,
+      "Physical asset record for this camera."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "online / offline",
+      "Camera status."
+    ],
+    [
+      "MonitoringAlert",
+      "alert_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "AI-flagged behavior from the camera feed."
+    ],
+    [
+      null,
+      "camera_id",
+      "INT",
+      "FK",
+      "Camera.camera_id",
+      null,
+      "Camera that detected the behavior."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone where detected."
+    ],
+    [
+      null,
+      "behavior_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "running / fall / overcrowding / unattended_bag / restricted_area / loitering",
+      "Detected behavior."
+    ],
+    [
+      null,
+      "severity",
+      "VARCHAR(20)",
+      null,
+      null,
+      "low / medium / high / critical",
+      "Severity rating."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "open / resolved",
+      "Alert status."
+    ],
+    [
+      null,
+      "linked_emergency_event_id",
+      "INT",
+      "FK",
+      "EmergencyEvent.event_id",
+      "nullable",
+      "Emergency event this was escalated to, if any."
+    ],
+    [
+      null,
+      "resolved_by_staff_id",
+      "INT",
+      "FK",
+      "Staff.staff_id",
+      "was 'SecurityStaff', now the general Staff table",
+      "Staff who closed the alert."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "Time detected."
+    ],
+    [
+      "EmergencyEvent",
+      "event_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A confirmed incident requiring a response."
+    ],
+    [
+      null,
+      "event_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "fall / smoke_fire / suspicious_bag / crowding / security_breach",
+      "Incident category."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone where detected."
+    ],
+    [
+      null,
+      "notified_staff_id",
+      "INT",
+      "FK",
+      "Staff.staff_id",
+      "was 'SecurityStaff', now the general Staff table",
+      "Staff notified."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "detected / dispatched / resolved",
+      "Response status."
+    ],
+    [
+      null,
+      "detected_time",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "When the incident was detected."
+    ],
+    [
+      null,
+      "resolved_time",
+      "DATETIME",
+      null,
+      null,
+      "nullable",
+      "When resolved."
+    ],
+    [
+      "DigitalTwinPosition",
+      "position_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Live x,y,z sample feeding the admin 3D view."
+    ],
+    [
+      null,
+      "entity_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "passenger / bag",
+      "What kind of entity this position belongs to."
+    ],
+    [
+      null,
+      "entity_id",
+      "INT",
+      null,
+      null,
+      "polymorphic \u2014 not DB-enforced, validate in the digital-twin service",
+      "Points into Passenger/Bag based on entity_type."
+    ],
+    [
+      null,
+      "x_coord",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "3D X coordinate."
+    ],
+    [
+      null,
+      "y_coord",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "3D Y coordinate."
+    ],
+    [
+      null,
+      "z_coord",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "3D Z coordinate (floor level)."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "Time of this position sample."
+    ],
+    [
+      "AuditLog",
+      "audit_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Who accessed or changed what, when, and from where."
+    ],
+    [
+      null,
+      "user_account_id",
+      "INT",
+      "FK",
+      "UserAccount.user_account_id",
+      "nullable \u2014 system actions have no user",
+      "Who performed the action."
+    ],
+    [
+      null,
+      "action",
+      "VARCHAR(20)",
+      null,
+      null,
+      "view / create / update / delete / export",
+      "What kind of action."
+    ],
+    [
+      null,
+      "entity_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "e.g. Passenger, TravelDocument, Bag",
+      "Which table was touched."
+    ],
+    [
+      null,
+      "entity_id",
+      "INT",
+      null,
+      null,
+      "polymorphic",
+      "Which row was touched."
+    ],
+    [
+      null,
+      "ip_address",
+      "VARCHAR(45)",
+      null,
+      null,
+      null,
+      "Origin of the request."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "When the action occurred."
+    ]
+  ],
+  "9. Devices & Equipment": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "Equipment",
+      "equipment_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Master registry of every physical machine \u2014 kiosks, gates, cameras, and now solar/energy hardware too."
+    ],
+    [
+      null,
+      "equipment_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "smart_login_kiosk / checkin_kiosk / baggage_scanner / security_gate / boarding_gate_display / camera / solar_panel_array / battery_bank",
+      "Asset category."
+    ],
+    [
+      null,
+      "label",
+      "VARCHAR(100)",
+      null,
+      null,
+      null,
+      "Human name, e.g. 'Smart Login Kiosk A1'."
+    ],
+    [
+      null,
+      "serial_number",
+      "VARCHAR(50)",
+      "UQ",
+      null,
+      "UNIQUE",
+      "Manufacturer serial number."
+    ],
+    [
+      null,
+      "model",
+      "VARCHAR(50)",
+      null,
+      null,
+      null,
+      "Hardware model."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone this asset is installed in."
+    ],
+    [
+      null,
+      "install_date",
+      "DATE",
+      null,
+      null,
+      null,
+      "Date the asset was installed."
+    ],
+    [
+      null,
+      "firmware_version",
+      "VARCHAR(20)",
+      null,
+      null,
+      null,
+      "Current firmware/software version."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "operational / degraded / down / under_maintenance",
+      "Asset status."
+    ],
+    [
+      null,
+      "last_health_check",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "Timestamp of the most recent automated health ping."
+    ],
+    [
+      null,
+      "updated_at",
+      "DATETIME",
+      null,
+      null,
+      "auto-update on row change",
+      "Last time this record changed."
+    ],
+    [
+      "EquipmentHealthCheck",
+      "check_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Automated telemetry sample."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      "indexed \u2014 high write volume",
+      "Asset being pinged."
+    ],
+    [
+      null,
+      "check_time",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "When the check ran."
+    ],
+    [
+      null,
+      "metric_type",
+      "VARCHAR(30)",
+      null,
+      null,
+      "cpu_temp / network_latency / uptime / camera_feed_status",
+      "What was measured."
+    ],
+    [
+      null,
+      "value",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Measured value."
+    ],
+    [
+      null,
+      "status_result",
+      "VARCHAR(20)",
+      null,
+      null,
+      "ok / warning / critical",
+      "Evaluated status for this sample."
+    ]
+  ],
+  "10. Sustainability & Power": [
+    [
+      "Table",
+      "Attribute",
+      "Data Type",
+      "Key",
+      "References",
+      "Notes / Constraints",
+      "Description"
+    ],
+    [
+      "PowerSource",
+      "source_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per power source feeding the terminal \u2014 solar, grid, or battery."
+    ],
+    [
+      null,
+      "source_type",
+      "VARCHAR(20)",
+      null,
+      null,
+      "solar / grid / battery_storage",
+      "Type of power source."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      "nullable \u2014 grid isn't zone-specific",
+      "Zone this source primarily serves, if localized."
+    ],
+    [
+      null,
+      "description",
+      "VARCHAR(100)",
+      null,
+      null,
+      null,
+      "Free-text description."
+    ],
+    [
+      "SolarInstallation",
+      "installation_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "One row per physical solar array."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      null,
+      "Zone/rooftop this array is installed on."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      "so the array also appears in the general device registry",
+      "Physical asset record for this array."
+    ],
+    [
+      null,
+      "capacity_kw",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Rated peak capacity in kilowatts."
+    ],
+    [
+      null,
+      "panel_count",
+      "INT",
+      null,
+      null,
+      null,
+      "Number of panels in this array."
+    ],
+    [
+      null,
+      "installed_date",
+      "DATE",
+      null,
+      null,
+      null,
+      "Installation date."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "operational / degraded / offline",
+      "Array status."
+    ],
+    [
+      "EnergyGenerationLog",
+      "log_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Time-series generation reading."
+    ],
+    [
+      null,
+      "installation_id",
+      "INT",
+      "FK",
+      "SolarInstallation.installation_id",
+      "indexed \u2014 high write volume, time-series",
+      "Which array generated this."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "When this reading was taken."
+    ],
+    [
+      null,
+      "kwh_generated",
+      "DECIMAL(8,3)",
+      null,
+      null,
+      "interval reading, e.g. per 15 min",
+      "Energy generated in this interval."
+    ],
+    [
+      "EnergyStorage",
+      "battery_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "A battery bank storing solar-generated power for continuous operation after dark."
+    ],
+    [
+      null,
+      "installation_id",
+      "INT",
+      "FK",
+      "SolarInstallation.installation_id",
+      "nullable \u2014 a bank can serve the grid too, not only one array",
+      "Solar array this battery is primarily charged from."
+    ],
+    [
+      null,
+      "capacity_kwh",
+      "DECIMAL(8,2)",
+      null,
+      null,
+      null,
+      "Total storage capacity."
+    ],
+    [
+      null,
+      "current_charge_pct",
+      "DECIMAL(5,2)",
+      null,
+      null,
+      null,
+      "Current charge level, 0-100."
+    ],
+    [
+      null,
+      "status",
+      "VARCHAR(20)",
+      null,
+      null,
+      "charging / discharging / idle / fault",
+      "Battery status."
+    ],
+    [
+      null,
+      "last_updated",
+      "DATETIME",
+      null,
+      null,
+      null,
+      "When current_charge_pct was last refreshed."
+    ],
+    [
+      "EnergyConsumptionLog",
+      "log_id",
+      "INT",
+      "PK",
+      null,
+      null,
+      "Time-series consumption reading, for efficiency reporting on the admin dashboard."
+    ],
+    [
+      null,
+      "zone_id",
+      "INT",
+      "FK",
+      "Zone.zone_id",
+      "nullable \u2014 set this OR equipment_id, whichever granularity was metered",
+      "Zone this consumption is attributed to."
+    ],
+    [
+      null,
+      "equipment_id",
+      "INT",
+      "FK",
+      "Equipment.equipment_id",
+      "nullable \u2014 see zone_id",
+      "Specific device this consumption is attributed to."
+    ],
+    [
+      null,
+      "source_id",
+      "INT",
+      "FK",
+      "PowerSource.source_id",
+      "nullable \u2014 which source served this load, if metered",
+      "Power source that supplied this consumption."
+    ],
+    [
+      null,
+      "timestamp",
+      "DATETIME",
+      null,
+      null,
+      "indexed",
+      "When this reading was taken."
+    ],
+    [
+      null,
+      "kwh_consumed",
+      "DECIMAL(8,3)",
+      null,
+      null,
+      null,
+      "Energy consumed in this interval."
+    ]
+  ],
+  "11. Relationships": [
+    [
+      "Module",
+      "Parent Table",
+      "Child Table",
+      "Relationship",
+      "Foreign Key (in Child)",
+      "Business Meaning"
+    ],
+    [
+      "Identity & Face",
+      "Country",
+      "Passenger",
+      "1 : N",
+      "Passenger.nationality_country_code",
+      "Many passengers share a nationality."
+    ],
+    [
+      "Identity & Face",
+      "Passenger",
+      "TravelDocument",
+      "1 : N",
+      "TravelDocument.passenger_id",
+      "A passenger can hold more than one passport over time."
+    ],
+    [
+      "Identity & Face",
+      "Country",
+      "TravelDocument",
+      "1 : N",
+      "TravelDocument.issuing_country_code",
+      "Many documents share an issuing country."
+    ],
+    [
+      "Identity & Face",
+      "Passenger",
+      "FaceEnrollment",
+      "1 : N",
+      "FaceEnrollment.passenger_id",
+      "Only one enrollment is 'active' at a time."
+    ],
+    [
+      "Identity & Face",
+      "TravelDocument",
+      "FaceEnrollment",
+      "1 : N",
+      "FaceEnrollment.document_id",
+      "Which document was used at each enrollment."
+    ],
+    [
+      "Identity & Face",
+      "Equipment",
+      "FaceEnrollment",
+      "1 : N",
+      "FaceEnrollment.equipment_id",
+      "A smart-login kiosk enrolls many passengers."
+    ],
+    [
+      "Identity & Face",
+      "Passenger",
+      "FaceVerificationLog",
+      "1 : N",
+      "FaceVerificationLog.passenger_id",
+      "A passenger is verified many times per trip."
+    ],
+    [
+      "Identity & Face",
+      "FaceEnrollment",
+      "FaceVerificationLog",
+      "1 : N",
+      "FaceVerificationLog.enrollment_id",
+      "One enrolled face is matched against many times."
+    ],
+    [
+      "Identity & Face",
+      "Equipment",
+      "FaceVerificationLog",
+      "1 : N",
+      "FaceVerificationLog.equipment_id",
+      "A gate/kiosk camera performs many verifications."
+    ],
+    [
+      "Identity & Face",
+      "Passenger",
+      "PassengerDevice",
+      "1 : N",
+      "PassengerDevice.passenger_id",
+      "A passenger may have more than one device with the app."
+    ],
+    [
+      "Flights & Bookings",
+      "Airline",
+      "Flight",
+      "1 : N",
+      "Flight.airline_id",
+      "An airline operates many flights."
+    ],
+    [
+      "Flights & Bookings",
+      "Airport",
+      "Flight",
+      "1 : N",
+      "Flight.origin_airport_id / destination_airport_id",
+      "An airport is origin/destination for many flights."
+    ],
+    [
+      "Flights & Bookings",
+      "Country",
+      "Airport",
+      "1 : N",
+      "Airport.country_code",
+      "Many airports share a country."
+    ],
+    [
+      "Flights & Bookings",
+      "BoardingGate",
+      "Flight",
+      "1 : N",
+      "Flight.boarding_gate_id",
+      "A physical gate is reused across many flights."
+    ],
+    [
+      "Flights & Bookings",
+      "Passenger",
+      "Booking",
+      "1 : N",
+      "Booking.passenger_id",
+      "A passenger can hold multiple bookings."
+    ],
+    [
+      "Flights & Bookings",
+      "Flight",
+      "Booking",
+      "1 : N",
+      "Booking.flight_id",
+      "A flight has many booked passengers."
+    ],
+    [
+      "Flights & Bookings",
+      "Passenger",
+      "Notification",
+      "1 : N",
+      "Notification.passenger_id",
+      "A passenger receives many notifications."
+    ],
+    [
+      "Flights & Bookings",
+      "Staff",
+      "Notification",
+      "1 : N",
+      "Notification.staff_id",
+      "A staff member receives many notifications."
+    ],
+    [
+      "Check-in & Tagging",
+      "Booking",
+      "CheckInRecord",
+      "1 : 1",
+      "CheckInRecord.booking_id",
+      "Each booking is checked in once."
+    ],
+    [
+      "Check-in & Tagging",
+      "Equipment",
+      "CheckInRecord",
+      "1 : N",
+      "CheckInRecord.equipment_id",
+      "A kiosk processes many check-ins."
+    ],
+    [
+      "Check-in & Tagging",
+      "CheckInRecord",
+      "Bag",
+      "1 : N",
+      "Bag.checkin_id",
+      "One check-in can register one or more bags."
+    ],
+    [
+      "Check-in & Tagging",
+      "Booking",
+      "Bag",
+      "1 : N",
+      "Bag.booking_id",
+      "A booking can include multiple bags."
+    ],
+    [
+      "Check-in & Tagging",
+      "Bag",
+      "BagCheckpointLog",
+      "1 : N",
+      "BagCheckpointLog.bag_id",
+      "A bag generates many checkpoint scans."
+    ],
+    [
+      "Check-in & Tagging",
+      "Equipment",
+      "BagCheckpointLog",
+      "1 : N",
+      "BagCheckpointLog.equipment_id",
+      "A scanner logs many checkpoint events."
+    ],
+    [
+      "Baggage Security",
+      "Bag",
+      "BaggageInspection",
+      "1 : N",
+      "BaggageInspection.bag_id",
+      "A bag can be scanned/re-scanned."
+    ],
+    [
+      "Baggage Security",
+      "Equipment",
+      "BaggageInspection",
+      "1 : N",
+      "BaggageInspection.equipment_id",
+      "One scanner inspects many bags."
+    ],
+    [
+      "Baggage Security",
+      "Staff",
+      "BaggageInspection",
+      "1 : N",
+      "BaggageInspection.reviewed_by_staff_id",
+      "A staff member reviews many flagged bags."
+    ],
+    [
+      "Baggage Security",
+      "BaggageInspection",
+      "DetectedItem",
+      "1 : N",
+      "DetectedItem.inspection_id",
+      "One inspection can flag multiple items."
+    ],
+    [
+      "Security & Boarding",
+      "Zone",
+      "SecurityGate",
+      "1 : N",
+      "SecurityGate.zone_id",
+      "A zone can have more than one controlled entry point."
+    ],
+    [
+      "Security & Boarding",
+      "Equipment",
+      "SecurityGate",
+      "1 : 1",
+      "SecurityGate.equipment_id",
+      "Each gate has one asset record."
+    ],
+    [
+      "Security & Boarding",
+      "Passenger",
+      "SecurityGateLog",
+      "1 : N",
+      "SecurityGateLog.passenger_id",
+      "A passenger passes multiple gate checks per trip."
+    ],
+    [
+      "Security & Boarding",
+      "SecurityGate",
+      "SecurityGateLog",
+      "1 : N",
+      "SecurityGateLog.gate_id",
+      "A gate logs many crossings."
+    ],
+    [
+      "Security & Boarding",
+      "FaceVerificationLog",
+      "SecurityGateLog",
+      "1 : 1",
+      "SecurityGateLog.verification_id",
+      "Each crossing points at the exact face-match event that authorized it."
+    ],
+    [
+      "Security & Boarding",
+      "Zone",
+      "BoardingGate",
+      "1 : N",
+      "BoardingGate.zone_id",
+      "A zone contains multiple boarding gates."
+    ],
+    [
+      "Security & Boarding",
+      "Equipment",
+      "BoardingGate",
+      "1 : 1",
+      "BoardingGate.equipment_id",
+      "Each boarding gate has one asset record."
+    ],
+    [
+      "Security & Boarding",
+      "Passenger",
+      "BoardingLog",
+      "1 : N",
+      "BoardingLog.passenger_id",
+      "A passenger has one boarding log per flight."
+    ],
+    [
+      "Security & Boarding",
+      "Flight",
+      "BoardingLog",
+      "1 : N",
+      "BoardingLog.flight_id",
+      "A flight has many boarding events."
+    ],
+    [
+      "Security & Boarding",
+      "BoardingGate",
+      "BoardingLog",
+      "1 : N",
+      "BoardingLog.boarding_gate_id",
+      "A gate logs many boarding events."
+    ],
+    [
+      "Security & Boarding",
+      "FaceVerificationLog",
+      "BoardingLog",
+      "1 : 1",
+      "BoardingLog.verification_id",
+      "Each boarding event points at the exact face-match that authorized it."
+    ],
+    [
+      "Wayfinding",
+      "Zone",
+      "MapNode",
+      "1 : N",
+      "MapNode.zone_id",
+      "A zone contains many map nodes."
+    ],
+    [
+      "Wayfinding",
+      "MapNode",
+      "MapEdge",
+      "1 : N",
+      "MapEdge.from_node_id / to_node_id",
+      "Nodes connect to form the routable graph."
+    ],
+    [
+      "Staff & Permissions",
+      "Department",
+      "Staff",
+      "1 : N",
+      "Staff.department_id",
+      "A department has many staff members."
+    ],
+    [
+      "Staff & Permissions",
+      "Staff",
+      "StaffRole",
+      "1 : N",
+      "StaffRole.staff_id",
+      "A staff member can hold multiple roles."
+    ],
+    [
+      "Staff & Permissions",
+      "Role",
+      "StaffRole",
+      "1 : N",
+      "StaffRole.role_id",
+      "A role can be held by many staff members."
+    ],
+    [
+      "Staff & Permissions",
+      "Role",
+      "RolePermission",
+      "1 : N",
+      "RolePermission.role_id",
+      "A role has many permissions."
+    ],
+    [
+      "Staff & Permissions",
+      "Permission",
+      "RolePermission",
+      "1 : N",
+      "RolePermission.permission_id",
+      "A permission can belong to many roles."
+    ],
+    [
+      "Staff & Permissions",
+      "Staff",
+      "K9Unit",
+      "1 : N",
+      "K9Unit.handler_staff_id",
+      "A staff member handles one (typically) K9 unit."
+    ],
+    [
+      "Admin & Twin",
+      "Staff",
+      "UserAccount",
+      "1 : 1",
+      "UserAccount.linked_person_id (linked_person_type='staff')",
+      "A staff member has one console login (polymorphic FK)."
+    ],
+    [
+      "Admin & Twin",
+      "Passenger",
+      "UserAccount",
+      "1 : 1",
+      "UserAccount.linked_person_id (linked_person_type='passenger')",
+      "A passenger has one app login (polymorphic FK)."
+    ],
+    [
+      "Admin & Twin",
+      "Zone",
+      "Camera",
+      "1 : N",
+      "Camera.zone_id",
+      "A zone is covered by multiple cameras."
+    ],
+    [
+      "Admin & Twin",
+      "Equipment",
+      "Camera",
+      "1 : 1",
+      "Camera.equipment_id",
+      "Each camera has one asset record."
+    ],
+    [
+      "Admin & Twin",
+      "Camera",
+      "MonitoringAlert",
+      "1 : N",
+      "MonitoringAlert.camera_id",
+      "A camera can trigger many alerts."
+    ],
+    [
+      "Admin & Twin",
+      "EmergencyEvent",
+      "MonitoringAlert",
+      "1 : N",
+      "MonitoringAlert.linked_emergency_event_id",
+      "A routine alert can be escalated into a confirmed emergency."
+    ],
+    [
+      "Admin & Twin",
+      "Staff",
+      "MonitoringAlert",
+      "1 : N",
+      "MonitoringAlert.resolved_by_staff_id",
+      "A staff member resolves many alerts."
+    ],
+    [
+      "Admin & Twin",
+      "Zone",
+      "EmergencyEvent",
+      "1 : N",
+      "EmergencyEvent.zone_id",
+      "Many emergencies can occur within a zone."
+    ],
+    [
+      "Admin & Twin",
+      "Staff",
+      "EmergencyEvent",
+      "1 : N",
+      "EmergencyEvent.notified_staff_id",
+      "A staff member is notified of many emergencies."
+    ],
+    [
+      "Admin & Twin",
+      "Passenger",
+      "DigitalTwinPosition",
+      "1 : N",
+      "DigitalTwinPosition.entity_id (entity_type='passenger')",
+      "Many position samples over time (polymorphic FK)."
+    ],
+    [
+      "Admin & Twin",
+      "Bag",
+      "DigitalTwinPosition",
+      "1 : N",
+      "DigitalTwinPosition.entity_id (entity_type='bag')",
+      "Many position samples over time (polymorphic FK)."
+    ],
+    [
+      "Admin & Twin",
+      "UserAccount",
+      "AuditLog",
+      "1 : N",
+      "AuditLog.user_account_id",
+      "A login performs many audited actions."
+    ],
+    [
+      "Devices",
+      "Zone",
+      "Equipment",
+      "1 : N",
+      "Equipment.zone_id",
+      "A zone contains many physical assets."
+    ],
+    [
+      "Devices",
+      "Equipment",
+      "EquipmentHealthCheck",
+      "1 : N",
+      "EquipmentHealthCheck.equipment_id",
+      "An asset reports many health samples over time."
+    ],
+    [
+      "Sustainability & Power",
+      "Zone",
+      "PowerSource",
+      "1 : N",
+      "PowerSource.zone_id",
+      "A zone can be served by more than one source."
+    ],
+    [
+      "Sustainability & Power",
+      "Zone",
+      "SolarInstallation",
+      "1 : N",
+      "SolarInstallation.zone_id",
+      "A zone/rooftop can host more than one array."
+    ],
+    [
+      "Sustainability & Power",
+      "Equipment",
+      "SolarInstallation",
+      "1 : 1",
+      "SolarInstallation.equipment_id",
+      "Each array also has a device-registry record."
+    ],
+    [
+      "Sustainability & Power",
+      "SolarInstallation",
+      "EnergyGenerationLog",
+      "1 : N",
+      "EnergyGenerationLog.installation_id",
+      "An array reports many generation readings over time."
+    ],
+    [
+      "Sustainability & Power",
+      "SolarInstallation",
+      "EnergyStorage",
+      "1 : N",
+      "EnergyStorage.installation_id",
+      "An array can charge more than one battery bank."
+    ],
+    [
+      "Sustainability & Power",
+      "Zone",
+      "EnergyConsumptionLog",
+      "1 : N",
+      "EnergyConsumptionLog.zone_id",
+      "A zone reports many consumption readings."
+    ],
+    [
+      "Sustainability & Power",
+      "Equipment",
+      "EnergyConsumptionLog",
+      "1 : N",
+      "EnergyConsumptionLog.equipment_id",
+      "A specific device can be metered individually."
+    ],
+    [
+      "Sustainability & Power",
+      "PowerSource",
+      "EnergyConsumptionLog",
+      "1 : N",
+      "EnergyConsumptionLog.source_id",
+      "A source supplies many logged consumption events."
+    ]
+  ]
+}

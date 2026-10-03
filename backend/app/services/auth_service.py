@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 import bcrypt
 from datetime import datetime
 from ..models.identity import Passenger, TravelDocument
+from ..models.admin_cameras import UserAccount
 from ..utils.errors import AirportException
 
 class AuthService:
@@ -22,7 +23,7 @@ class AuthService:
     @staticmethod
     def register_passenger(db: Session, payload):
         # Check if email exists
-        if db.query(Passenger).filter(Passenger.email == payload.email).first():
+        if db.query(UserAccount).filter(UserAccount.email == payload.email).first():
             raise AirportException(code="EMAIL_EXISTS", message="Email already registered", status_code=400)
             
         # Check if passport exists
@@ -45,17 +46,26 @@ class AuthService:
         # Create Passenger
         new_passenger = Passenger(
             full_name=payload.fullName,
-            email=payload.email,
-            password_hash=AuthService.get_password_hash(payload.password),
             nationality_country_code=payload.nationalityCountryCode,
             date_of_birth=dob,
-            phone=payload.phone,
-            is_active=True,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
         db.add(new_passenger)
         db.flush() # flush to get the passenger_id without committing yet
+
+        # Create UserAccount
+        new_account = UserAccount(
+            username=payload.email,
+            email=payload.email,
+            password_hash=AuthService.get_password_hash(payload.password),
+            linked_person_type="passenger",
+            linked_person_id=new_passenger.passenger_id,
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(new_account)
         
         # Create Travel Document
         new_doc = TravelDocument(
@@ -69,22 +79,24 @@ class AuthService:
         )
         db.add(new_doc)
         db.commit()
-        db.refresh(new_passenger)
+        db.refresh(new_account)
         
         return {
-            "userAccountId": new_passenger.passenger_id,
-            "passengerId": new_passenger.passenger_id,
+            "userAccountId": new_account.user_account_id,
+            "passengerId": new_account.linked_person_id,
             "message": "User registered successfully",
-            "createdAt": new_passenger.created_at.isoformat() + "Z"
+            "createdAt": new_account.created_at.isoformat() + "Z"
         }
 
     @staticmethod
     def login_passenger(db: Session, email: str, password: str):
-        passenger = db.query(Passenger).filter(Passenger.email == email).first()
-        if not passenger:
+        account = db.query(UserAccount).filter(UserAccount.email == email, UserAccount.linked_person_type == "passenger").first()
+        if not account:
             raise AirportException(code="INVALID_CREDENTIALS", message="Incorrect email or password", status_code=401)
             
-        if not AuthService.verify_password(password, passenger.password_hash):
+        if not AuthService.verify_password(password, account.password_hash):
             raise AirportException(code="INVALID_CREDENTIALS", message="Incorrect email or password", status_code=401)
             
-        return passenger
+        account.last_login = datetime.utcnow()
+        db.commit()
+        return account

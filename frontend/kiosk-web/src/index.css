@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+html,
+body {
+  min-height: 100%;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.font-mono-num {
+  font-family: 'Space Grotesk', monospace;
+}
+
+@keyframes scanLaser {
+  0% {
+    top: 0%;
+    opacity: 0.2;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 96%;
+    opacity: 0.2;
+  }
+}
+
+.anim-laser {
+  animation: scanLaser 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes facePulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    border-color: rgba(0, 97, 148, 0.45);
+    box-shadow: 0 0 20px rgba(0, 97, 148, 0.2);
+  }
+
+  50% {
+    transform: scale(1.025);
+    border-color: rgba(0, 123, 185, 0.95);
+    box-shadow: 0 0 35px rgba(0, 123, 185, 0.45);
+  }
+}
+
+.anim-face-oval {
+  animation: facePulse 2.6s ease-in-out infinite;
+}
+
+@keyframes bobAnim {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.anim-bob {
+  animation: bobAnim 3.2s ease-in-out infinite;
+}
+
+.high-contrast {
+  filter: contrast(1.25) saturate(1.1);
+}

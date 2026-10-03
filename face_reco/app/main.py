@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     baggage,
@@ -33,6 +34,13 @@ from app.services.faiss_index import faiss_index
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(enroll.router)
 app.include_router(verify.router)
 app.include_router(security.router)

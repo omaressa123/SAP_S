@@ -1,5 +1,4 @@
 tensorflow>=2.16
-tf-keras
 deepface
 faiss-cpu
 opencv-python

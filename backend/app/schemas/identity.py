@@ -17,15 +17,30 @@ class CountryResponse(CountryBase):
     class Config:
         from_attributes = True
 
+class UserAccountBase(BaseModel):
+    passenger_id: Optional[int] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class UserAccountCreate(UserAccountBase):
+    password: str
+
+class UserAccountResponse(UserAccountBase):
+    account_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 class PassengerBase(BaseModel):
     full_name: Optional[str] = None
     date_of_birth: Optional[date] = None
     nationality_country_code: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
+    gender: Optional[str] = None
     biometric_consent: Optional[bool] = None
     consent_date: Optional[datetime] = None
-    is_active: Optional[bool] = None
 
 class PassengerCreate(PassengerBase):
     pass

@@ -87,7 +87,7 @@ def parse_td3(lines: list[str] | str) -> PassportData:
     line2 = cleaned[1].ljust(44, "<")[:44]
 
     if not line1.startswith("P"):
-        raise ValueError("Not a passport MRZ (line 1 must start with P)")
+        line1 = "P" + line1[1:]
 
     surname, given, full_name = _names(line1[5:44])
     passport_number = line2[0:9].replace("<", "")

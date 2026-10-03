@@ -1,6 +1,13 @@
 import os
+import sys
+import io
 
-# 1. Force Legacy Keras for Keras 3 / TF 2.16+ compatibility
+# Fix for UnicodeEncodeError on Windows when DeepFace prints emojis
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# 1. DeepFace requires legacy Keras (Keras 2) to avoid KerasTensor issues in Keras 3
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 # 2. Force CPU execution to avoid broken GPU JIT/libdevice/cuInit errors

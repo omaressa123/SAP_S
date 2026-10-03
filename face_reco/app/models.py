@@ -44,6 +44,10 @@ class Passenger(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     passport: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     flight_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    nationality: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    date_of_birth: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    expiry_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    mrz_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("face_embeddings.embedding_id"), nullable=True
     )

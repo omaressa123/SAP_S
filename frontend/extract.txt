@@ -1,0 +1,644 @@
+--- HEADER ---
+<header class="bg-white/95 backdrop-blur-md border-b border-[#bfc7d2]/50 px-6 lg:px-8 py-3.5 shadow-sm sticky top-0 z-40">
+ <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+  <!-- Brand & Gate Location Identification -->
+  <div class="flex items-center gap-3.5 cursor-pointer" onclick="goToScreen(1)">
+   <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#006194] to-[#0092dd] flex items-center justify-center text-white shadow-md shadow-[#006194]/25">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+     <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2">
+     </path>
+    </svg>
+   </div>
+   <div>
+    <div class="flex items-center gap-2">
+     <span class="text-xl font-extrabold tracking-tight text-[#131b2e]">
+      AEROGATE
+     </span>
+     <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#006194]/10 text-[#006194] border border-[#006194]/20 tracking-wider">
+      GATE B22
+     </span>
+    </div>
+    <p class="text-xs text-[#3f4850] font-medium">
+     Terminal 2 • International Departures
+    </p>
+   </div>
+  </div>
+  <!-- Stepper Indicator -->
+  <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
+   <!-- Step 1 -->
+   <button class="px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all bg-[#006194] text-white shadow-sm shadow-[#006194]/30 hover:opacity-95" id="step-nav-1" onclick="goToScreen(1)">
+    <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">
+     1
+    </span>
+    <span class="">
+     Method
+    </span>
+   </button>
+   <span class="text-slate-300 font-bold px-0.5">
+    ›
+   </span>
+   <!-- Step 2 -->
+   <button class="px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200" id="step-nav-2" onclick="goToScreen(2)">
+    <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
+     2
+    </span>
+    <span class="">
+     Scan Document
+    </span>
+   </button>
+   <span class="text-slate-300 font-bold px-0.5">
+    ›
+   </span>
+   <!-- Step 3 -->
+   <button class="px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200" id="step-nav-3" onclick="goToScreen(3)">
+    <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
+     3
+    </span>
+    <span class="">
+     Verification
+    </span>
+   </button>
+   <span class="text-slate-300 font-bold px-0.5">
+    ›
+   </span>
+   <!-- Step 4 -->
+   <button class="px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200" id="step-nav-4" onclick="goToScreen(4)">
+    <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
+     4
+    </span>
+    <span class="">
+     Pass Gate
+    </span>
+   </button>
+  </nav>
+  <!-- Right Utility Actions -->
+  <div class="flex items-center gap-3">
+   <!-- Language Selector -->
+   <div class="flex items-center bg-slate-100 rounded-xl p-1 text-xs font-bold text-slate-600 border border-slate-200/80">
+    <button class="px-2.5 py-1 bg-white text-slate-900 rounded-lg shadow-sm">
+     EN
+    </button>
+    <button class="px-2.5 py-1 hover:text-slate-900 transition">
+     ES
+    </button>
+    <button class="px-2.5 py-1 hover:text-slate-900 transition">
+     FR
+    </button>
+    <button class="px-2.5 py-1 hover:text-slate-900 transition">
+     العربية
+    </button>
+   </div>
+   <!-- Assistance Trigger -->
+   <button class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#006194] text-xs font-bold transition active:scale-95 border border-slate-200/60" onclick="triggerAssistanceModal()">
+    <span class="material-symbols-outlined text-base">
+     support_agent
+    </span>
+    <span class="">
+     Assistance
+    </span>
+   </button>
+  </div>
+ </div>
+</header>
+
+--- SCREEN 1 (Passport) ---
+<section class="h-auto min-h-fit overflow-visible transition-all duration-300 ease-out" id="screen-1">
+ <!-- Title & Floor Marking Indicator -->
+ <div class="text-center max-w-2xl mx-auto mb-10">
+  <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#e2e7ff] text-[#006194] font-extrabold text-xs uppercase tracking-wider mb-4 border border-[#006194]/20 shadow-xs">
+   <span class="w-2 h-2 rounded-full bg-[#006194]">
+   </span>
+   Step 1 of 4 • Identification
+  </span>
+  <h2 class="text-3xl sm:text-4xl font-extrabold text-[#131b2e] tracking-tight mb-4">
+   Welcome. Please choose how you would like to identify yourself.
+  </h2>
+  <div class="inline-flex items-center gap-2 text-slate-600 font-semibold text-xs sm:text-sm bg-white px-4 py-2 rounded-full border border-slate-200 shadow-xs">
+   <svg class="w-4 h-4 text-[#006194]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+    </path>
+    <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+    </path>
+   </svg>
+   <span class="">
+    Stand on the yellow floor markings in front of the kiosk
+   </span>
+  </div>
+ </div>
+ <!-- Method Selection Cards Grid -->
+ <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+  <!-- Option 1: Mobile Boarding Pass / QR -->
+  <div class="group relative bg-white border-2 border-[#dae2fd] hover:border-[#006194] rounded-3xl p-8 cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between transform hover:-translate-y-1" onclick="selectMethod('qr')">
+   <div class="absolute top-6 right-6">
+    <span class="text-xs font-extrabold px-3 py-1 rounded-full bg-sky-100 text-[#006194]">
+     FASTEST • 3s
+    </span>
+   </div>
+   <div>
+    <div class="w-14 h-14 rounded-2xl bg-sky-50 text-[#006194] flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
+     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+      <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      </path>
+     </svg>
+    </div>
+    <h3 class="text-2xl font-bold text-slate-900 mb-2">
+     Boarding Pass / QR Code
+    </h3>
+    <p class="text-slate-500 text-sm mb-6">
+     On mobile phone screen or printed paper airline ticket
+    </p>
+    <!-- Animated Visual Demonstration -->
+    <div class="bg-[#faf8ff] rounded-2xl p-6 h-52 flex flex-col items-center justify-center border border-slate-100 relative overflow-hidden">
+     <div class="w-48 h-8 bg-sky-100/70 border-t-2 border-sky-400 rounded-lg absolute bottom-5 flex items-center justify-center">
+      <span class="text-[10px] uppercase font-bold tracking-wider text-sky-700">
+       Scanner Glass Target
+      </span>
+     </div>
+     <div class="w-24 h-36 bg-white border-2 border-slate-800 rounded-2xl shadow-lg flex flex-col items-center p-2 z-10 anim-bob">
+      <div class="w-8 h-1 bg-slate-300 rounded-full mb-3">
+      </div>
+      <div class="w-14 h-14 bg-slate-900 rounded-lg p-1.5 flex items-center justify-center">
+       <div class="grid grid-cols-3 gap-0.5 w-full h-full">
+        <span class="bg-white">
+        </span>
+        <span class="bg-slate-900">
+        </span>
+        <span class="bg-white">
+        </span>
+        <span class="bg-slate-900">
+        </span>
+        <span class="bg-white">
+        </span>
+        <span class="bg-slate-900">
+        </span>
+        <span class="bg-white">
+        </span>
+        <span class="bg-white">
+        </span>
+        <span class="bg-white">
+        </span>
+       </div>
+      </div>
+      <span class="text-[8px] font-bold text-slate-500 mt-2 font-mono">
+       QR-082
+      </span>
+     </div>
+    </div>
+   </div>
+   <button class="mt-8 w-full py-4 rounded-2xl bg-[#006194] group-hover:bg-[#004b73] text-white font-bold text-base flex items-center justify-center gap-2 shadow-md shadow-[#006194]/25 transition">
+    <span class="">
+     Select QR Code
+    </span>
+    <svg class="w-5 h-5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+     <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+     </path>
+    </svg>
+   </button>
+  </div>
+  <!-- Option 2: Passport / Travel ID -->
+  <div class="group relative bg-white border-2 border-[#dae2fd] hover:border-[#006194] rounded-3xl p-8 cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between transform hover:-translate-y-1" onclick="selectMethod('passport')">
+   <div class="absolute top-6 right-6">
+    <span class="text-xs font-extrabold px-3 py-1 rounded-full bg-slate-100 text-slate-700">
+     UNIVERSAL • E-CHIP
+    </span>
+   </div>
+   <div>
+    <div class="w-14 h-14 rounded-2xl bg-sky-50 text-[#006194] flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
+     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+      <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      </path>
+     </svg>
+    </div>
+    <h3 class="text-2xl font-bold text-slate-900 mb-2">
+     Passport / Travel ID
+    </h3>
+    <p class="text-slate-500 text-sm mb-6">
+     Physical booklet with photo page laid flat on reader glass
+    </p>
+    <!-- Animated Visual Demonstration -->
+    <div class="bg-[#faf8ff] rounded-2xl p-6 h-52 flex flex-col items-center justify-center border border-slate-100 relative overflow-hidden">
+     <div class="w-52 h-8 bg-sky-100/70 border-t-2 border-sky-400 rounded-lg absolute bottom-5 flex items-center justify-center">
+      <span class="text-[10px] uppercase font-bold tracking-wider text-sky-700">
+       Illuminated Platen
+      </span>
+     </div>
+     <div class="w-48 h-28 bg-[#131b2e] border-2 border-slate-700 rounded-xl shadow-lg flex items-center justify-between p-2 z-10 anim-bob">
+      <div class="w-1/2 h-full bg-slate-100 rounded-lg p-2 flex flex-col justify-between">
+       <div class="w-6 h-7 bg-slate-300 rounded">
+       </div>
+       <div class="space-y-1">
+        <div class="w-14 h-1.5 bg-slate-400 rounded">
+        </div>
+        <div class="w-10 h-1 bg-slate-300 rounded">
+        </div>
+       </div>
+      </div>
+      <div class="w-1/2 h-full flex flex-col items-center justify-center text-slate-400 pl-1">
+       <div class="w-8 h-8 rounded-full border-2 border-sky-400 flex items-center justify-center">
+        <span class="w-2.5 h-2.5 bg-sky-400 rounded-full animate-ping">
+        </span>
+       </div>
+       <span class="text-[8px] text-sky-300 mt-1 uppercase tracking-wider font-bold">
+        ICAO 9303
+       </span>
+      </div>
+     </div>
+    </div>
+   </div>
+   <button class="mt-8 w-full py-4 rounded-2xl bg-[#006194] group-hover:bg-[#004b73] text-white font-bold text-base flex items-center justify-center gap-2 shadow-md shadow-[#006194]/25 transition">
+    <span class="">
+     Select Passport
+    </span>
+    <svg class="w-5 h-5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+     <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+     </path>
+    </svg>
+   </button>
+  </div>
+ </div>
+ <!-- Quick Accessibility Toolbar Bottom -->
+ <div class="mt-12 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-slate-600">
+  <button class="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition shadow-xs" onclick="playAudioPrompt('Please present your travel document or mobile boarding pass on the scanner.')">
+   <svg class="w-4 h-4 text-[#006194]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+    <path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+    </path>
+   </svg>
+   <span class="">
+    Audio Directions
+   </span>
+  </button>
+  <button class="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition shadow-xs" onclick="toggleHighContrast()">
+   <svg class="w-4 h-4 text-[#006194]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+    </path>
+    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+    </path>
+   </svg>
+   <span class="" id="contrast-btn-text">
+    High Contrast Mode
+   </span>
+  </button>
+  <span class="text-slate-300">
+   •
+  </span>
+  <span class="text-slate-500 font-medium">
+   ICAO 9303 Compliant • Encrypted Session (Biometrics deleted after passage)
+  </span>
+ </div>
+</section>
+
+--- SCREEN 2 (Face) ---
+<section class="hidden h-auto min-h-fit overflow-visible transition-all duration-300 ease-out" id="screen-2">
+ <div class="text-center max-w-2xl mx-auto mb-8">
+  <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#e2e7ff] text-[#006194] font-extrabold text-xs uppercase tracking-wider mb-3 border border-[#006194]/20 shadow-xs" id="step2-pill">
+   <span class="w-2 h-2 rounded-full bg-[#006194] animate-pulse">
+   </span>
+   Step 2 of 4 • Document Scan
+  </span>
+  <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2" id="step2-title">
+   Place your document face down on the illuminated glass reader
+  </h2>
+  <p class="text-slate-500 text-sm font-medium" id="step2-subtitle">
+   Passport photo page, national ID, or mobile boarding pass QR code
+  </p>
+ </div>
+ <div class="grid lg:grid-cols-12 gap-8 items-start max-w-5xl mx-auto">
+  <!-- Left: Interactive Scanner Viewport Demonstration -->
+  <div class="lg:col-span-7 bg-white border border-[#dae2fd] rounded-3xl p-6 shadow-sm">
+   <div class="relative w-full h-80 bg-[#131b2e] rounded-2xl overflow-hidden flex items-center justify-center border-4 border-slate-100 shadow-inner">
+    <!-- Animated Scan Laser Beam -->
+    <div class="anim-laser absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_18px_#38bdf8] z-20" id="scan-laser">
+    </div>
+    <!-- Alignment Reticle -->
+    <div class="absolute inset-8 border border-dashed border-sky-500/40 rounded-xl pointer-events-none flex flex-col justify-between p-3 z-10">
+     <div class="flex justify-between text-[11px] font-mono-num text-sky-400 font-bold">
+      <span class="">
+       [SCANNER BED A-02]
+      </span>
+      <span class="" id="scan-mode-tag">
+       MRZ OPTICAL READ
+      </span>
+     </div>
+     <div class="text-center text-xs font-semibold text-sky-300 tracking-wider">
+      KEEP DOCUMENT FLUSH AGAINST TOP-LEFT CORNER
+     </div>
+    </div>
+    <!-- Dynamic Graphic based on Selected Method -->
+    <div class="z-10 flex flex-col items-center" id="scanner-doc-graphic">
+     <!-- Dynamically populated via JS -->
+    </div>
+   </div>
+   <!-- Quick Scanning Tips -->
+   <div class="grid grid-cols-3 gap-3 mt-6">
+    <div class="p-3 bg-[#faf8ff] rounded-xl border border-slate-100 text-center">
+     <span class="text-xl block mb-1">
+      ✋
+     </span>
+     <p class="text-xs font-bold text-slate-800">
+      Keep Flat
+     </p>
+     <p class="text-[11px] text-slate-500">
+      Press gently on glass
+     </p>
+    </div>
+    <div class="p-3 bg-[#faf8ff] rounded-xl border border-slate-100 text-center">
+     <span class="text-xl block mb-1">
+      ⏱️
+     </span>
+     <p class="text-xs font-bold text-slate-800">
+      Hold 2 Sec
+     </p>
+     <p class="text-[11px] text-slate-500">
+      Do not slide or move
+     </p>
+    </div>
+    <div class="p-3 bg-[#faf8ff] rounded-xl border border-slate-100 text-center">
+     <span class="text-xl block mb-1">
+      💡
+     </span>
+     <p class="text-xs font-bold text-slate-800">
+      Max Brightness
+     </p>
+     <p class="text-[11px] text-slate-500">
+      If using smartphone
+     </p>
+    </div>
+   </div>
+  </div>
+  <!-- Right: Status / Error Recovery Panel -->
+  <div class="lg:col-span-5 space-y-6">
+   <!-- Normal Scanning Progress Box -->
+   <div class="bg-white border border-[#dae2fd] rounded-3xl p-6 shadow-sm" id="scan-normal-box">
+    <div class="flex items-center justify-between mb-4">
+     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+      Reader Status
+     </span>
+     <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+      <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping">
+      </span>
+      Optical Sensor Active
+     </span>
+    </div>
+    <div class="space-y-4">
+     <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#006194] flex items-center justify-center font-extrabold text-sm">
+       <span class="" id="scan-step-number">
+        1
+       </span>
+      </div>
+      <div>
+       <h4 class="text-sm font-bold text-slate-800" id="scan-status-title">
+        Detecting Document Surface
+       </h4>
+       <p class="text-xs text-slate-500" id="scan-status-desc">
+        Reading optical Machine Readable Zone (MRZ)...
+       </p>
+      </div>
+     </div>
+     <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+      <div class="bg-[#006194] h-full w-[15%] rounded-full transition-all duration-500" id="scan-progress-bar">
+      </div>
+     </div>
+    </div>
+    <!-- Simulation Controls Trigger -->
+    <div class="mt-8 pt-6 border-t border-slate-100 space-y-3">
+     <button class="w-full py-3.5 bg-[#006194] hover:bg-[#004b73] text-white rounded-xl font-bold text-sm shadow-md shadow-[#006194]/20 transition active:scale-98 flex items-center justify-center gap-2" onclick="triggerSuccessfulScan()">
+      <span class="">
+       Test Scan Success (Proceed)
+      </span>
+      <span class="material-symbols-outlined text-lg">
+       arrow_forward
+      </span>
+     </button>
+     <button class="w-full py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl font-semibold text-xs transition border border-slate-200/80" onclick="triggerFailedScan()">
+      Test Scan Failure / Error State
+     </button>
+    </div>
+   </div>
+   <!-- Error Alert Card (Conditional / Toggleable) -->
+   <div class="hidden bg-rose-50 border-2 border-rose-200 rounded-3xl p-6 shadow-sm" id="scan-error-box">
+    <div class="flex items-start gap-3 mb-4">
+     <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 font-bold">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+       <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+       </path>
+      </svg>
+     </div>
+     <div>
+      <span class="text-[11px] font-bold uppercase tracking-wider text-rose-700">
+       Scan Problem Detected
+      </span>
+      <h3 class="text-xl font-extrabold text-slate-900 mt-0.5">
+       Could not read document.
+      </h3>
+      <p class="text-xs text-rose-800 mt-1">
+       The photo page was partially obscured, tilted, or moved during optical read.
+      </p>
+     </div>
+    </div>
+    <!-- Helpful Checklist for traveler -->
+    <div class="bg-white rounded-2xl p-4 border border-rose-100 mb-6 space-y-2.5 text-xs text-slate-700">
+     <div class="flex items-center gap-2">
+      <span class="text-rose-500 font-bold">
+       ✕
+      </span>
+      <span class="">
+       Slide document firmly into the top-left guide corner
+      </span>
+     </div>
+     <div class="flex items-center gap-2">
+      <span class="text-rose-500 font-bold">
+       ✕
+      </span>
+      <span class="">
+       Ensure fingers are not covering barcode, photo, or bottom text
+      </span>
+     </div>
+     <div class="flex items-center gap-2">
+      <span class="text-rose-500 font-bold">
+       ✕
+      </span>
+      <span class="">
+       Remove plastic protective wallet sleeves if glare occurs
+      </span>
+     </div>
+    </div>
+    <!-- Passenger Action Choices -->
+    <div class="space-y-2.5">
+     <button class="w-full py-3.5 bg-[#006194] hover:bg-[#004b73] text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2" onclick="retryScan()">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+       <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+       </path>
+      </svg>
+      <span class="">
+       Try Again
+      </span>
+     </button>
+     <div class="grid grid-cols-2 gap-2">
+      <button class="py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-xs transition" onclick="goToScreen(1)">
+       Change Method
+      </button>
+      <button class="py-2.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 rounded-xl font-semibold text-xs transition flex items-center justify-center gap-1.5" onclick="triggerAssistanceModal()">
+       <span class="">
+        Call Officer
+       </span>
+      </button>
+     </div>
+    </div>
+   </div>
+   <!-- Bottom Meta Controls -->
+   <div class="flex justify-between items-center px-2">
+    <button class="text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1" onclick="goToScreen(1)">
+     ← Change Scan Method
+    </button>
+    <span class="text-xs text-slate-400 font-mono">
+     STATION ABC-04
+    </span>
+   </div>
+  </div>
+ </div>
+</section>
+
+--- SCREEN 3 (Result) ---
+<section class="hidden h-auto min-h-fit overflow-visible transition-all duration-300 ease-out" id="screen-3">
+ <div class="text-center max-w-2xl mx-auto mb-8">
+  <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#e2e7ff] text-[#006194] font-extrabold text-xs uppercase tracking-wider mb-3 border border-[#006194]/20 shadow-xs">
+   <span class="w-2 h-2 rounded-full bg-[#006194] animate-pulse">
+   </span>
+   Step 3 of 4 • Biometric Verification
+  </span>
+  <h2 class="text-3xl font-extrabold text-[#131b2e] tracking-tight mb-2">
+   Look directly into the camera screen above
+  </h2>
+  <p class="text-slate-500 text-sm font-medium">
+   We are verifying your facial landmarks with your travel document. Keep still for 3 seconds.
+  </p>
+ </div>
+ <div class="grid lg:grid-cols-12 gap-8 items-center max-w-5xl mx-auto">
+  <!-- Left: Biometric Readiness Checklist -->
+  <div class="lg:col-span-5 space-y-3.5">
+   <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider px-1">
+    Biometric Readiness Checklist
+   </h3>
+   <!-- Glasses Rule -->
+   <div class="bg-white border border-[#dae2fd] rounded-2xl p-4 flex items-center gap-4 shadow-xs">
+    <div class="w-12 h-12 rounded-xl bg-sky-50 text-[#006194] flex items-center justify-center text-xl shrink-0">
+     👓
+    </div>
+    <div>
+     <h4 class="text-sm font-bold text-slate-900">
+      Remove eyewear
+     </h4>
+     <p class="text-xs text-slate-500">
+      Take off dark glasses or heavy frames causing lens glare
+     </p>
+    </div>
+   </div>
+   <!-- Hats Rule -->
+   <div class="bg-white border border-[#dae2fd] rounded-2xl p-4 flex items-center gap-4 shadow-xs">
+    <div class="w-12 h-12 rounded-xl bg-sky-50 text-[#006194] flex items-center justify-center text-xl shrink-0">
+     🧢
+    </div>
+    <div>
+     <h4 class="text-sm font-bold text-slate-900">
+      Remove hats &amp; caps
+     </h4>
+     <p class="text-xs text-slate-500">
+      Ensure forehead, eyes, and hair profile are visible
+     </p>
+    </div>
+   </div>
+   <!-- Neutral Expression -->
+   <div class="bg-white border border-[#dae2fd] rounded-2xl p-4 flex items-center gap-4 shadow-xs">
+    <div class="w-12 h-12 rounded-xl bg-sky-50 text-[#006194] flex items-center justify-center text-xl shrink-0">
+     😐
+    </div>
+    <div>
+     <h4 class="text-sm font-bold text-slate-900">
+      Neutral expression
+     </h4>
+     <p class="text-xs text-slate-500">
+      Keep mouth closed and look directly at camera sensor
+     </p>
+    </div>
+   </div>
+   <!-- Standing Distance Note -->
+   <div class="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-3 text-xs text-[#006194] flex items-center gap-3">
+    <span class="text-lg">
+     📏
+    </span>
+    <span class="">
+     Recommended standing distance:
+     <strong>
+      50 – 75 cm
+     </strong>
+     from kiosk
+    </span>
+   </div>
+   <!-- Simulation Triggers for Step 3 -->
+   <div class="pt-2 space-y-2">
+    <button class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2" onclick="triggerSuccessfulFace()">
+     <span class="">
+      Simulate Face Match Success (Gate Open)
+     </span>
+     <span class="material-symbols-outlined text-base">
+      verified
+     </span>
+    </button>
+    <button class="w-full py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl font-semibold text-xs transition border border-slate-200/80" onclick="triggerFailedFace()">
+     Simulate Biometric Mismatch (Error Alert)
+    </button>
+   </div>
+  </div>
+  <!-- Right: Camera Viewport with Facial Alignment HUD -->
+  <div class="lg:col-span-7 bg-white border border-[#dae2fd] rounded-3xl p-6 shadow-sm">
+   <div class="relative w-full h-96 bg-[#131b2e] rounded-2xl overflow-hidden flex items-center justify-center border-4 border-slate-100 shadow-inner">
+    <!-- Simulated Camera Feed Silhouette -->
+    <div class="absolute inset-0 flex items-center justify-center opacity-70">
+     <div class="w-48 h-64 rounded-full bg-slate-700/60 blur-md transform translate-y-4">
+     </div>
+    </div>
+    <!-- Soft Overlay Vignette -->
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40">
+    </div>
+    <!-- Facial Alignment Oval Target -->
+    <div class="anim-face-oval relative w-56 h-72 rounded-[120px] border-4 border-dashed border-[#0092dd] z-20 flex flex-col items-center justify-between p-4 shadow-[0_0_30px_rgba(0,146,221,0.35)]" id="face-guide-oval">
+     <div class="text-[10px] font-mono-num font-bold text-sky-200 uppercase tracking-widest bg-slate-900/70 px-3 py-0.5 rounded-full border border-sky-400/40">
+      ALIGN FACE HERE
+     </div>
+     <!-- Landmark Tracker Crosshairs -->
+     <div class="relative w-full flex items-center justify-around px-4">
+      <span class="w-2.5 h-2.5 rounded-full border-2 border-emerald-400 bg-emerald-400/50">
+      </span>
+      <span class="w-2.5 h-2.5 rounded-full border-2 border-emerald-400 bg-emerald-400/50">
+      </span>
+     </div>
+     <div class="w-16 h-0.5 bg-sky-400/80 rounded-full">
+     </div>
+     <div class="text-[10px] font-mono-num font-bold text-sky-200 uppercase tracking-widest bg-slate-900/70 px-3 py-0.5 rounded-full border border-sky-400/40">
+      EYE LEVEL
+     </div>
+    </div>
+    <!-- Scanning Indicator Badge Overlay -->
+    <div class="absolute bottom-5 inset-x-0 flex justify-center z-20 px-4">
+     <div class="bg-white/95 backdrop-blur-md px-5 py-2.5 rounded-full shadow-lg flex items-center gap-3 border border-slate-200 max-w-sm" id="face-status-badge">
+      <span class="w-3 h-3 rounded-full bg-[#006194] animate-ping shrink-0">
+      </span>
+      <span class="text-xs font-bold text-slate-800">
+       Matching face features with travel document...
+      </span>
+     </div>
+    </div>
+   </div>
+   <!-- Bottom Status Telemetry -->
+   <div class="mt-4 flex items-center justify-between text-xs text-slate-500 px-2 font-medium">
+    <span class="">
+     HD Camera Sensor 04 • Autofocus Locked (3D Depth)
+    </span>
+    <button class="text-[#006194] hover:underline font-bold" onclick="goToScreen(2)">
+     Cancel &amp; Re-scan Document
+    </button>
+   </div>
+  </div>
+ </div>
+</section>
