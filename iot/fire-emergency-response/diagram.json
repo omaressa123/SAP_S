@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "author": "Airport IoT Team",
+  "editor": "wokwi",
+  "serialMonitor": {
+  "display": "terminal"
+},
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -38.1,
+      "left": 273,
+      "attrs": { "temperature": "24" }
+    },
+    { "type": "wokwi-gas-sensor", "id": "gas1", "top": 12.3, "left": -444.2, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_fire",
+      "top": -80.2,
+      "left": -182.4,
+      "attrs": { "color": "red", "label": "FIRE" }
+    },
+    { "type": "wokwi-buzzer", "id": "bz1", "top": -237.6, "left": -391.8, "attrs": {} },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_exit1",
+      "top": 206.4,
+      "left": 229.85,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_exit1",
+      "top": 284.4,
+      "left": 263,
+      "attrs": { "color": "red", "label": "EXIT 1" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_exit2",
+      "top": 187.2,
+      "left": 335.45,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_exit2",
+      "top": 274.8,
+      "left": 339.8,
+      "attrs": { "color": "green", "label": "EXIT 2" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_exit3",
+      "top": 110.4,
+      "left": 604.25,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_exit3",
+      "top": 265.2,
+      "left": 416.6,
+      "attrs": { "color": "blue", "label": "EXIT 3" }
+    },
+    { "type": "wokwi-gnd", "id": "gnd1", "top": 76.8, "left": -269.4, "attrs": {} },
+    { "type": "wokwi-vcc", "id": "vcc2", "top": 39.16, "left": 230.4, "attrs": {} },
+    { "type": "wokwi-gnd", "id": "gnd2", "top": 86.4, "left": 306.6, "attrs": {} },
+    { "type": "wokwi-gnd", "id": "gnd3", "top": -28.8, "left": -231, "attrs": {} },
+    { "type": "wokwi-gnd", "id": "gnd4", "top": -134.4, "left": -375, "attrs": {} },
+    { "type": "wokwi-gnd", "id": "gnd5", "top": 364.8, "left": 354.6, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "gas1:GND", "gnd1:GND", "black", [ "h0" ] ],
+    [ "gas1:GND", "gnd1:GND", "black", [ "h0" ] ],
+    [ "gas1:AOUT", "esp:34", "purple", [ "h211.2", "v38.4" ] ],
+    [ "dht1:SDA", "esp:4", "violet", [ "v0" ] ],
+    [ "dht1:VCC", "vcc2:VCC", "red", [ "v19.2", "h-38.4" ] ],
+    [ "dht1:GND", "gnd2:GND", "black", [ "v0" ] ],
+    [ "btn_fire:2.l", "gnd3:GND", "black", [ "h0" ] ],
+    [ "btn_fire:1.l", "esp:13", "gold", [ "h-57.6", "v153.6" ] ],
+    [ "bz1:1", "gnd4:GND", "black", [ "v0" ] ],
+    [ "esp:25", "bz1:2", "green", [ "v0", "h-71.81", "v-249.6", "h-288" ] ],
+    [ "led_exit3:C", "gnd5:GND", "black", [ "v48", "h-86" ] ],
+    [ "led_exit2:C", "gnd5:GND", "black", [ "v0" ] ],
+    [ "led_exit1:C", "gnd5:GND", "black", [ "v0" ] ],
+    [ "led_exit3:A", "r_exit3:2", "green", [ "v38.4", "h76.8", "v-115.2", "h-76.8" ] ],
+    [ "led_exit1:A", "r_exit1:2", "green", [ "v19.2", "h19.2", "v-76.8", "h-48" ] ],
+    [ "r_exit1:1", "esp:16", "#8f4814", [ "h76.8", "v-249.6", "h-153.6", "v144" ] ],
+    [ "led_exit2:A", "r_exit2:2", "green", [ "v19.2", "h28.8", "v-96", "h-28.8" ] ],
+    [ "r_exit2:1", "esp:17", "limegreen", [ "h0", "v-240", "h-192", "v182.4" ] ],
+    [ "r_exit3:1", "esp:18", "magenta", [ "h0", "v-172.8", "h-470.4", "v192" ] ],
+    [ "gas1:VCC", "esp:3V3", "red", [ "h278.4", "v-29.7" ] ]
+  ],
+  "dependencies": {}
+}
