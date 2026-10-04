@@ -1,0 +1,46 @@
+# Central configuration for the fall detection pipeline.
+# All scripts accept CLI overrides but fall back to these defaults.
+
+paths:
+  raw_data_dir: data/raw
+  keypoints_dir: data/processed/keypoints
+  windows_file: data/processed/windows.npz
+  rf_model_out: models/rf_fall_model.joblib
+  lstm_model_out: models/lstm_fall_model.pt
+
+capture:
+  target_fps: 15          # continuous processing rate — falls are fast (~1s), no polling
+
+pose:
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  model_complexity: 1      # 0=lite, 1=full, 2=heavy (MediaPipe Pose)
+
+windowing:
+  window_frames: 30        # ~1-2 sec at 15fps
+  stride: 5
+
+confirmation:
+  stillness_check_seconds: 2.5
+  stillness_movement_threshold: 0.015   # normalized centroid movement per frame, tune on your data
+
+classifier:
+  # Option A (default): random_forest or xgboost
+  # Option B: lstm
+  type: random_forest
+  random_forest:
+    n_estimators: 300
+    max_depth: 12
+    class_weight: balanced
+  lstm:
+    hidden_size: 64
+    num_layers: 2
+    dropout: 0.3
+    epochs: 40
+    batch_size: 16
+    learning_rate: 0.001
+
+data_sources:
+  le2i_kaggle_dataset: "tuyenldvn/falldataset-imvia"
+  ur_fall_url: "https://fenix.ur.edu.pl/~mkepski/ds/uf.html"
+  roboflow_project: "ur-fall-detection"  # placeholder — fill in your Roboflow workspace/project

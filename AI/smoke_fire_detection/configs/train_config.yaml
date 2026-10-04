@@ -1,0 +1,73 @@
+# ============================================================
+# Smoke & Fire Detection — Training Configuration
+# Smart Airport Project · Module: Passenger Monitoring / Emergency AI
+# ============================================================
+
+project_name: smoke_fire_detection
+
+# The 9 classes, in the order folders must be named under data/train, data/val, data/test.
+# "normal" is the required background/no-hazard class — do not remove it.
+classes:
+  - fire
+  - smoke
+  - explosion
+  - steam
+  - fog
+  - dust
+  - sunlight
+  - reflection
+  - normal
+
+# Which classes count as an actual hazard (used by check_dataset.py reporting only;
+# the scanning/decision system that consumes this model is a separate, later stage).
+hazard_classes:
+  - fire
+  - smoke
+  - explosion
+
+# Recommended minimum images per class before training is worth running.
+# check_dataset.py will warn (not block) if a class falls below this.
+min_images_per_class:
+  train: 150
+  val: 40
+  test: 20
+
+# ---- Dataset paths ----
+data_dir: data              # contains train/ val/ test/, each with one folder per class
+raw_dir: data/raw           # drop newly collected, unsplit images here before running split_dataset.py
+
+# ---- Split ratios (used only by scripts/split_dataset.py) ----
+split_ratios:
+  train: 0.70
+  val: 0.20
+  test: 0.10
+split_seed: 42
+
+# ---- Model ----
+model: yolov8s-cls.pt        # pretrained checkpoint to fine-tune from (auto-downloaded by ultralytics)
+imgsz: 224
+
+# ---- Training hyperparameters ----
+epochs: 50
+batch: 32
+patience: 10                 # early stopping — stop if val accuracy doesn't improve for this many epochs
+optimizer: auto               # let ultralytics pick (SGD/AdamW) based on dataset size
+lr0: 0.001
+seed: 42
+device: 0                     # GPU index; set to "cpu" if no GPU is available
+workers: 4
+
+# ---- Augmentation (helps most for the confounder classes: sunlight/reflection/steam/fog/dust) ----
+augment: true
+hsv_h: 0.015                  # hue jitter
+hsv_s: 0.5                    # saturation jitter
+hsv_v: 0.4                    # brightness jitter — important since fire/sunlight differ mainly by color+context
+degrees: 10.0                 # rotation
+flipud: 0.0                   # vertical flip off — fire/smoke orientation is meaningful (rises upward)
+fliplr: 0.5                   # horizontal flip fine
+translate: 0.1
+scale: 0.3
+
+# ---- Output ----
+output_dir: outputs
+run_name: smoke_fire_v1

@@ -1,0 +1,10 @@
+line-length = 100
+
+[lint]
+select = ["E", "F", "I"]
+ignore = [
+  "E501",  # line length handled by formatter preference
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["E402"]
