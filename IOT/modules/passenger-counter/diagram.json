@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "author": "Airport IoT Team",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-led", "id": "led_entry", "top": -60, "left": -80, "attrs": { "color": "green", "label": "ENTRY EVENT" } },
+    { "type": "wokwi-led", "id": "led_exit", "top": -60, "left": -140, "attrs": { "color": "yellow", "label": "EXIT EVENT" } },
+    { "type": "wokwi-led", "id": "led_status", "top": -60, "left": -200, "attrs": { "color": "red", "label": "STATUS ONLINE" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": -120, "left": 120, "attrs": { "volume": "0.2" } },
+    { "type": "wokwi-pushbutton", "id": "btn_sensor_a", "top": 160, "left": -180, "attrs": { "color": "green", "label": "1. Beam / Sensor A (Outer)" } },
+    { "type": "wokwi-pushbutton", "id": "btn_sensor_b", "top": 160, "left": -60, "attrs": { "color": "yellow", "label": "2. Beam / Sensor B (Inner)" } },
+    { "type": "wokwi-pushbutton", "id": "btn_reset", "top": 240, "left": -120, "attrs": { "color": "grey", "label": "3. Reset Count" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": -20, "left": -80, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": -20, "left": -140, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": -20, "left": -200, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$if:serial:RX", "", [] ],
+    [ "esp:RX", "$if:serial:TX", "", [] ],
+    [ "esp:2", "r1:1", "green", [ "h:0" ] ],
+    [ "r1:2", "led_entry:A", "green", [ "h:0" ] ],
+    [ "led_entry:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:4", "r2:1", "yellow", [ "h:0" ] ],
+    [ "r2:2", "led_exit:A", "yellow", [ "h:0" ] ],
+    [ "led_exit:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:5", "r3:1", "red", [ "h:0" ] ],
+    [ "r3:2", "led_status:A", "red", [ "h:0" ] ],
+    [ "led_status:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:18", "buzzer:2", "purple", [ "h:0" ] ],
+    [ "buzzer:1", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:19", "btn_sensor_a:2.1", "green", [ "h:0" ] ],
+    [ "btn_sensor_a:1.1", "esp:GND.2", "black", [ "h:0" ] ],
+    [ "esp:21", "btn_sensor_b:2.1", "yellow", [ "h:0" ] ],
+    [ "btn_sensor_b:1.1", "esp:GND.2", "black", [ "h:0" ] ],
+    [ "esp:22", "btn_reset:2.1", "grey", [ "h:0" ] ],
+    [ "btn_reset:1.1", "esp:GND.2", "black", [ "h:0" ] ]
+  ],
+  "dependencies": {}
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "author": "Airport IoT Team",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-led", "id": "led_green", "top": -60, "left": -80, "attrs": { "color": "green", "label": "NORMAL" } },
+    { "type": "wokwi-led", "id": "led_red", "top": -60, "left": -140, "attrs": { "color": "red", "label": "ALARM" } },
+    { "type": "wokwi-led", "id": "led_beacon", "top": -120, "left": 160, "attrs": { "color": "red", "label": "BEACON" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": -120, "left": -60, "attrs": { "volume": "0.2" } },
+    { "type": "wokwi-pushbutton", "id": "btn_trigger", "top": 120, "left": -180, "attrs": { "color": "red", "label": "1. TRIGGER" } },
+    { "type": "wokwi-pushbutton", "id": "btn_silence", "top": 120, "left": -60, "attrs": { "color": "yellow", "label": "2. Silence" } },
+    { "type": "wokwi-pushbutton", "id": "btn_lockdown", "top": 200, "left": -60, "attrs": { "color": "red", "label": "3. Lockdown" } },
+    { "type": "wokwi-pushbutton", "id": "btn_reset", "top": 280, "left": -120, "attrs": { "color": "grey", "label": "4. Reset" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": -20, "left": -80, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": -20, "left": -140, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": -80, "left": 160, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$if:serial:RX", "", [] ],
+    [ "esp:RX", "$if:serial:TX", "", [] ],
+    [ "esp:2", "r1:1", "green", [ "h:0" ] ],
+    [ "r1:2", "led_green:A", "green", [ "h:0" ] ],
+    [ "led_green:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:4", "r2:1", "red", [ "h:0" ] ],
+    [ "r2:2", "led_red:A", "red", [ "h:0" ] ],
+    [ "led_red:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:18", "r3:1", "orange", [ "h:0" ] ],
+    [ "r3:2", "led_beacon:A", "orange", [ "h:0" ] ],
+    [ "led_beacon:C", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:5", "buzzer:2", "purple", [ "h:0" ] ],
+    [ "buzzer:1", "esp:GND.1", "black", [ "h:0" ] ],
+    [ "esp:19", "btn_trigger:2.1", "red", [ "h:0" ] ],
+    [ "btn_trigger:1.1", "esp:GND.2", "black", [ "h:0" ] ],
+    [ "esp:21", "btn_silence:2.1", "yellow", [ "h:0" ] ],
+    [ "btn_silence:1.1", "esp:GND.2", "black", [ "h:0" ] ],
+    [ "esp:22", "btn_lockdown:2.1", "red", [ "h:0" ] ],
+    [ "btn_lockdown:1.1", "esp:GND.2", "black", [ "h:0" ] ],
+    [ "esp:23", "btn_reset:2.1", "grey", [ "h:0" ] ],
+    [ "btn_reset:1.1", "esp:GND.2", "black", [ "h:0" ] ]
+  ],
+  "dependencies": {}
+}
