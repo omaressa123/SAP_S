@@ -4,5 +4,6 @@ sqlalchemy
 pydantic
 pydantic-settings
 numpy
-PyJWTpsycopg2-binary
+PyJWT
+psycopg2-binary
 PyJWT
