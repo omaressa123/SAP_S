@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 
 const links = [
   { to: '/', label: 'Dashboard' },
@@ -10,11 +10,6 @@ const links = [
 ]
 
 export default function Navbar() {
-  const navigate = useNavigate()
-  const logout = () => {
-    localStorage.removeItem('token')
-    navigate('/login')
-  }
   return (
     <nav>
       <strong className="brand">✈ Smart Airport</strong>
@@ -23,7 +18,6 @@ export default function Navbar() {
           {l.label}
         </NavLink>
       ))}
-      <button onClick={logout}>Logout</button>
     </nav>
   )
 }

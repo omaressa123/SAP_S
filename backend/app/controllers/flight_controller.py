@@ -9,6 +9,35 @@ from ..models.flights import Flight, Airline, Airport
 
 router = APIRouter()
 
+@router.get("/all")
+@router.get("")
+def get_all_flights(db: Session = Depends(get_db)):
+    flights = db.query(Flight).all()
+    results = []
+    for f in flights:
+        airline = db.query(Airline).filter(Airline.airline_id == f.airline_id).first()
+        origin = db.query(Airport).filter(Airport.airport_id == f.origin_airport_id).first()
+        dest = db.query(Airport).filter(Airport.airport_id == f.destination_airport_id).first()
+        gate_num = "TBD"
+        if f.boarding_gate_id:
+            from ..models.security import BoardingGate
+            gate = db.query(BoardingGate).filter(BoardingGate.boarding_gate_id == f.boarding_gate_id).first()
+            if gate:
+                gate_num = gate.gate_number
+
+        results.append({
+            "flightId": f.flight_id,
+            "flightNumber": f.flight_number,
+            "airline": airline.name if airline else "Unknown",
+            "airlineCode": airline.iata_code if airline else "",
+            "originAirport": origin.iata_code if origin else "JFK",
+            "destinationAirport": dest.iata_code if dest else "DOH",
+            "boardingGate": gate_num,
+            "status": f.status or "SCHEDULED",
+            "scheduledDeparture": f.scheduled_departure.isoformat() + "Z" if f.scheduled_departure else None
+        })
+    return success_response(data=results)
+
 class CreateFlightRequest(BaseModel):
     flightNumber: str
     airlineCode: str
