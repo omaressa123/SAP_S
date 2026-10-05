@@ -1,0 +1,147 @@
+# Smart Green Airport — full development environment.
+#   docker compose up --build     # start everything
+#   docker compose down           # stop (data kept in postgres_data)
+#   docker compose down -v        # DESTRUCTIVE: also deletes the database
+#
+# URL map (host):
+#   Frontend: http://localhost            Backend: http://localhost:8000
+#   Health:   http://localhost:8000/health Twin:    http://localhost:8100
+#   MQTT (ESP32/host tools): <host-LAN-IP>:1883
+name: smart-airport
+
+networks:
+  airport-network:
+    name: airport-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: smart-airport-postgres-data
+  mosquitto_data:
+    name: smart-airport-mosquitto-data
+  mosquitto_log:
+    name: smart-airport-mosquitto-log
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}
+  SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-secret}
+  API_KEY: ${API_KEY:-MOCK_API_KEY_123}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+  MQTT_BROKER: mosquitto
+  MQTT_PORT: 1883
+  MQTT_USERNAME: ${MQTT_USERNAME:-}
+  MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+  MQTT_TOPIC_FILTER: ${MQTT_TOPIC_FILTER:-airport/#}
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: smart-airport-postgres
+    restart: unless-stopped
+    networks: [airport-network]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smart_airport}
+      POSTGRES_USER: ${POSTGRES_USER:-smart_airport}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      # PG18+ images store data in versioned subdirs; mount the parent.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smart_airport} -d ${POSTGRES_DB:-smart_airport}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smart-airport-mosquitto
+    restart: unless-stopped
+    networks: [airport-network]
+    ports:
+      # Host port is configurable: if something already occupies 1883 on the
+      # host, start with MQTT_HOST_PORT=1884 (container port stays 1883, so
+      # Docker-to-Docker `mosquitto:1883` never changes).
+      - "${MQTT_HOST_PORT:-1883}:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -t '$$SYS/broker/uptime' -C 1 -W 5"]
+      interval: 10s
+      timeout: 6s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-airport-backend
+    restart: unless-stopped
+    networks: [airport-network]
+    environment: *backend-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+
+  mqtt-consumer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-airport-mqtt-consumer
+    restart: unless-stopped
+    networks: [airport-network]
+    environment: *backend-env
+    # Same image, consumer entrypoint (no DB init, no uvicorn).
+    entrypoint: ["python", "-m", "app.services.mqtt_consumer"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    container_name: smart-airport-frontend
+    restart: unless-stopped
+    networks: [airport-network]
+    ports:
+      # Same pattern as MQTT: default 80, override if the host uses it.
+      - "${FRONTEND_HOST_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  twin:
+    build:
+      context: ./airport-twin
+      dockerfile: backend/Dockerfile
+    container_name: smart-airport-twin
+    restart: unless-stopped
+    networks: [airport-network]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}
+      TWIN_SIMULATION: ${TWIN_SIMULATION:-true}
+    ports:
+      - "8100:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy

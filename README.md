@@ -46,6 +46,54 @@ air_ai/
                                 └──────────────────────────┘
 ```
 
+## Run with Docker (recommended)
+
+The entire development environment starts with a single command — PostgreSQL,
+Mosquitto, FastAPI backend, MQTT consumer, React dashboard, and the Digital
+Twin backend. No manual terminals needed.
+
+```bash
+cp .env.example .env   # change ALL secrets before any deployment; .env is gitignored
+docker compose up --build
+```
+
+| Service | Container | URL / Port |
+|---|---|---|
+| Dashboard (React + nginx) | `smart-airport-frontend` | http://localhost |
+| Core API (FastAPI) | `smart-airport-backend` | http://localhost:8000 |
+| API health | — | http://localhost:8000/health |
+| Digital Twin API | `smart-airport-twin` | http://localhost:8100 |
+| PostgreSQL 18 | `smart-airport-postgres` | `postgres:5432` (Docker) / `localhost:5432` (host tools) |
+| Mosquitto MQTT | `smart-airport-mosquitto` | `mosquitto:1883` (Docker) / host LAN IP `:1883` (ESP32) |
+| MQTT consumer | `smart-airport-mqtt-consumer` | `airport/#` → PostgreSQL |
+
+```bash
+docker compose up -d        # detached
+docker compose ps           # status
+docker compose logs -f [service]
+docker compose down         # stop — data kept (named volumes)
+docker compose down -v      # DESTRUCTIVE: deletes the database
+```
+
+Notes:
+
+- Startup order is health-gated: PostgreSQL (healthy) → schema init (`init_db.py`)
+  → Mosquitto → backend → MQTT consumer → frontend. The database survives
+  `down`/`up` via the `postgres_data` volume.
+- The frontend image bakes in `VITE_API_URL` (default `http://localhost:8000`,
+  browser-accessible — never the Docker-internal `http://backend:8000`).
+  `CORS_ORIGINS` defaults to `http://localhost` to match.
+- If host ports are occupied, remap without touching container ports:
+  `MQTT_HOST_PORT=1884 FRONTEND_HOST_PORT=3000 docker compose up -d`.
+- ESP32 devices on the LAN must target this machine's **LAN IP** on port 1883
+  (not `localhost`, not the `mosquitto` hostname).
+- Verify the pipeline: publish `airport/fire-smoke/FIRE-001/event`, then check
+  `equipment` + `emergency_event` + `monitoring_alert` rows and
+  `/api/v1/reports/operations`.
+- Not containerized (run locally, see sections below): AI services (heavy
+  TF/YOLO stacks — `AI/<module>`), ESP32 firmware (`IOT/`, PlatformIO), and the
+  Expo passenger app (`EXPO_PUBLIC_API_URL=http://<host-LAN-IP>:8000`).
+
 ## 1. Backend — `backend/`
 
 FastAPI `Smart Airport System API` v2.0.0 (`backend/app/main.py`). Layered design: `controllers/` (HTTP routers, 13 domains) → `services/` → `repositories/` → `models/` (SQLAlchemy), plus `schemas/` (Pydantic), `core/`, `db/`, `config.py`.
@@ -111,7 +159,9 @@ Relational schema covering the whole journey: passenger, travel_document, face_e
 
 `SMART_AIRPORT_Foundation.md` (business→software→network chain), drawio models: business model, UML use cases, activity diagrams, sequence diagrams.
 
-## Quick Start
+## Quick Start (without Docker)
+
+Prefer `docker compose up --build` above. Manual alternative:
 
 ```bash
 # Core API

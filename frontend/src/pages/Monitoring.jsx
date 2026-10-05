@@ -40,7 +40,11 @@ export default function Monitoring() {
           <Button>Submit</Button>
         </form>
         {error && <p className="error">{error}</p>}
-        {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+        {result && (
+          <div className={`anim-fade-in${/critical/i.test(form.severity) ? ' sev-critical' : /high|medium|warning/i.test(form.severity) ? ' sev-warning' : ''}`}>
+            <pre>{JSON.stringify(result, null, 2)}</pre>
+          </div>
+        )}
       </Card>
     </>
   )

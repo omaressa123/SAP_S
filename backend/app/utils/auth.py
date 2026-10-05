@@ -25,7 +25,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         raise AirportException(code="INVALID_TOKEN", message="Invalid JWT token", status_code=401)
 
 def verify_api_key(api_key: str = Security(api_key_header)):
-    if not api_key or api_key != "MOCK_API_KEY_123":
+    if not api_key or api_key != settings.API_KEY:
         raise AirportException(code="UNAUTHORIZED", message="Invalid or missing X-API-KEY", status_code=401)
     return api_key
 

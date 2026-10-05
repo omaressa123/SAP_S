@@ -71,6 +71,33 @@ export const SmartGateApi = {
   })
 }
 
+export const ReportsApi = {
+  overview: () => api('/api/v1/reports/overview'),
+  passengers: (params = {}) => api(`/api/v1/reports/passengers${toQuery(params)}`),
+  flights: (params = {}) => api(`/api/v1/reports/flights${toQuery(params)}`),
+  baggage: (params = {}) => api(`/api/v1/reports/baggage${toQuery(params)}`),
+  security: () => api('/api/v1/reports/security'),
+  ai: () => api('/api/v1/reports/ai'),
+  iot: () => api('/api/v1/reports/iot'),
+  operations: () => api('/api/v1/reports/operations'),
+}
+
+function toQuery(params) {
+  const q = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '')),
+  ).toString()
+  return q ? `?${q}` : ''
+}
+
+export const AiApi = {
+  registry: () => api('/api/v1/ai/registry'),
+  faceVerify: (data) => api('/api/v1/ai/face/verify', { method: 'POST', body: JSON.stringify(data) }),
+  baggageAnalyze: (data) => api('/api/v1/ai/baggage/analyze', { method: 'POST', body: JSON.stringify(data) }),
+  smokeFire: (data) => api('/api/v1/ai/smoke-fire/analyze', { method: 'POST', body: JSON.stringify(data) }),
+  scene: (data) => api('/api/v1/ai/scene/analyze', { method: 'POST', body: JSON.stringify(data) }),
+  baggagePerson: (data) => api('/api/v1/ai/scene/baggage-person', { method: 'POST', body: JSON.stringify(data) }),
+}
+
 export const AirportApi = {
   getLiveDashboard: () => api('/api/v1/digital-twin/dashboard/live'),
   getFlights: () => api('/api/v1/flights/all'),

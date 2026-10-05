@@ -5,5 +5,9 @@ pydantic
 pydantic-settings
 numpy
 PyJWT
-psycopg2-binary
-PyJWT
+psycopg[binary]
+bcrypt
+python-multipart
+paho-mqtt
+httpx
+pytest

@@ -1,0 +1,237 @@
+/* Smart Airport animation system — subtle, GPU-friendly (transform/opacity).
+   Brand palette preserved: navy #071739, sand #E3C39D. */
+
+:root {
+  --anim-fast: 300ms;
+  --anim-med: 450ms;
+  --anim-slow: 600ms;
+  --anim-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --status-online: #0e7c4a;
+  --status-warning: #c77b1a;
+  --status-offline: #d64550;
+}
+
+/* ---------- Entrance ---------- */
+@keyframes ops-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ops-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.anim-fade-up {
+  opacity: 0;
+  animation: ops-fade-up var(--anim-med) var(--anim-ease) both;
+  animation-delay: var(--anim-delay, 0ms);
+}
+.anim-fade-in {
+  opacity: 0;
+  animation: ops-fade-in var(--anim-fast) ease both;
+  animation-delay: var(--anim-delay, 0ms);
+}
+
+/* ---------- Status dots ---------- */
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #8b93a7;
+  flex: none;
+}
+.status-dot.online { background: var(--status-online); }
+.status-dot.warning { background: var(--status-warning); }
+.status-dot.offline { background: var(--status-offline); }
+.status-dot.pulse { position: relative; }
+.status-dot.pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: ops-ring 2s ease-out infinite;
+}
+.status-dot.online.pulse { color: var(--status-online); }
+.status-dot.warning.pulse { color: var(--status-warning); }
+.status-dot.offline.pulse { color: var(--status-offline); }
+@keyframes ops-ring {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  70% { transform: scale(1.15); opacity: 0; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Severity pulses (controlled, finite-feel: slow, low-amplitude) */
+.sev-warning { animation: ops-sev-amber 2.4s ease-in-out infinite; border-radius: 12px; }
+.sev-critical { animation: ops-sev-red 1.8s ease-in-out infinite; border-radius: 12px; }
+@keyframes ops-sev-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(199, 123, 26, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(199, 123, 26, 0.25); }
+}
+@keyframes ops-sev-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(214, 69, 80, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(214, 69, 80, 0.3); }
+}
+
+/* Flight status */
+.flight-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: #eef0fa;
+  color: var(--color-navy);
+}
+.flight-pill.boarding { background: rgba(7, 23, 57, 0.08); }
+.flight-pill.boarding .bar {
+  width: 44px; height: 6px; border-radius: 4px; overflow: hidden;
+  background: rgba(7, 23, 57, 0.15);
+}
+.flight-pill.boarding .bar::after {
+  content: ''; display: block; height: 100%; width: 40%;
+  border-radius: 4px; background: #071739;
+  animation: ops-board 1.6s ease-in-out infinite;
+}
+@keyframes ops-board {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.flight-pill.departed { background: #d9f5e5; color: #0e7c4a; }
+.flight-pill.delayed { background: #fdf1de; color: #8a5a12; animation: ops-sev-amber 2.4s ease-in-out infinite; }
+.flight-pill.cancelled { background: #fbe3e5; color: #a8323a; }
+.flight-pill.cancelled .status-dot { width: 8px; height: 8px; }
+
+/* ---------- Animated bars (scaleX, staggered) ---------- */
+.anim-bar-fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--anim-slow) var(--anim-ease);
+  transition-delay: var(--anim-delay, 0ms);
+}
+.anim-bar-fill.grown { transform: scaleX(1); }
+
+/* ---------- Skeleton shimmer ---------- */
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0fa 25%, #e2e7f5 40%, #eef0fa 55%);
+  background-size: 200% 100%;
+  animation: ops-shimmer 1.4s linear infinite;
+  min-height: 14px;
+}
+@keyframes ops-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ---------- AI scan frame ---------- */
+.scan-frame {
+  position: relative;
+  border: 2px solid rgba(7, 23, 57, 0.25);
+  border-radius: 12px;
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgba(7, 23, 57, 0.03);
+}
+.scan-frame .scan-line {
+  position: absolute;
+  left: 8px; right: 8px; height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #071739, #E3C39D, transparent);
+  animation: ops-scan 1.8s ease-in-out infinite;
+}
+@keyframes ops-scan {
+  0% { top: 6%; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { top: 92%; opacity: 0; }
+}
+
+/* ---------- Live activity feed ---------- */
+.live-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--color-border);
+  animation: ops-fade-up var(--anim-fast) var(--anim-ease) both;
+}
+.live-item:last-child { border-bottom: none; }
+.live-time { color: var(--color-muted); font-size: 0.8rem; white-space: nowrap; }
+
+/* ---------- Dashboard atmosphere (very subtle) ---------- */
+.ops-bg { position: relative; }
+.ops-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(600px 300px at 15% 0%, rgba(227, 195, 157, 0.07), transparent 70%),
+    radial-gradient(800px 400px at 90% 20%, rgba(7, 23, 57, 0.05), transparent 70%);
+}
+.ops-grid {
+  background-image:
+    linear-gradient(rgba(7, 23, 57, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 23, 57, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+  border-radius: var(--radius);
+}
+
+/* ---------- Card hover (subtle, desktop) ---------- */
+.card.lift { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+@media (hover: hover) {
+  .card.lift:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-sand, #E3C39D);
+    box-shadow: 0 14px 34px rgba(7, 23, 57, 0.14);
+  }
+  .card.lift:hover .kpi-icon { transform: translateX(2px) scale(1.06); }
+}
+.kpi-icon { transition: transform 0.2s ease; }
+.kpi-value { font-variant-numeric: tabular-nums; }
+.kpi-value.tick { animation: ops-tick var(--anim-fast) ease; }
+@keyframes ops-tick {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* ---------- Error state entrance ---------- */
+.anim-error {
+  animation: ops-fade-up var(--anim-med) var(--anim-ease) both;
+}
+
+/* ---------- Reduced motion: keep only essential state changes ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .live-item, .anim-error { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .status-dot.pulse::after,
+  .flight-pill.boarding .bar::after,
+  .flight-pill.delayed,
+  .sev-warning, .sev-critical,
+  .scan-frame .scan-line,
+  .skeleton { animation: none !important; }
+  .anim-bar-fill { transform: none !important; transition: none !important; }
+  .skeleton { opacity: 0.7; }
+}
+
+/* ---------- Layout safety ---------- */
+html, body { overflow-x: clip; }
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.dash-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .dash-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}

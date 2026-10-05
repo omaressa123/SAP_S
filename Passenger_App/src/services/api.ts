@@ -11,7 +11,7 @@ import { mockAlerts, mockBags, mockFlight, mockWaypoints } from '../data/mock';
  * Every call caches last-known data so Offline Mode + Sync keeps working.
  */
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://gateway.example.com';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 
 async function withCache<T>(key: string, fetcher: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -26,12 +26,36 @@ async function withCache<T>(key: string, fetcher: () => Promise<T>, fallback: T)
   }
 }
 
+async function getJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { 'X-API-KEY': 'MOCK_API_KEY_123' },
+  });
+  if (!res.ok) throw new Error(`API ${res.status} on ${path}`);
+  const body = await res.json();
+  return (body?.data ?? body) as T;
+}
+
+const USE_MOCK = BASE_URL.includes('gateway.example.com');
+
 export const RestApi = {
   baseUrl: BASE_URL,
-  getFlight: () => withCache('flight', async () => mockFlight, mockFlight),
-  getBags: () => withCache('bags', async () => mockBags, mockBags),
-  getAlerts: () => withCache('alerts', async () => mockAlerts, mockAlerts),
+  getFlight: () => withCache('flight',
+    async () => (USE_MOCK ? mockFlight : getJson<typeof mockFlight>('...')),
+    mockFlight),
+  getBags: () => withCache('bags',
+    async () => (USE_MOCK ? mockBags : getJson<typeof mockBags>('/api/v1/baggage-tracking/all')),
+    mockBags),
+  getAlerts: () => withCache('alerts',
+    async () => (USE_MOCK ? mockAlerts : getJson<typeof mockAlerts>('/api/v1/reports/operations')),
+    mockAlerts),
   getWaypoints: () => withCache('waypoints', async () => mockWaypoints, mockWaypoints),
+  /** Passenger journey helpers (live when EXPO_PUBLIC_API_URL points at the core backend). */
+  getPassengers: () => withCache('passengers',
+    async () => (USE_MOCK ? [] as unknown[] : getJson<unknown[]>('/api/v1/passenger/all')),
+    [] as unknown[]),
+  getFlights: () => withCache('flights-list',
+    async () => (USE_MOCK ? [mockFlight] : getJson<typeof mockFlight | unknown[]>('/api/v1/flights/all')),
+    [mockFlight]),
 };
 
 export type RealtimeEvent =

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from .config import settings
 from .utils.errors import AirportException
 from .utils.response_envelope import error_response
 
@@ -8,16 +9,20 @@ from .controllers import (
     auth_controller, passenger_controller, kiosk_controller, baggage_drop_controller,
     inspection_controller, baggage_tracking_controller, security_gate_controller,
     boarding_gate_controller, monitoring_controller, k9_patrols_controller,
-    maintenance_controller, digital_twin_controller, flight_controller
+    maintenance_controller, digital_twin_controller, flight_controller,
+    reports_controller, ai_controller,
 )
 
 app = FastAPI(title="Smart Airport System API", version="2.0.0")
 
-# CORS Middleware
+# CORS Middleware — origins come from Settings (CORS_ORIGINS in .env).
+# NOTE: allow_credentials must be False when origins are ["*"], otherwise
+# browsers reject credentialed responses served with `Access-Control-Allow-Origin: *`.
+_cors_origins = settings.cors_origins_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False if _cors_origins == ["*"] else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,6 +50,8 @@ app.include_router(monitoring_controller.router, prefix="/api/v1/monitoring", ta
 app.include_router(k9_patrols_controller.router, prefix="/api/v1/k9-patrols", tags=["10. K9 Units"])
 app.include_router(maintenance_controller.router, prefix="/api/v1/maintenance", tags=["11. IoT Maintenance"])
 app.include_router(digital_twin_controller.router, prefix="/api/v1/digital-twin", tags=["12. Digital Twin"])
+app.include_router(reports_controller.router, prefix="/api/v1/reports", tags=["13. Reports & Analytics"])
+app.include_router(ai_controller.router, prefix="/api/v1/ai", tags=["14. AI Center"])
 
 @app.get("/health", tags=["Health"])
 def health_check():
