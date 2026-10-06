@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { api } from '../services/api'
+import { KvGrid, StatusBadge } from '../components/ai/AiVisuals'
 
 export default function DigitalTwin() {
   const [form, setForm] = useState({ equipmentId: '', x: '', y: '', z: '', status: 'active' })
@@ -33,7 +34,16 @@ export default function DigitalTwin() {
           <Button>Update</Button>
         </form>
         {error && <p className="error">{error}</p>}
-        {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+        {result && (
+          <div style={{ marginTop: 10 }}>
+            <p><StatusBadge tone="good">POSITION UPDATED</StatusBadge></p>
+            <KvGrid items={[
+              { k: 'Equipment', v: form.equipmentId },
+              { k: 'Position', v: `(${form.x}, ${form.y}, ${form.z})` },
+              { k: 'Status', v: form.status },
+            ]} />
+          </div>
+        )}
       </Card>
     </>
   )

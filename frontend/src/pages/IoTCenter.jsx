@@ -4,6 +4,7 @@ import useApi from '../hooks/useApi'
 import FadeIn from '../components/animations/FadeIn'
 import PulseDot from '../components/animations/PulseDot'
 import { BarChart, EmptyState, ErrorState, Loading } from '../components/States'
+import { EventTimeline, StatusBadge } from '../components/ai/AiVisuals'
 
 const KNOWN_MODULES = ['Smart Gate', 'Passenger Counter', 'Smart Baggage', 'Fire Detection', 'Environment', 'Smart Elevator', 'Aircraft Parking']
 
@@ -40,7 +41,20 @@ export default function IoTCenter() {
       </FadeIn>
       <BarChart title="Devices by status" rows={(data.by_status || []).map((r) => ({ label: r.status, count: r.count }))} />
       <Card title={`Telemetry events (${health.length})`}>
-        {!health.length ? <EmptyState hint="no telemetry in database" /> : <pre>{JSON.stringify(health.slice(0, 50), null, 2)}</pre>}
+        {!health.length ? <EmptyState hint="no telemetry in database" /> : (
+          <>
+            <p><StatusBadge tone="live">{health.length} EVENTS IN DATABASE</StatusBadge></p>
+            <EventTimeline
+              emptyHint="no telemetry in database"
+              events={health.slice(0, 50).map((h) => ({
+                title: `Equipment ${h.equipment_id} — ${h.metric_type}: ${h.value}`,
+                detail: h.status_result, time: h.check_time,
+                severity: h.status_result === 'ok' ? 'low' : 'high',
+                badge: h.status_result?.toUpperCase(), tone: h.status_result === 'ok' ? 'good' : 'bad',
+              }))}
+            />
+          </>
+        )}
       </Card>
     </>
   )

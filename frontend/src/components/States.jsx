@@ -7,21 +7,37 @@ export function Loading({ label = 'Loading live airport data…' }) {
   return <SkeletonSection label={label} />
 }
 
-export function EmptyState({ title = 'No data available', hint }) {
+export function EmptyState({ title = 'No data available', hint, icon = '📭', action }) {
   return (
     <Card title={title}>
+      <div className="state-illust" aria-hidden>{icon}</div>
       <p>No data available{hint ? ` — ${hint}` : '.'}</p>
+      {action && <p style={{ marginTop: 8 }}>{action}</p>}
     </Card>
   )
 }
 
 export function ErrorState({ error, onRetry }) {
+  const msg = typeof error === 'string' ? error : error?.message || ''
+  // Never dump stacks/JSON: show only the first human-readable line.
+  const clean = msg.split('\n')[0].slice(0, 220)
   return (
-    <div className="anim-error">
-      <Card title="Connection issue">
-        <p className="error">Unable to load airport data{error ? `: ${error}` : '.'}</p>
-        {onRetry && <p><button className="btn" onClick={onRetry}>Retry</button></p>}
+    <div className="anim-error" role="alert">
+      <Card title="⚠ Service unavailable">
+        <p><strong>AI MODULE UNAVAILABLE</strong> — unable to connect to the service{clean ? `: ${clean}` : '.'}</p>
+        {onRetry && <p style={{ marginTop: 8 }}><button className="btn" onClick={onRetry}>Retry</button></p>}
       </Card>
+    </div>
+  )
+}
+
+/** Animated processing indicator for in-flight AI work. Render ONLY while busy. */
+export function AIProcessingIndicator({ label = 'AI MODEL PROCESSING', detail = 'Analyzing — this usually takes a few seconds…' }) {
+  return (
+    <div className="ai-processing" role="status" aria-label={label}>
+      <strong>{label}</strong>
+      <span className="ai-proc-dots" aria-hidden><i /><i /><i /></span>
+      <span className="ai-muted">{detail}</span>
     </div>
   )
 }

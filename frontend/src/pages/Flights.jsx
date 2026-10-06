@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { api } from '../services/api'
+import { KvGrid, StatusBadge } from '../components/ai/AiVisuals'
 
 const initial = { flightNumber: '', airlineCode: '', originAirportCode: '', destinationAirportCode: '', scheduledDeparture: '', boardingGateCode: '' }
 
@@ -33,7 +34,17 @@ export default function Flights() {
           <Button>Create</Button>
         </form>
         {error && <p className="error">{error}</p>}
-        {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+        {result && (
+          <div style={{ marginTop: 10 }}>
+            <p><StatusBadge tone="good">FLIGHT CREATED</StatusBadge></p>
+            <KvGrid items={[
+              { k: 'Flight', v: result.flightNumber || result.flight_number || form.flightNumber },
+              { k: 'Route', v: `${form.originAirportCode || result.originAirportCode || '—'} → ${form.destinationAirportCode || result.destinationAirportCode || '—'}` },
+              { k: 'Status', v: result.status || 'scheduled' },
+              { k: 'Record ID', v: result.flightId ?? result.flight_id ?? result.id ?? '—' },
+            ]} />
+          </div>
+        )}
       </Card>
     </>
   )

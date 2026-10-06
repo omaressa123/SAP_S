@@ -214,6 +214,9 @@
   .flight-pill.delayed,
   .sev-warning, .sev-critical,
   .scan-frame .scan-line,
+  .ai-proc-dots i,
+  .mini-scene .mini-beam, .mini-scene .mini-bag,
+  .mini-scene .mini-gate-l, .mini-scene .mini-gate-r,
   .skeleton { animation: none !important; }
   .anim-bar-fill { transform: none !important; transition: none !important; }
   .skeleton { opacity: 0.7; }
