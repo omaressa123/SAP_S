@@ -1,7 +1,7 @@
 # Smart Green Airport — full development environment.
 #   docker compose up --build     # start everything
-#   docker compose down           # stop (data kept in postgres_data)
-#   docker compose down -v        # DESTRUCTIVE: also deletes the database
+#   docker compose down           # stop (host PostgreSQL data is untouched)
+# NOTE: PostgreSQL lives on the Ubuntu host (port 5433), not in compose.
 #
 # URL map (host):
 #   Frontend: http://localhost            Backend: http://localhost:8000
@@ -15,18 +15,20 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
-    name: smart-airport-postgres-data
   mosquitto_data:
     name: smart-airport-mosquitto-data
   mosquitto_log:
     name: smart-airport-mosquitto-log
 
+# NOTE: PostgreSQL is the EXTERNAL host cluster (Ubuntu, port 5433), not a
+# container. Inside Docker, `localhost` means the container itself, so the
+# host is reached via host.docker.internal (host-gateway). Local (non-Docker)
+# runs use localhost:5433 instead (see backend/.env).
 x-backend-env: &backend-env
-  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@host.docker.internal:5433/${POSTGRES_DB:-smart_airport}
   SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-secret}
   API_KEY: ${API_KEY:-MOCK_API_KEY_123}
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
   MQTT_BROKER: mosquitto
   MQTT_PORT: 1883
   MQTT_USERNAME: ${MQTT_USERNAME:-}
@@ -34,26 +36,6 @@ x-backend-env: &backend-env
   MQTT_TOPIC_FILTER: ${MQTT_TOPIC_FILTER:-airport/#}
 
 services:
-  postgres:
-    image: postgres:18
-    container_name: smart-airport-postgres
-    restart: unless-stopped
-    networks: [airport-network]
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smart_airport}
-      POSTGRES_USER: ${POSTGRES_USER:-smart_airport}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
-    ports:
-      - "5432:5432"
-    volumes:
-      # PG18+ images store data in versioned subdirs; mount the parent.
-      - postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smart_airport} -d ${POSTGRES_DB:-smart_airport}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: smart-airport-mosquitto
@@ -81,12 +63,12 @@ services:
     container_name: smart-airport-backend
     restart: unless-stopped
     networks: [airport-network]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment: *backend-env
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
       mosquitto:
         condition: service_started
     healthcheck:
@@ -103,12 +85,17 @@ services:
     container_name: smart-airport-mqtt-consumer
     restart: unless-stopped
     networks: [airport-network]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment: *backend-env
     # Same image, consumer entrypoint (no DB init, no uvicorn).
     entrypoint: ["python", "-m", "app.services.mqtt_consumer"]
+    # Inherits the backend image's HTTP healthcheck, which can never pass
+    # here (no uvicorn on :8000) -- disable it; liveness is visible in logs
+    # ("MQTT connected ... subscribing airport/#").
+    healthcheck:
+      test: ["NONE"]
     depends_on:
-      postgres:
-        condition: service_healthy
       mosquitto:
         condition: service_healthy
       backend:
@@ -137,11 +124,10 @@ services:
     container_name: smart-airport-twin
     restart: unless-stopped
     networks: [airport-network]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@host.docker.internal:5433/${POSTGRES_DB:-smart_airport}
       TWIN_SIMULATION: ${TWIN_SIMULATION:-true}
     ports:
       - "8100:8100"
-    depends_on:
-      postgres:
-        condition: service_healthy

@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY app ./app
-COPY init_db.py seed_db.py scripts_smoke.py ./
+COPY init_db.py seed_db.py seed_demo_data.py setup_database.py scripts_smoke.py ./
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh && \
     useradd -m appuser && chown -R appuser:appuser /app

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Smart Airport System"
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg://smart_airport:change-me@localhost:5432/smart_airport",
+        "postgresql+psycopg://smart_airport:change-me-postgres@localhost:5433/smart_airport",
     )
 
     class Config:
