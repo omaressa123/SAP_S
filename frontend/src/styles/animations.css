@@ -238,3 +238,33 @@ html, body { overflow-x: clip; }
 @media (max-width: 640px) {
   .dash-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
+
+/* ---------- Kiosk & Biometrics Animations ---------- */
+@keyframes scannerMove {
+  0% { top: 10%; opacity: 0.2; }
+  50% { top: 85%; opacity: 1; }
+  100% { top: 10%; opacity: 0.2; }
+}
+
+@keyframes faceSweep {
+  0% { top: 15%; opacity: 0.3; }
+  50% { top: 80%; opacity: 1; }
+  100% { top: 15%; opacity: 0.3; }
+}
+
+.animate-scannerMove {
+  animation: scannerMove 2.2s infinite ease-in-out;
+}
+
+.animate-faceSweep {
+  animation: faceSweep 2s infinite ease-in-out;
+}
+
+@keyframes fadeInKiosk {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeInKiosk 0.35s ease-out forwards;
+}

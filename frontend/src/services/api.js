@@ -13,7 +13,7 @@ export async function api(path, options = {}) {
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(body?.error?.message || body?.message || `API error: ${res.status}`)
+    throw new Error(body?.detail || body?.error?.message || body?.data?.error || body?.message || `API error: ${res.status}`)
   }
   return body?.data !== undefined ? body.data : body
 }
@@ -28,6 +28,21 @@ export const SmartGateApi = {
       documentType: 'passport',
       ...payload
     })
+  }),
+
+  scanPassportImage: (payload = {}) => api('/api/v1/kiosk/scan-passport-image', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+
+  registerPassengerOcr: (payload = {}) => api('/api/v1/kiosk/register', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+
+  compareFaceMatch: (payload = {}) => api('/api/v1/kiosk/compare-face-match', {
+    method: 'POST',
+    body: JSON.stringify(payload)
   }),
 
   enrollBiometrics: (payload = {}) => api('/api/v1/kiosk/biometrics/enroll', {

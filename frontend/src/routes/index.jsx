@@ -18,6 +18,7 @@ const BaggageAI = lazy(() => import('../pages/BaggageAI'))
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const IoTCenter = lazy(() => import('../pages/IoTCenter'))
+const EGateKiosk = lazy(() => import('../pages/EGateKiosk'))
 
 export default function AppRoutes() {
   return (
@@ -38,6 +39,9 @@ export default function AppRoutes() {
           <Route path="/ai/full-detection" element={<FullDetection />} />
           <Route path="/iot" element={<IoTCenter />} />
         </Route>
+        {/* Full-screen Terminal Kiosk Views */}
+        <Route path="/egate" element={<EGateKiosk />} />
+        <Route path="/kiosk" element={<EGateKiosk />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

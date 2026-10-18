@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # SQLite remains only as a local/dev fallback when DATABASE_URL is unset.
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg://smart_airport:change-me-postgres@localhost:5433/smart_airport",
+        "postgresql+psycopg2://postgres:yahya2004718@localhost:5432/smart_airport",
     )
     SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-change-in-production")
     ALGORITHM: str = "HS256"
