@@ -15,4 +15,5 @@ from . import (  # noqa: F401
     admin_cameras,
     devices,
     sustainability,
+    agents,
 )

@@ -237,24 +237,66 @@ Key moments: book → check-in (kiosk/app) → bag drop → security face-scan �
 - **Maintenance team:** respond to `equipment_health_check` warnings/criticals, update `equipment.status`.
 - **Emergency team:** acknowledge/dispatch/resolve `emergency_event`.
 
-## Agent Pipeline (Future)
+## Agent Pipeline
 
-Planned AI agent layer orchestrating the technical layers (AI, IoT, Software, Database, Network) around the passenger journey.
+Implemented autonomous multi-agent system (`backend/app/agents/`) that integrates existing AI models, backend, central database, and Digital Twin. No models are retrained or replaced — existing services are wrapped in typed adapters and orchestrated deterministically.
+
+### Architecture
 
 ```
-Perception (sensors/AI) → Orchestration (agent planner) → Action (actuators/APIs)
-       ↑                                                        │
-       └─────────────── Feedback (twin position, alerts) ───────┘
+Perception (AI/IoT events) → Agent Registry → Orchestrator → Agent Actions
+                                     ↓                              ↓
+                              Event System ←── Decision Audit ←── Digital Twin
 ```
 
-Proposed future stages:
-1. **Perception agents** — consume `camera` streams (AI Platform: YOLO face/object/smoke-fire detection), IoT MQTT telemetry (`airport/{module}/{device}/{event}`), equipment health checks.
-2. **Reasoning / planner agent** — correlates events across domains (e.g., unattended bag + crowding → emergency_event), decides staff dispatch, gate changes, or passenger re-routing.
-3. **Action agents** — write to `emergency_event`, `monitoring_alert`, `notification`; command IoT actuators (gates, elevators, charging); update Digital Twin `digital_twin_position`.
-4. **Memory & audit** — all agent decisions logged to `audit_log` (view/create/update/delete/export) for traceability and human-in-the-loop override.
-5. **Human-in-the-loop** — high-confidence actions auto-execute; low-confidence / `flagged_for_staff` cases routed to `SecurityOfficer` / `EmergencyTeam` via Admin Dashboard.
+### Components
 
-The pipeline targets: reduced check-in/security/boarding latency, real-time baggage traceability, predictive equipment maintenance, and energy-aware operations.
+| Component | Location | Purpose |
+|---|---|---|
+| Agent Interface | `app/agents/base.py` | Common contract: capabilities, input validation, event handling, structured output, timeout, error handling |
+| Agent Registry | `app/agents/registry.py` | Registers agents, tracks capabilities/health, prevents duplicate registration |
+| Event System | `app/agents/events.py` | Event creation, validation, routing, correlation IDs, idempotency, PostgreSQL persistence |
+| Orchestrator | `app/agents/orchestrator.py` | Deterministic event classification, routing, multi-step workflows, retry/timeout/duplicate protection |
+| Model Adapters | `app/agents/adapters/` | Wrap existing AI services (face, baggage threat, safety) without retraining |
+| Identity Agent | `app/agents/identity_agent.py` | Passport/MRZ validation + face verification → Verified / Retry / Review |
+| Baggage Agent | `app/agents/baggage_agent.py` | Baggage tracking + X-ray screening evaluation → SAFE / MANUAL_REVIEW |
+| Safety Agent | `app/agents/safety_agent.py` | Fire/smoke/fall/restricted-area detection → severity-classified incidents |
+| Twin Publisher | `app/agents/twin_publisher.py` | Publishes state changes to Digital Twin (`:8100` REST API) |
+| Agent Service | `app/agents/service.py` | Wires registry, orchestrator, agents, and twin publisher together |
+
+### Agents Implemented
+
+1. **Identity Agent** (`identity_agent`) — Coordinates passport document validation and face verification via the existing `AI/face_reco` service. Applies explicit decision rules (document validity, face match, biometric consent, enrollment). Returns `verified` / `retry` / `review`. Never treats face recognition as proof of visa validity.
+
+2. **Baggage Agent** (`baggage_agent`) — Tracks baggage identifiers/status via `bag`/`bag_checkpoint_log`. Evaluates X-ray screening results via `BaggageThreatAdapter`. Applies explicit rules: threat items → `MANUAL_REVIEW`, non-threat items → `SAFE`. Records suspicious events and holds bags for review.
+
+3. **Safety Agent** (`safety_agent`) — Receives fire/smoke/fall/restricted-area/unattended-bag/overcrowding events. Classifies severity via explicit rules. Creates `emergency_event` and `monitoring_alert` records. All model detections are treated as candidates requiring human review.
+
+### API Endpoints (`/api/v1/agents/`, X-API-KEY protected)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/registry` | GET | Registered agents + capabilities + health |
+| `/agents/{id}` | GET | Single agent detail |
+| `/tasks/{id}` | GET | Agent task status |
+| `/workflows/{id}` | GET | Workflow execution status |
+| `/workflows` | GET | List recent workflows |
+| `/events` | GET | Recent airport events |
+| `/events` | POST | Ingest and route a new airport event |
+| `/agents/{id}/heartbeat` | POST | Agent heartbeat |
+| `/snapshot` | GET | Full observability snapshot |
+
+### Database Tables Added
+
+`agentdefinition`, `agenttask`, `agenteexecution`, `airportevent`, `workflowexecution`, `decisionaudit` — created via `init_db.py` alongside existing tables. No existing tables are modified.
+
+### Safety Boundaries
+
+- Agents never execute arbitrary shell commands, unrestricted SQL, or unapproved physical actions.
+- Model detections are candidate events, not confirmed emergencies — all require human review.
+- Identity/immigration/security decisions route to human review when confidence is below threshold.
+- Digital Twin is visualization-only; never the source of operational decisions.
+- No Kafka, Redis, or new infrastructure — existing PostgreSQL + FastAPI is the message bus.
 
 ## Quick Start (without Docker)
 

@@ -10,8 +10,11 @@ from .controllers import (
     inspection_controller, baggage_tracking_controller, security_gate_controller,
     boarding_gate_controller, monitoring_controller, k9_patrols_controller,
     maintenance_controller, digital_twin_controller, flight_controller,
-    reports_controller, ai_controller,
+    reports_controller, ai_controller, agent_controller,
 )
+
+# Agent service initialization
+from .agents.service import agent_service
 
 app = FastAPI(title="Smart Airport System API", version="2.0.0")
 
@@ -36,7 +39,18 @@ async def airport_exception_handler(request: Request, exc: AirportException):
 async def generic_exception_handler(request: Request, exc: Exception):
     return error_response(code="INTERNAL_SERVER_ERROR", message=str(exc), status_code=500)
 
-# Register all 12 routers
+# Initialize agent service on startup
+@app.on_event("startup")
+def init_agent_service():
+    agent_service.init(
+        face_service_url=settings.FACE_RECO_URL,
+        baggage_backend_url=f"{settings.DATABASE_URL and 'http://localhost:8000'}/api/v1/ai/baggage/analyze",
+        smoke_fire_url=settings.SMOKE_FIRE_URL,
+        fall_detection_url=settings.FULL_DETECTION_URL,
+        twin_base_url="http://localhost:8100",
+    )
+
+# Register all routers
 app.include_router(auth_controller.router, prefix="/api/v1/auth", tags=["1. Auth & User Management"])
 app.include_router(passenger_controller.router, prefix="/api/v1/passenger", tags=["2. Passenger Mobile App"])
 app.include_router(flight_controller.router, prefix="/api/v1/flights", tags=["System - Flights"])
@@ -52,6 +66,7 @@ app.include_router(maintenance_controller.router, prefix="/api/v1/maintenance", 
 app.include_router(digital_twin_controller.router, prefix="/api/v1/digital-twin", tags=["12. Digital Twin"])
 app.include_router(reports_controller.router, prefix="/api/v1/reports", tags=["13. Reports & Analytics"])
 app.include_router(ai_controller.router, prefix="/api/v1/ai", tags=["14. AI Center"])
+app.include_router(agent_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
 
 @app.get("/health", tags=["Health"])
 def health_check():
