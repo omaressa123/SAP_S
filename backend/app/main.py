@@ -44,7 +44,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
 def init_agent_service():
     agent_service.init(
         face_service_url=settings.FACE_RECO_URL,
-        baggage_backend_url=f"{settings.DATABASE_URL and 'http://localhost:8000'}/api/v1/ai/baggage/analyze",
+        baggage_backend_url="http://localhost:8000/api/v1/ai/baggage/analyze",
+        btd_inference_url=settings.BTD_INFERENCE_URL,
         smoke_fire_url=settings.SMOKE_FIRE_URL,
         fall_detection_url=settings.FULL_DETECTION_URL,
         twin_base_url="http://localhost:8100",

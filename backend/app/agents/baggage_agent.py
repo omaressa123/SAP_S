@@ -47,6 +47,7 @@ class BaggageAgent(AgentInterface):
                 "type": "object",
                 "properties": {
                     "bag_id": {"type": "integer"},
+                    "image_path": {"type": "string"},
                     "detections": {"type": "array"},
                     "equipment_id": {"type": "integer"},
                     "ai_model_version": {"type": "string"},
@@ -113,6 +114,7 @@ class BaggageAgent(AgentInterface):
     async def _handle_baggage_scan(self, payload: Dict[str, Any]) -> AgentResult:
         """Evaluate X-ray screening results for a bag."""
         bag_id = payload["bag_id"]
+        image_path = payload.get("image_path")
         equipment_id = payload.get("equipment_id")
         detections = payload.get("detections", [])
         ai_model_version = payload.get("ai_model_version", "btd-yolo11")
@@ -129,14 +131,16 @@ class BaggageAgent(AgentInterface):
                     requires_human_review=True,
                 )
 
-            # Run threat detection adapter
+            # Run threat detection adapter (real inference if image_path given)
             threat_result = await self.threat_adapter.execute_with_guard(
                 event_type="baggage_scan",
                 payload={
                     "bag_id": bag_id,
+                    "image_path": image_path,
                     "detections": detections,
                     "equipment_id": equipment_id,
                     "ai_model_version": ai_model_version,
+                    "checkpoint_type": checkpoint_type,
                 },
             )
 

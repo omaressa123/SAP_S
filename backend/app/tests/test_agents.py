@@ -17,13 +17,18 @@ from app.models.agents import (
     WorkflowExecution, DecisionAudit,
 )
 from app.models.identity import Passenger, TravelDocument, FaceEnrollment
-from app.models.check_in import Bag
+from app.models.check_in import Bag, BagCheckpointLog
 from app.models.admin_cameras import EmergencyEvent, MonitoringAlert
 from app.models.devices import Equipment
+from app.models.baggage_security_screening import BaggageInspection, DetectedItem
 
 # ---- helpers ----
 
 def _seed_passenger(db, pid=TEST_PASSENGER_ID):
+    # Idempotent: avoid PK clashes across tests (clean_tables doesn't clear seed tables).
+    db.query(FaceEnrollment).filter(FaceEnrollment.passenger_id == pid).delete()
+    db.query(TravelDocument).filter(TravelDocument.passenger_id == pid).delete()
+    db.query(Passenger).filter(Passenger.passenger_id == pid).delete()
     p = Passenger(
         passenger_id=pid, full_name="Test Passenger", email=f"p{pid}@example.com",
         password_hash="hash", biometric_consent=True, is_active=True,
@@ -48,6 +53,19 @@ def _seed_passenger(db, pid=TEST_PASSENGER_ID):
     return pid
 
 def _seed_bag(db, bid=TEST_BAG_ID):
+    # Idempotent: avoid PK clashes across tests (clean_tables doesn't clear seed tables).
+    inspection_ids = [r[0] for r in db.query(BaggageInspection.inspection_id)
+                      .filter(BaggageInspection.bag_id == bid).all()]
+    if inspection_ids:
+        db.query(DetectedItem).filter(
+            DetectedItem.inspection_id.in_(inspection_ids)
+        ).delete(synchronize_session=False)
+    db.query(BaggageInspection).filter(BaggageInspection.bag_id == bid).delete(
+        synchronize_session=False)
+    db.query(BagCheckpointLog).filter(BagCheckpointLog.bag_id == bid).delete(
+        synchronize_session=False)
+    db.query(Bag).filter(Bag.bag_id == bid).delete(synchronize_session=False)
+    db.commit()
     b = Bag(
         bag_id=bid, passenger_id=TEST_PASSENGER_ID,
         rfid_tag=f"RFID{bid:06d}", qr_code=f"QR{bid:06d}",
@@ -205,7 +223,28 @@ class TestModelAdapters:
         assert result.requires_human_review is True
         assert result.metadata["threat_found"] is True
 
-    def test_baggage_adapter_safe(self):
+    def test_baggage_adapter_safe_no_detections(self):
+        """No detections -> SAFE (the only SAFE outcome)."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        adapter = BaggageThreatAdapter()
+        import asyncio
+        result = asyncio.run(adapter.infer({
+            "bag_id": 1,
+            "detections": [],
+        }))
+        assert result.success is True
+        assert result.detection == "SAFE"
+        assert result.verified_event == "no_items_detected"
+        assert result.requires_human_review is False
+        assert result.metadata["threat_found"] is False
+
+    def test_baggage_adapter_any_detection_manual_review(self):
+        """Any detection (known threat or unknown class) -> MANUAL_REVIEW.
+
+        A model detection is a candidate requiring human review; it is never
+        automatically SAFE. "laptop" is not even a BTD class, but an unknown
+        detection must not become SAFE.
+        """
         from app.agents.adapters.baggage import BaggageThreatAdapter
         adapter = BaggageThreatAdapter()
         import asyncio
@@ -216,8 +255,28 @@ class TestModelAdapters:
             ],
         }))
         assert result.success is True
-        assert result.detection == "SAFE"
-        assert result.requires_human_review is False
+        assert result.detection == "MANUAL_REVIEW"
+        assert result.verified_event == "threat_detected"
+        assert result.requires_human_review is True
+        assert result.metadata["threat_found"] is True
+
+    def test_baggage_adapter_real_btd_class(self):
+        """A real BTD threat class (knife) -> MANUAL_REVIEW with preserved
+        class name and confidence."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        adapter = BaggageThreatAdapter()
+        import asyncio
+        result = asyncio.run(adapter.infer({
+            "bag_id": 1,
+            "detections": [
+                {"item_type": "knife", "confidence": 0.93},
+            ],
+        }))
+        assert result.success is True
+        assert result.detection == "MANUAL_REVIEW"
+        assert result.confidence == 0.93
+        assert result.metadata["detections"][0]["item_type"] == "knife"
+
 
     def test_safety_adapter_precomputed(self):
         from app.agents.adapters.safety import SafetyAdapter
@@ -246,6 +305,267 @@ class TestModelAdapters:
         assert result.success is False
         assert result.service_unavailable is True
         assert result.requires_human_review is True
+
+
+class TestBaggageAdapterRealInference:
+    """Tests for the BTD HTTP inference endpoint integration.
+
+    These tests mock the HTTP layer (httpx.AsyncClient) because the YOLO11
+    runtime (torch + ultralytics) is not installed in this environment, so
+    the real model cannot be executed here. The adapter code path is the same
+    one used against the real endpoint.
+    """
+
+    def _mock_httpx_response(self, status_code=200, json_body=None, exc=None):
+        """Build a mock httpx AsyncClient context manager."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.status_code = status_code
+        if json_body is not None:
+            mock_response.json = MagicMock(return_value=json_body)
+        else:
+            mock_response.json = MagicMock(side_effect=ValueError("no json"))
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        if exc is not None:
+            mock_client.post = AsyncMock(side_effect=exc)
+
+        return patch("httpx.AsyncClient", return_value=mock_client)
+
+    def test_real_inference_parse_detections(self, temp_image):
+        """Real image upload → detections parsed → MANUAL_REVIEW."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        response_body = {
+            "detections": [
+                {"item_type": "knife", "confidence": 0.93, "box": [10, 20, 100, 200]},
+                {"item_type": "gun", "confidence": 0.88, "box": [50, 60, 150, 250]},
+            ],
+            "detection_count": 2,
+            "model": "best.pt",
+        }
+        with self._mock_httpx_response(json_body=response_body):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is True
+        assert result.detection == "MANUAL_REVIEW"
+        assert result.verified_event == "threat_detected"
+        assert result.requires_human_review is True
+        assert result.confidence == 0.93  # max confidence
+        assert result.metadata["detection_count"] == 2
+        assert result.metadata["threat_found"] is True
+        types = [d["item_type"] for d in result.metadata["detections"]]
+        assert "knife" in types and "gun" in types
+
+    def test_real_inference_no_detections_safe(self, temp_image):
+        """Real inference returns no detections -> SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        response_body = {"detections": [], "detection_count": 0, "model": "best.pt"}
+        with self._mock_httpx_response(json_body=response_body):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is True
+        assert result.detection == "SAFE"
+        assert result.requires_human_review is False
+        assert result.metadata["threat_found"] is False
+
+    def test_real_inference_service_unavailable_not_safe(self, temp_image):
+        """BTD service unreachable -> success=False, never SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+        import httpx
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        with self._mock_httpx_response(exc=httpx.ConnectError("refused")):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+        assert "unreachable" in result.error
+
+    def test_real_inference_timeout_not_safe(self, temp_image):
+        """BTD inference timeout -> success=False, never SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+        import httpx
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        with self._mock_httpx_response(exc=httpx.TimeoutException("timed out")):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert "timed out" in result.error
+
+    def test_real_inference_http_error_not_safe(self, temp_image):
+        """BTD service HTTP error -> success=False, never SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        with self._mock_httpx_response(status_code=500, json_body={"detail": "boom"}):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert "HTTP 500" in result.error
+
+    def test_real_inference_malformed_json_not_safe(self, temp_image):
+        """BTD service returns invalid JSON -> success=False, never SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        with self._mock_httpx_response(status_code=200, json_body=None):
+            result = asyncio.run(adapter.infer({
+                "image_path": temp_image,
+                "bag_id": 1,
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert "invalid JSON" in result.error
+
+    def test_real_inference_image_not_found(self):
+        """Missing image file -> success=False, requires review, not SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        result = asyncio.run(adapter.infer({
+            "image_path": "/tmp/does_not_exist.jpg",
+            "bag_id": 1,
+        }))
+        assert result.success is False
+        assert result.requires_human_review is True
+        assert "not found" in result.error
+
+    def test_real_inference_no_service_url(self, temp_image):
+        """No BTD_INFERENCE_URL configured -> service_unavailable, not SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter()  # no service_url
+        result = asyncio.run(adapter.infer({
+            "image_path": temp_image,
+            "bag_id": 1,
+        }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+
+    def test_precomputed_path_still_works(self):
+        """Existing callers supplying precomputed detections still work."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        result = asyncio.run(adapter.infer({
+            "bag_id": 1,
+            "detections": [
+                {"item_type": "scissors", "confidence": 0.9},
+            ],
+        }))
+        assert result.success is True
+        assert result.detection == "MANUAL_REVIEW"
+        assert result.metadata["detections"][0]["item_type"] == "scissors"
+
+
+class TestBaggageAgentEndToEnd:
+    """End-to-end: image upload triggers inference → decision → persistence → twin."""
+
+    def test_baggage_scan_with_image_via_api(self, temp_image):
+        db = SessionLocal()
+        _seed_bag(db)
+        db.close()
+
+        # Mock the BTD inference endpoint to return a knife detection
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        orig_infer = BaggageThreatAdapter.infer
+
+        async def fake_infer(self, payload):
+            from app.agents.adapters.base import AdapterResult
+            return AdapterResult(
+                success=True,
+                model_id="baggage_threat_detection",
+                model_version="btd-yolo11",
+                detection="MANUAL_REVIEW",
+                confidence=0.93,
+                verified_event="threat_detected",
+                requires_human_review=True,
+                metadata={
+                    "bag_id": payload.get("bag_id"),
+                    "detections": [{"item_type": "knife", "confidence": 0.93}],
+                    "threat_found": True,
+                },
+            )
+
+        BaggageThreatAdapter.infer = fake_infer
+        try:
+            r = client.post("/api/v1/agents/events",
+                json={
+                    "event_type": "baggage_scan",
+                    "source": "api",
+                    "payload": {
+                        "bag_id": TEST_BAG_ID,
+                        "image_path": temp_image,
+                    },
+                },
+                headers=HEADERS,
+            )
+        finally:
+            BaggageThreatAdapter.infer = orig_infer
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+
+        # Verify inspection + detected item persisted
+        db = SessionLocal()
+        insp = db.query(__import__("app.models.baggage_security_screening", fromlist=["BaggageInspection"]).BaggageInspection).first()
+        assert insp is not None
+        assert insp.result == "MANUAL_REVIEW"
+        det = db.query(__import__("app.models.baggage_security_screening", fromlist=["DetectedItem"]).DetectedItem).first()
+        assert det is not None
+        assert det.item_type == "knife"
+        # Bag held for review
+        bag = db.query(Bag).filter(Bag.bag_id == TEST_BAG_ID).first()
+        assert bag.current_status == "stationary"
+        # Emergency event + alert created
+        ee = db.query(EmergencyEvent).filter(EmergencyEvent.event_type == "suspicious_bag").first()
+        assert ee is not None
+        al = db.query(MonitoringAlert).filter(MonitoringAlert.behavior_type == "unattended_bag").first()
+        assert al is not None
+        # Task execution recorded (stored under the capability name "screen_baggage")
+        from app.models.agents import AgentTask
+        task = db.query(AgentTask).filter(AgentTask.task_type == "screen_baggage").first()
+        assert task is not None
+        assert task.status == "completed"
+
+        # Digital Twin publishing attempted via the existing TwinPublisher
+        from app.agents.service import agent_service
+        assert agent_service.twin_publisher.publish_agent_event.called
+        db.close()
 
 
 class TestEventRouting:
@@ -352,14 +672,16 @@ class TestDatabasePersistence:
     def test_emergency_event_persisted(self):
         db = SessionLocal()
         ee = EmergencyEvent(
-            event_id=1, event_type="fire", zone_id=3,
+            event_type="fire", zone_id=3,
             status="detected", detected_time=datetime.utcnow(),
         )
         db.add(ee)
         db.commit()
-        row = db.query(EmergencyEvent).filter(EmergencyEvent.event_id == 1).first()
+        db.refresh(ee)
+        row = db.query(EmergencyEvent).filter(EmergencyEvent.event_type == "fire").first()
         assert row is not None
         assert row.event_type == "fire"
+        assert row.event_id == ee.event_id
         db.close()
 
 

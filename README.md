@@ -259,16 +259,42 @@ Perception (AI/IoT events) → Agent Registry → Orchestrator → Agent Actions
 | Orchestrator | `app/agents/orchestrator.py` | Deterministic event classification, routing, multi-step workflows, retry/timeout/duplicate protection |
 | Model Adapters | `app/agents/adapters/` | Wrap existing AI services (face, baggage threat, safety) without retraining |
 | Identity Agent | `app/agents/identity_agent.py` | Passport/MRZ validation + face verification → Verified / Retry / Review |
-| Baggage Agent | `app/agents/baggage_agent.py` | Baggage tracking + X-ray screening evaluation → SAFE / MANUAL_REVIEW |
+| Baggage Agent | `app/agents/baggage_agent.py` | Baggage tracking + real YOLO11 X-ray screening → SAFE / MANUAL_REVIEW / PROCESSING_ERROR |
 | Safety Agent | `app/agents/safety_agent.py` | Fire/smoke/fall/restricted-area detection → severity-classified incidents |
 | Twin Publisher | `app/agents/twin_publisher.py` | Publishes state changes to Digital Twin (`:8100` REST API) |
 | Agent Service | `app/agents/service.py` | Wires registry, orchestrator, agents, and twin publisher together |
+
+### BTD Inference Endpoint (`AI/BTD/inference_server.py`)
+
+A lightweight FastAPI wrapper exposes the **existing** YOLO11 model (`AI/BTD/best.pt`) over HTTP without retraining or duplicating it. It imports the model instance already loaded by `AI/BTD/app.py`, so the weights load once per process. The existing Gradio UI (`app.py`) is unchanged and keeps working.
+
+Endpoints:
+- `GET /health` — model availability + class labels
+- `POST /analyze` — upload an X-ray image (`image` field), optional `conf` / `iou`; returns real detections `{item_type, confidence, box}`
+
+Startup (from `AI/BTD/`, requires `torch` + `ultralytics`):
+```bash
+python -m uvicorn inference_server:app --host 0.0.0.0 --port 8002
+```
+
+The backend references it via `BTD_INFERENCE_URL` (default `http://localhost:8002`).
+
+### Model classes discovered
+
+The YOLO11 checkpoint (`classes.json`) defines 12 threat/contraband classes:
+
+`baton, bullet, gun, hammer, handcuffs, knife, lighter, pliers, powerbank, scissors, sprayer, wrench`
 
 ### Agents Implemented
 
 1. **Identity Agent** (`identity_agent`) — Coordinates passport document validation and face verification via the existing `AI/face_reco` service. Applies explicit decision rules (document validity, face match, biometric consent, enrollment). Returns `verified` / `retry` / `review`. Never treats face recognition as proof of visa validity.
 
-2. **Baggage Agent** (`baggage_agent`) — Tracks baggage identifiers/status via `bag`/`bag_checkpoint_log`. Evaluates X-ray screening results via `BaggageThreatAdapter`. Applies explicit rules: threat items → `MANUAL_REVIEW`, non-threat items → `SAFE`. Records suspicious events and holds bags for review.
+2. **Baggage Agent** (`baggage_agent`) — Tracks baggage identifiers/status via `bag`/`bag_checkpoint_log`. Accepts either an X-ray `image_path` (sent to the BTD inference endpoint for real YOLO11 inference) or precomputed detections. Applies explicit screening rules:
+   - any detection → `MANUAL_REVIEW` (candidate threat, human review)
+   - no detections → `SAFE`
+   - inference/service failure → `PROCESSING_ERROR` (never silently `SAFE`)
+   
+   Records `baggage_inspection` + `detected_item`, holds suspicious bags, creates `emergency_event`/`monitoring_alert`, and publishes state changes to the Digital Twin.
 
 3. **Safety Agent** (`safety_agent`) — Receives fire/smoke/fall/restricted-area/unattended-bag/overcrowding events. Classifies severity via explicit rules. Creates `emergency_event` and `monitoring_alert` records. All model detections are treated as candidates requiring human review.
 

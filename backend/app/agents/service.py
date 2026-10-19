@@ -34,6 +34,7 @@ class AgentService:
         self,
         face_service_url: Optional[str] = None,
         baggage_backend_url: Optional[str] = None,
+        btd_inference_url: Optional[str] = None,
         smoke_fire_url: Optional[str] = None,
         fall_detection_url: Optional[str] = None,
         twin_base_url: str = "http://localhost:8100",
@@ -45,18 +46,22 @@ class AgentService:
         # Core infrastructure
         self.registry = AgentRegistry()
         self.event_system = EventSystem(db_session_factory=SessionLocal)
-        self.orchestrator = AgentOrchestrator(
-            registry=self.registry,
-            event_system=self.event_system,
-        )
         self.twin_publisher = TwinPublisher(
             twin_base_url=twin_base_url,
             auth_token=twin_auth_token,
         )
+        self.orchestrator = AgentOrchestrator(
+            registry=self.registry,
+            event_system=self.event_system,
+            twin_publisher=self.twin_publisher,
+        )
 
         # Model adapters (wrap existing AI services)
         face_adapter = FaceVerificationAdapter(service_url=face_service_url)
-        baggage_adapter = BaggageThreatAdapter(backend_url=baggage_backend_url)
+        baggage_adapter = BaggageThreatAdapter(
+            service_url=btd_inference_url,
+            backend_url=baggage_backend_url,
+        )
         safety_adapter = SafetyAdapter(
             smoke_fire_url=smoke_fire_url,
             fall_detection_url=fall_detection_url,
@@ -64,7 +69,9 @@ class AgentService:
 
         # Agents
         self.identity_agent = IdentityAgent(face_service_url=face_service_url)
-        self.baggage_agent = BaggageAgent(backend_url=baggage_backend_url)
+        self.baggage_agent = BaggageAgent(
+            backend_url=baggage_backend_url,
+        )
         self.safety_agent = SafetyAgent(
             smoke_fire_url=smoke_fire_url,
             fall_detection_url=fall_detection_url,

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "*")
     FACE_RECO_URL: str = os.getenv("FACE_RECO_URL", "http://localhost:8001")
     BTD_URL: str = os.getenv("BTD_URL", "http://localhost:8002")
+    # BTD HTTP inference endpoint (AI/BTD/inference_server.py) — real YOLO11
+    # X-ray baggage threat detection. Optional; core backend works without it.
+    BTD_INFERENCE_URL: str = os.getenv("BTD_INFERENCE_URL", "http://localhost:8002")
     SMOKE_FIRE_URL: str = os.getenv("SMOKE_FIRE_URL", "http://localhost:8003")
     FULL_DETECTION_URL: str = os.getenv("FULL_DETECTION_URL", "http://localhost:8004")
     MQTT_BROKER: str = os.getenv("MQTT_BROKER", "localhost")

@@ -39,6 +39,7 @@ from ..models.admin_cameras import MonitoringAlert as MMonitoringAlert
 from .base import AgentInterface, AgentResult, AgentStatus
 from .registry import AgentRegistry
 from .events import AirportEvent, EventSystem, EventSource, EventSeverity
+from .twin_publisher import TwinPublisher
 
 
 class WorkflowStatus(str, Enum):
@@ -104,9 +105,15 @@ class WorkflowContext:
 class AgentOrchestrator:
     """Routes events to agents and executes deterministic workflows."""
 
-    def __init__(self, registry: AgentRegistry, event_system: EventSystem):
+    def __init__(
+        self,
+        registry: AgentRegistry,
+        event_system: EventSystem,
+        twin_publisher: Optional[TwinPublisher] = None,
+    ):
         self.registry = registry
         self.event_system = event_system
+        self.twin_publisher = twin_publisher
         self._workflows: Dict[str, WorkflowContext] = {}
         self._running_tasks: Dict[str, asyncio.Task] = {}
         self._step_guard: set = set()  # (workflow_id, task_id) to prevent loops
@@ -315,7 +322,7 @@ class AgentOrchestrator:
 
         data = step.result.get("data", {})
 
-        # Emit a downstream event for the Digital Twin consumer
+        # Persist a downstream event for the Digital Twin consumer.
         twin_event = AirportEvent.create(
             event_type=f"{event.event_type}.completed",
             source="agent",
@@ -336,6 +343,25 @@ class AgentOrchestrator:
             flight_id=event.flight_id,
         )
         self.event_system.publish(twin_event)
+
+        # Push the structured state change to the Digital Twin REST API
+        # (airport-twin :8100). Failure here is non-fatal: the twin is
+        # visualization-only and the agent workflow continues.
+        if self.twin_publisher is not None:
+            import asyncio as _asyncio
+
+            try:
+                await _asyncio.wait_for(
+                    self.twin_publisher.publish_agent_event(
+                        asset_code=f"bag-{event.bag_id}" if event.bag_id else "bag-unknown",
+                        event_type=f"{event.event_type}.completed",
+                        payload=data,
+                    ),
+                    timeout=10.0,
+                )
+            except Exception:  # noqa: BLE001
+                # Twin unreachable — non-fatal; event is still persisted above.
+                pass
 
     # ----- persistence helpers -----
 

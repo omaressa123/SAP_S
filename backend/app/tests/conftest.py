@@ -47,10 +47,18 @@ from app.agents.service import agent_service
 agent_service.init(
     face_service_url="http://localhost:8001",
     baggage_backend_url="http://localhost:8000/api/v1/ai/baggage/analyze",
+    btd_inference_url="http://localhost:8002",
     smoke_fire_url="http://localhost:8003",
     fall_detection_url="http://localhost:8004",
     twin_base_url="http://localhost:8100",
 )
+
+# Mock the twin publisher so tests do not make real HTTP calls to a service
+# that is not running in the test environment. The twin publish path is
+# non-fatal anyway; this just keeps the test suite fast and deterministic.
+from unittest.mock import AsyncMock
+agent_service.twin_publisher.publish_agent_event = AsyncMock(return_value=True)
+agent_service.twin_publisher.publish_state_change = AsyncMock(return_value=True)
 
 client = TestClient(app)
 HEADERS = {"X-API-KEY": "MOCK_API_KEY_123"}
@@ -71,3 +79,20 @@ def clean_tables():
     finally:
         db.close()
     yield
+
+
+@pytest.fixture
+def temp_image(tmp_path):
+    """Create a small valid PNG image file for BTD inference tests (no PIL needed)."""
+    # Minimal valid 1x1 opaque PNG.
+    png_bytes = (
+        b"\x89PNG\r\n\x1a\n"
+        b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+        b"\x90wS\xde"
+        b"\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18"
+        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x18\xd8\xff\xff"
+        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    img_path = tmp_path / "xray.png"
+    img_path.write_bytes(png_bytes)
+    return str(img_path)
