@@ -11,3 +11,5 @@ python-multipart
 paho-mqtt
 httpx
 pytest
+cloudinary
+Pillow

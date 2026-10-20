@@ -69,7 +69,16 @@ export const SmartGateApi = {
     body: JSON.stringify({
       boardingGateId: 22,
       flightId: 1,
-      passengerId: 2,
+      passengerId: 4,
+      ...payload
+    })
+  }),
+
+  enrollGateFace: (payload = {}) => api('/api/v1/boarding-gate/enroll-face', {
+    method: 'POST',
+    body: JSON.stringify({
+      passengerId: 4,
+      flightNumber: 'QR-082',
       ...payload
     })
   }),

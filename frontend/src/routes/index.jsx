@@ -22,6 +22,7 @@ const IoTCenter = lazy(() => import('../pages/IoTCenter'))
 const EGateKiosk = lazy(() => import('../pages/EGateKiosk'))
 const EventCenter = lazy(() => import('../pages/EventCenter'))
 const WorkflowMonitor = lazy(() => import('../pages/WorkflowMonitor'))
+const GateBoarding = lazy(() => import('../pages/GateBoarding'))
 
 export default function AppRoutes() {
   return (
@@ -48,6 +49,9 @@ export default function AppRoutes() {
         {/* Full-screen Terminal Kiosk Views */}
         <Route path="/egate" element={<EGateKiosk />} />
         <Route path="/kiosk" element={<EGateKiosk />} />
+        <Route path="/gate-boarding" element={<GateBoarding />} />
+        <Route path="/boarding-gate" element={<GateBoarding />} />
+        <Route path="/entry-gate" element={<GateBoarding />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

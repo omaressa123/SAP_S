@@ -22,8 +22,9 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models.identity import Passenger, TravelDocument, Country
+from ..models.identity import Passenger, TravelDocument, Country, FaceEnrollment
 from ..models.flights import Flight, Booking, Airport
+from ..services.storage_service import storage_service
 
 class ScanPassportRequest(BaseModel):
     kioskEquipmentId: Optional[int] = 4
@@ -38,39 +39,102 @@ class EnrollFaceRequest(BaseModel):
 
 @router.post("/passport/scan", dependencies=[Depends(verify_api_key)])
 def scan_passport(payload: ScanPassportRequest, db: Session = Depends(get_db)):
-    # Look for matching passenger in database (e.g. Alex Mercer or Ahmed Hassan)
-    passenger = db.query(Passenger).filter(
-        (Passenger.full_name.ilike("%alex%")) | (Passenger.email.ilike("%alex%"))
-    ).first()
-    
-    if not passenger:
-        passenger = db.query(Passenger).first()
+    from ..services.passport_ocr_service import scan_and_extract_passport, parse_mrz_lines
 
-    passport_num = "P982301A"
-    full_name = "Alex Mercer"
-    country_code = "US"
-    dob = "1988-06-12"
-    p_id = 1
-    flight_num = "QR-082"
-    booking_id = 101
+    p_data = None
+    if payload.scannedImageBase64 and payload.scannedImageBase64.strip():
+        try:
+            res = scan_and_extract_passport(payload.scannedImageBase64)
+            p_data = res.get("passport")
+        except Exception:
+            pass
 
-    if passenger:
-        p_id = passenger.passenger_id
-        full_name = passenger.full_name
-        country_code = passenger.nationality_country_code or "US"
-        dob = passenger.date_of_birth.isoformat() if passenger.date_of_birth else "1988-06-12"
-        doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == passenger.passenger_id).first()
+    if not p_data and payload.rawMrzCode:
+        p_data = parse_mrz_lines(payload.rawMrzCode.splitlines())
+        if p_data:
+            p_data = p_data.__dict__
+
+    passport_num = p_data.get("passport_number") if p_data else None
+    full_name = p_data.get("full_name") if p_data else None
+    country_code = p_data.get("nationality", "USA") if p_data else "USA"
+    dob = p_data.get("date_of_birth", "1990-01-01") if p_data else "1990-01-01"
+
+    # Search in database by document number or name
+    passenger = None
+    if passport_num:
+        doc = db.query(TravelDocument).filter(TravelDocument.document_number == passport_num).first()
         if doc:
-            passport_num = doc.document_number
-        booking = db.query(Booking).filter(Booking.passenger_id == passenger.passenger_id).first()
-        if booking:
-            booking_id = booking.booking_id
-            flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first()
-            if flight:
-                flight_num = flight.flight_number
+            passenger = db.query(Passenger).filter(Passenger.passenger_id == doc.passenger_id).first()
+
+    if not passenger and full_name:
+        passenger = db.query(Passenger).filter(Passenger.full_name.ilike(f"%{full_name}%")).first()
+
+    if not passenger:
+        # Create passenger if new
+        p_dob = None
+        try:
+            p_dob = datetime.strptime(dob, "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+        passenger = Passenger(
+            full_name=full_name or "PASSPORT HOLDER",
+            date_of_birth=p_dob,
+            nationality_country_code=country_code,
+            password_hash="kiosk_auto_pass",
+            biometric_consent=True,
+            consent_date=datetime.utcnow(),
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(passenger)
+        db.commit()
+        db.refresh(passenger)
+
+        if passport_num:
+            new_doc = TravelDocument(
+                passenger_id=passenger.passenger_id,
+                document_type="passport",
+                document_number=passport_num,
+                issuing_country_code=country_code,
+                is_primary=True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            db.add(new_doc)
+            db.commit()
+
+    p_id = passenger.passenger_id
+    full_name = passenger.full_name
+    country_code = passenger.nationality_country_code or country_code
+
+    # Query or create booking
+    booking = db.query(Booking).filter(Booking.passenger_id == p_id).first()
+    fl_qr = db.query(Flight).filter(Flight.flight_number == "QR-082").first()
+    if not fl_qr:
+        fl_qr = db.query(Flight).first()
+
+    if not booking:
+        booking = Booking(
+            passenger_id=p_id,
+            flight_id=fl_qr.flight_id if fl_qr else 1,
+            booking_reference=f"QR82-P{p_id}-TICKET",
+            seat_number="18B",
+            booking_class="Economy",
+            booking_status="confirmed",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+
+    flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first() if booking else fl_qr
+    flight_num = flight.flight_number if flight else "QR-082"
 
     return success_response(data={
-        "passportNumber": passport_num,
+        "passportNumber": passport_num or "A16041745",
         "fullName": full_name,
         "nationalityCountryCode": country_code,
         "dateOfBirth": dob,
@@ -79,34 +143,91 @@ def scan_passport(payload: ScanPassportRequest, db: Session = Depends(get_db)):
             "passengerId": p_id,
             "profileFound": True,
             "linkedBooking": {
-                "bookingId": booking_id,
+                "bookingId": booking.booking_id if booking else 101,
                 "flightNumber": flight_num,
-                "seatNumber": "14A",
+                "seatNumber": booking.seat_number if booking else "18B",
                 "gate": "B22",
-                "group": "2",
-                "class": "Business Class",
+                "group": "Zone 2",
+                "class": booking.booking_class if booking else "Economy",
                 "destination": "Doha (DOH)"
             }
         }
     })
 
 @router.post("/biometrics/enroll", dependencies=[Depends(verify_api_key)])
-def enroll_biometrics(payload: EnrollFaceRequest):
+def enroll_biometrics(payload: EnrollFaceRequest, db: Session = Depends(get_db)):
+    p_id = payload.passengerId
+    if not p_id:
+        p_latest = db.query(Passenger).order_by(Passenger.passenger_id.desc()).first()
+        p_id = p_latest.passenger_id if p_latest else 1
+
+    passenger = db.query(Passenger).filter(Passenger.passenger_id == p_id).first()
+    p_name = passenger.full_name if passenger else "PASSPORT HOLDER"
+
+    doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == p_id).first()
+    doc_num = doc.document_number if doc else "UNKNOWN"
+
+    b = db.query(Booking).filter(Booking.passenger_id == p_id).first()
+    fl_num = "QR-082"
+    seat_num = "18B"
+    if b:
+        seat_num = b.seat_number or seat_num
+        fl = db.query(Flight).filter(Flight.flight_id == b.flight_id).first()
+        if fl:
+            fl_num = fl.flight_number
+
+    # Upload face image if provided with face validation
+    face_url = f"/data/faces/p_{p_id}_face.jpg"
+    if payload.capturedFaceBase64 and payload.capturedFaceBase64.strip():
+        from ..services.biometric_service import biometric_service
+        img_np = biometric_service.clean_base64_to_cv2(payload.capturedFaceBase64)
+        if img_np is not None:
+            face_bbox = biometric_service.detect_human_face(img_np)
+            if face_bbox is None:
+                return error_response(code="NO_FACE_DETECTED", message="No human face detected in biometric capture. Please face the camera directly.", status_code=400)
+        uploaded_url = storage_service.upload_face(payload.capturedFaceBase64, passenger_id=p_id)
+        if uploaded_url:
+            face_url = uploaded_url
+
+    # Persist or update FaceEnrollment in PostgreSQL
+    fe = db.query(FaceEnrollment).filter(FaceEnrollment.passenger_id == p_id).first()
+    now = datetime.utcnow()
+    if not fe:
+        fe = FaceEnrollment(
+            passenger_id=p_id,
+            document_id=doc.document_id if doc else None,
+            equipment_id=payload.kioskEquipmentId or 4,
+            face_embedding_ref=face_url,
+            embedding_model="ArcFace",
+            enrollment_time=now,
+            status="active",
+            created_at=now,
+            updated_at=now
+        )
+        db.add(fe)
+    else:
+        fe.face_embedding_ref = face_url
+        fe.status = "active"
+        fe.updated_at = now
+    db.commit()
+    db.refresh(fe)
+
     return success_response(data={
         "enrollmentStatus": "SUCCESS",
-        "embeddingRef": f"vec_p{payload.passengerId}_8f9a0b12",
+        "embeddingRef": fe.face_embedding_ref,
         "faceQualityScore": 0.99,
         "matchWithPassportPhoto": True,
         "matchConfidence": 99.4,
-        "passengerName": "Alex Mercer",
-        "passportNumber": "P982301A",
-        "flightNumber": "QR-082",
+        "passengerName": p_name,
+        "passportNumber": doc_num,
+        "flightNumber": fl_num,
         "destination": "Doha (DOH)",
         "gate": "B22",
-        "seat": "14A",
-        "group": "2",
-        "sessionInitializedAt": "2026-10-05T10:45:00Z"
+        "seat": seat_num,
+        "group": "Zone 2",
+        "sessionInitializedAt": now.isoformat() + "Z"
     })
+
 
 class IssueBoardingPassRequest(BaseModel):
     bookingId: int
@@ -223,8 +344,6 @@ class CompareFaceMatchRequest(BaseModel):
 @router.post("/compare-face-match")
 def compare_face_match(payload: CompareFaceMatchRequest, db: Session = Depends(get_db)):
     """Real AI comparison between passport face photo and live camera face."""
-    import base64
-
     # 1. Preset test persona simulation
     if payload.is_sample_persona:
         if not payload.persona_match:
@@ -253,81 +372,26 @@ def compare_face_match(payload: CompareFaceMatchRequest, db: Session = Depends(g
         return success_response(data={
             "verified": False,
             "similarity": 0.0,
+            "distance": 1.0,
+            "threshold": 0.60,
             "reason": "Both passport photo and camera capture are required for biometric comparison.",
             "status": "failed"
         })
 
     try:
-        def clean_b64(b64_str):
-            if "," in b64_str:
-                b64_str = b64_str.split(",", 1)[1]
-            return base64.b64decode(b64_str)
-
-        import cv2
-        import numpy as np
-        from deepface import DeepFace
-
-        np_img1 = cv2.imdecode(np.frombuffer(clean_b64(img1_raw), np.uint8), cv2.IMREAD_COLOR)
-        np_img2 = cv2.imdecode(np.frombuffer(clean_b64(img2_raw), np.uint8), cv2.IMREAD_COLOR)
-
-        if np_img1 is None or np_img2 is None:
-            return success_response(data={
-                "verified": False,
-                "similarity": 0.0,
-                "reason": "Invalid or unreadable image file format.",
-                "status": "failed"
-            })
-
-        # Run DeepFace ArcFace verification with skip backend (face already cropped & aligned)
-        result = DeepFace.verify(
-            img1_path=np_img1,
-            img2_path=np_img2,
-            model_name="ArcFace",
-            detector_backend="skip",
-            distance_metric="cosine",
-            enforce_detection=False,
-        )
-
-        distance = float(result.get("distance", 0.5))
-        threshold = float(result.get("threshold", 0.68))
-        verified = bool(result.get("verified", distance <= threshold))
-
-        # Accurate biometric match percentage:
-        # Distance 0.0 -> ~99.4%
-        # Distance 0.35 -> ~88%
-        # Distance 0.68 -> ~60%
-        sim = max(0.05, min(0.994, round(1.0 - (distance / (threshold * 1.6)), 3)))
-        if verified and sim < 0.80:
-            sim = round(0.85 + (0.14 * (1.0 - (distance / threshold))), 3)
-
-        if not verified or distance > threshold:
-            return success_response(data={
-                "verified": False,
-                "similarity": sim,
-                "distance": round(distance, 3),
-                "threshold": threshold,
-                "reason": f"Biometric mismatch: Face distance ({distance:.2f}) exceeds threshold ({threshold:.2f}).",
-                "status": "failed"
-            })
-
-        return success_response(data={
-            "verified": True,
-            "similarity": sim,
-            "distance": round(distance, 3),
-            "threshold": threshold,
-            "reason": "Passport face match confirmed.",
-            "status": "verified"
-        })
-
+        from ..services.biometric_service import biometric_service
+        result = biometric_service.verify_face_pair(img1_raw, img2_raw)
+        return success_response(data=result)
     except Exception as exc:
-        import traceback
-        traceback.print_exc()
         return success_response(data={
             "verified": False,
-            "similarity": 0.05,
-            "reason": f"AI model could not process face comparison: {str(exc)[:120]}",
+            "similarity": 0.0,
+            "distance": 1.0,
+            "threshold": 0.60,
+            "reason": f"Face verification processing failed: {str(exc)[:80]}",
             "status": "failed"
         })
+
 
 
 class ScanPassportImageRequest(BaseModel):
@@ -422,11 +486,87 @@ def scan_passport_image(payload: ScanPassportImageRequest, db: Session = Depends
                 db.add(new_doc)
                 db.commit()
                 db_saved = True
+
+            # Also upload cropped passport face to Cloudinary and link in FaceEnrollment
+            if result.get("faceCropBase64") and p_id:
+                try:
+                    face_cloud_url = storage_service.upload_face(result["faceCropBase64"], passenger_id=p_id)
+                    fe = db.query(FaceEnrollment).filter(FaceEnrollment.passenger_id == p_id).first()
+                    now = datetime.utcnow()
+                    if not fe:
+                        doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == p_id).first()
+                        fe = FaceEnrollment(
+                            passenger_id=p_id,
+                            document_id=doc.document_id if doc else None,
+                            equipment_id=4,
+                            face_embedding_ref=face_cloud_url,
+                            embedding_model="ArcFace",
+                            enrollment_time=now,
+                            status="active",
+                            created_at=now,
+                            updated_at=now
+                        )
+                        db.add(fe)
+                    else:
+                        fe.face_embedding_ref = face_cloud_url
+                        fe.status = "active"
+                        fe.updated_at = now
+                    db.commit()
+                    result["faceUrl"] = face_cloud_url
+                except Exception:
+                    db.rollback()
+            # Ensure booking is attached to response
+            if p_id:
+                try:
+                    b = db.query(Booking).filter(Booking.passenger_id == p_id).first()
+                    fl_qr = db.query(Flight).filter(Flight.flight_number == "QR-082").first() or db.query(Flight).first()
+                    if not b and fl_qr:
+                        b = Booking(
+                            passenger_id=p_id,
+                            flight_id=fl_qr.flight_id,
+                            booking_reference=f"QR82-P{p_id}-TICKET",
+                            seat_number="18B",
+                            booking_class="Economy",
+                            booking_status="confirmed",
+                            created_at=datetime.utcnow(),
+                            updated_at=datetime.utcnow()
+                        )
+                        db.add(b)
+                        db.commit()
+                        db.refresh(b)
+
+                    flight = db.query(Flight).filter(Flight.flight_id == b.flight_id).first() if b else fl_qr
+                    dest = "Doha (DOH)"
+                    if flight and flight.destination_airport_id:
+                        dest_apt = db.query(Airport).filter(Airport.airport_id == flight.destination_airport_id).first()
+                        if dest_apt:
+                            dest = f"{dest_apt.city or dest_apt.airport_name} ({dest_apt.iata_code or 'DOH'})"
+
+                    p_record = db.query(Passenger).filter(Passenger.passenger_id == p_id).first()
+                    result["matchingPassenger"] = {
+                        "passengerId": p_id,
+                        "fullName": passport.get("full_name") or (p_record.full_name if p_record else "PASSPORT HOLDER"),
+                        "passportNumber": passport.get("passport_number", ""),
+                        "nationality": passport.get("nationality", "USA"),
+                        "linkedBooking": {
+                            "bookingId": b.booking_id if b else 101,
+                            "bookingReference": b.booking_reference if b else f"QR82-P{p_id}",
+                            "flightNumber": flight.flight_number if flight else "QR-082",
+                            "destination": dest,
+                            "seatNumber": b.seat_number if b else "18B",
+                            "gate": "B22",
+                            "group": "Zone 2",
+                            "class": b.booking_class if b else "Economy"
+                        }
+                    }
+                except Exception:
+                    pass
         except Exception:
             db.rollback()
 
     result["passengerId"] = p_id
     result["dbSaved"] = db_saved
+
     return success_response(data=result)
 
 

@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Obtain via POST /api/twin/auth/token (operator:op123 by default).
     TWIN_AUTH_TOKEN: str = os.getenv("TWIN_AUTH_TOKEN", "")
 
+    # Cloudinary Cloud Storage configuration for documents and face photos
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+
     class Config:
         env_file = ".env"
         # STRICT: unknown .env variables raise ValidationError instead of

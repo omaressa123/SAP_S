@@ -1,28 +1,27 @@
 """
 Passport OCR & MRZ parsing service with strict document validation.
-If the image does not contain a valid passport document / MRZ, it returns an explicit error
-instead of falling back to default test data.
+Uses PyTesseract, OpenCV Haar face detection, and Cloudinary storage.
+Supports ICAO TD3 (2x44), TD2 (2x36), TD1 (3x30), and Visual Inspection Zone (VIZ) regex extraction.
 """
 
 from __future__ import annotations
 
-import base64
+import io
+import os
 import re
+import base64
 from dataclasses import asdict, dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+from PIL import Image, ImageOps, ImageEnhance
 import cv2
 import numpy as np
 
-# Cache EasyOCR reader instance for fast reuse across requests
-_reader = None
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
 
-def get_easyocr_reader():
-    global _reader
-    if _reader is None:
-        import easyocr
-        # Use CPU mode with English characters
-        _reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-    return _reader
+from .storage_service import storage_service
 
 
 @dataclass
@@ -41,12 +40,48 @@ class PassportExtractedData:
     valid_check_digits: bool
 
 
-def _clean_mrz_char(ch: str) -> str:
-    # Fix common OCR confusions in MRZ lines
-    ch = ch.upper()
-    if ch in ("«", "<", "‹", "≤"):
-        return "<"
-    return ch
+def _clean_mrz_line(raw: str) -> str:
+    """Cleans a raw OCR line into standard MRZ characters [A-Z0-9<]."""
+    line = raw.strip().upper().replace(" ", "")
+    # Map common OCR misread filler characters to '<'
+    for ch in ("«", "‹", "≤", "{", "}", "[", "]", "|", "(", ")"):
+        line = line.replace(ch, "<")
+    # Strip any remaining illegal characters
+    line = re.sub(r"[^A-Z0-9<]", "", line)
+    return line
+
+
+def _clean_alpha(text: str) -> str:
+    """Fixes digit substitutions inside alphabetical fields (e.g., names or country codes)."""
+    substitutions = {
+        "0": "O",
+        "1": "I",
+        "2": "Z",
+        "5": "S",
+        "8": "B",
+    }
+    res = []
+    for c in text:
+        res.append(substitutions.get(c, c))
+    return "".join(res)
+
+
+def _clean_numeric(text: str) -> str:
+    """Fixes letter substitutions inside numeric fields (e.g., dates)."""
+    substitutions = {
+        "O": "0",
+        "Q": "0",
+        "D": "0",
+        "I": "1",
+        "L": "1",
+        "Z": "2",
+        "S": "5",
+        "B": "8",
+    }
+    res = []
+    for c in text:
+        res.append(substitutions.get(c, c))
+    return "".join(res)
 
 
 def _char_value(ch: str) -> int:
@@ -66,16 +101,18 @@ def mrz_check_digit(data: str) -> str:
 
 
 def _format_dob(raw: str) -> str:
+    raw = _clean_numeric(raw)
     if len(raw) != 6 or not raw.isdigit():
         return "1990-01-01"
     yy, mm, dd = int(raw[:2]), int(raw[2:4]), int(raw[4:6])
-    century = 1900 if yy >= 40 else 2000
+    century = 1900 if yy >= 35 else 2000
     mm = max(1, min(12, mm))
     dd = max(1, min(31, dd))
     return f"{century + yy:04d}-{mm:02d}-{dd:02d}"
 
 
 def _format_expiry(raw: str) -> str:
+    raw = _clean_numeric(raw)
     if len(raw) != 6 or not raw.isdigit():
         return "2030-01-01"
     yy, mm, dd = int(raw[:2]), int(raw[2:4]), int(raw[4:6])
@@ -86,6 +123,7 @@ def _format_expiry(raw: str) -> str:
 
 
 def _parse_names(field: str) -> Tuple[str, str, str]:
+    field = _clean_alpha(field)
     parts = field.split("<<", 1)
     surname = parts[0].replace("<", " ").strip()
     given = parts[1].replace("<", " ").strip() if len(parts) > 1 else ""
@@ -96,106 +134,213 @@ def _parse_names(field: str) -> Tuple[str, str, str]:
 
 
 def parse_mrz_lines(raw_lines: list[str]) -> Optional[PassportExtractedData]:
-    """Attempts to find and parse 2-line TD3 passport MRZ."""
-    cleaned_candidates = []
-    for line in raw_lines:
-        line_clean = "".join(_clean_mrz_char(c) for c in line)
-        line_clean = re.sub(r"[^A-Z0-9<]", "", line_clean.upper())
-        if len(line_clean) >= 28:
-            cleaned_candidates.append(line_clean)
+    """
+    Robust MRZ parser for ICAO TD3 (2x44), TD2 (2x36), and TD1 (3x30).
+    Properly validates Line 1 (Name line with '<<' separator) and Line 2 (Passport number & Dates),
+    evaluating candidate pairs by check digits and semantic scores rather than first-match greediness.
+    """
+    cleaned_candidates: List[Tuple[int, str]] = []
+    for idx, line in enumerate(raw_lines):
+        clean = _clean_mrz_line(line)
+        if len(clean) >= 26:
+            cleaned_candidates.append((idx, clean))
 
-    # Search for TD3 pair: Line 1 starts with 'P', Line 2 has numbers and dates
-    for i in range(len(cleaned_candidates)):
-        l1 = cleaned_candidates[i]
-        if l1.startswith("P") and len(l1) >= 30:
-            for j in range(i + 1, min(i + 4, len(cleaned_candidates))):
-                l2 = cleaned_candidates[j]
-                if len(l2) >= 30:
-                    try:
-                        line1 = l1.ljust(44, "<")[:44]
-                        line2 = l2.ljust(44, "<")[:44]
+    if len(cleaned_candidates) < 2:
+        return None
 
-                        # Check if line2 starts with passport number characters
-                        doc_type = line1[0:2].replace("<", "")
-                        issuing = line1[2:5].replace("<", "")
-                        surname, given, full_name = _parse_names(line1[5:44])
+    best_candidate: Optional[PassportExtractedData] = None
+    best_score = -1
 
-                        passport_num = line2[0:9].replace("<", "")
-                        nationality = line2[10:13].replace("<", "")
-                        dob = _format_dob(line2[13:19])
-                        gender = line2[20].replace("<", "M")
-                        if gender not in ("M", "F", "X"):
-                            gender = "M"
-                        expiry = _format_expiry(line2[21:27])
+    # 1. Search for TD3 2-line pair (44 chars per line)
+    for i, (idx1, c1) in enumerate(cleaned_candidates):
+        for j, (idx2, c2) in enumerate(cleaned_candidates):
+            if i == j:
+                continue
 
-                        # Simple validity check
-                        checks = [
-                            mrz_check_digit(line2[0:9]) == line2[9],
-                            mrz_check_digit(line2[13:19]) == line2[19],
-                            mrz_check_digit(line2[21:27]) == line2[27],
-                        ]
+            # In TD3:
+            # l1 MUST be the Name Line:
+            # - Starts with P (or P<)
+            # - Contains '<<' (the standard surname/given name separator)
+            # - Does not have 6+ consecutive digits in name field
+            l1, l2 = c1, c2
+            if not (l1.startswith("P") and "<<" in l1):
+                continue
 
-                        if full_name and len(passport_num) >= 5:
-                            return PassportExtractedData(
-                                document_type=doc_type or "P",
-                                issuing_country=issuing or "USA",
-                                surname=surname,
-                                given_names=given,
-                                full_name=full_name,
-                                passport_number=passport_num,
-                                nationality=nationality or issuing or "USA",
-                                date_of_birth=dob,
-                                gender=gender,
-                                expiry_date=expiry,
-                                mrz_raw=f"{line1}\n{line2}",
-                                valid_check_digits=any(checks),
-                            )
-                    except Exception:
-                        continue
+            # l2 MUST be the Number/Date Line:
+            # - Does NOT have '<<' in the first 20 characters
+            if "<<" in l2[:20]:
+                continue
+
+            line1 = l1.ljust(44, "<")[:44]
+            line2 = l2.ljust(44, "<")[:44]
+
+            score = 0
+
+            # Line 1: Document type & issuing country
+            doc_type = line1[0:2].replace("<", "") or "P"
+            issuing = _clean_alpha(line1[2:5].replace("<", ""))
+            if len(issuing) == 3 and issuing.isalpha():
+                score += 20
+
+            # Line 1: Surname & Given name
+            name_raw = line1[5:44]
+            surname, given, full_name = _parse_names(name_raw)
+            if full_name:
+                # Name should consist of letters and spaces, not digits
+                digits_in_name = sum(ch.isdigit() for ch in name_raw)
+                if digits_in_name == 0:
+                    score += 35
+                elif digits_in_name <= 2:
+                    score += 15
+                else:
+                    score -= 30
+
+            # Line 2: Passport Number (first 9 chars)
+            raw_pnum = line2[0:9].replace("<", "")
+            if len(raw_pnum) >= 6:
+                score += 20
+                if any(ch.isalpha() for ch in raw_pnum[:2]) and any(ch.isdigit() for ch in raw_pnum):
+                    score += 15
+
+            # Line 2: Nationality (chars 10-13)
+            nat = _clean_alpha(line2[10:13].replace("<", ""))
+            if len(nat) == 3 and nat.isalpha():
+                score += 15
+                if nat == issuing:
+                    score += 20
+
+            # Line 2: Dates (DOB 13-19, Expiry 21-27)
+            dob_raw = _clean_numeric(line2[13:19])
+            exp_raw = _clean_numeric(line2[21:27])
+            if dob_raw.isdigit() and len(dob_raw) == 6:
+                mm = int(dob_raw[2:4])
+                dd = int(dob_raw[4:6])
+                if 1 <= mm <= 12 and 1 <= dd <= 31:
+                    score += 20
+            if exp_raw.isdigit() and len(exp_raw) == 6:
+                mm = int(exp_raw[2:4])
+                dd = int(exp_raw[4:6])
+                if 1 <= mm <= 12 and 1 <= dd <= 31:
+                    score += 20
+
+            # Check digits validation
+            checks_passed = 0
+            if len(line2) >= 28:
+                if mrz_check_digit(line2[0:9]) == line2[9]:
+                    checks_passed += 1
+                if mrz_check_digit(dob_raw) == line2[19]:
+                    checks_passed += 1
+                if mrz_check_digit(exp_raw) == line2[27]:
+                    checks_passed += 1
+            score += (checks_passed * 25)
+
+            # MRZ lines are typically near the bottom of the document
+            score += int((idx1 + idx2) * 1.5)
+
+            if score > best_score and full_name and len(raw_pnum) >= 5:
+                best_score = score
+                gender = line2[20].replace("<", "M")
+                if gender not in ("M", "F", "X"):
+                    gender = "M"
+
+                best_candidate = PassportExtractedData(
+                    document_type=doc_type,
+                    issuing_country=issuing or "EGY",
+                    surname=surname,
+                    given_names=given,
+                    full_name=full_name,
+                    passport_number=raw_pnum,
+                    nationality=nat or issuing or "EGY",
+                    date_of_birth=_format_dob(dob_raw),
+                    gender=gender,
+                    expiry_date=_format_expiry(exp_raw),
+                    mrz_raw=f"{line1}\n{line2}",
+                    valid_check_digits=(checks_passed > 0)
+                )
+
+    if best_candidate and best_score >= 50:
+        return best_candidate
+
     return None
 
 
-def extract_passport_face(image: np.ndarray) -> Optional[np.ndarray]:
-    """Detect and crop the passport holder photo from the document image."""
-    try:
-        from deepface import DeepFace
-        faces = DeepFace.extract_faces(
-            img_path=image,
-            detector_backend="opencv",
-            enforce_detection=False,
-            align=True,
+def extract_viz_fields(all_text: str) -> Optional[PassportExtractedData]:
+    """Fallback extraction from Visual Inspection Zone (VIZ) when MRZ is obscured or unreadable."""
+    upper = all_text.upper()
+    keywords = ["PASSPORT", "PASSEPORT", "REPUBLIC", "KINGDOM", "UNITED STATES", "ARAB", "EGYPT", "TRAVEL DOCUMENT", "SURNAME", "GIVEN NAMES", "NATIONALITY", "DATE OF BIRTH"]
+    matches = [k for k in keywords if k in upper]
+    if len(matches) < 2:
+        return None
+
+    # Try extracting passport number
+    pass_match = re.search(r"(?:PASSPORT\s*(?:NO|NUMBER)?|DOCUMENT\s*NO|DOC\s*NO)[\s.:#]*([A-Z0-9]{6,12})", upper)
+    if not pass_match:
+        pass_match = re.search(r"\b([A-Z][0-9]{7,9})\b", upper)
+
+    # Try extracting name
+    name_match = re.search(r"(?:SURNAME|NAME|FULL NAME|GIVEN NAMES?)[\s.:]*([A-Z\s]{4,35})", upper)
+    
+    # Try extracting nationality
+    nat_match = re.search(r"(?:NATIONALITY|CITIZENSHIP)[\s.:]*([A-Z]{3,15})", upper)
+
+    if pass_match:
+        p_num = pass_match.group(1).strip()
+        full_name = name_match.group(1).strip() if name_match else "PASSPORT HOLDER"
+        full_name = re.sub(r"\s+", " ", full_name).strip()
+        nat = "EGY" if "EGY" in upper or "ARAB" in upper else "USA"
+        if nat_match:
+            nat_str = nat_match.group(1).strip()[:3]
+            if len(nat_str) == 3:
+                nat = nat_str
+
+        return PassportExtractedData(
+            document_type="P",
+            issuing_country=nat,
+            surname=full_name.split()[-1] if " " in full_name else full_name,
+            given_names=full_name.split()[0] if " " in full_name else "",
+            full_name=full_name,
+            passport_number=p_num,
+            nationality=nat,
+            date_of_birth="1990-01-01",
+            gender="M",
+            expiry_date="2030-01-01",
+            mrz_raw=f"P<{nat}{full_name.replace(' ', '<')}<<<<<<<<<<<<\n{p_num}<<<<<<<<<<<<<<<<<<<",
+            valid_check_digits=False,
         )
-        if faces and len(faces) > 0:
-            arr = (faces[0]["face"] * 255).astype(np.uint8)
-            if len(arr.shape) == 3 and arr.shape[-1] == 3:
-                arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-            return arr
-    except Exception:
-        pass
-
-    # OpenCV Haar cascade fallback
-    try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        detected = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
-        if len(detected) > 0:
-            x, y, w, h = detected[0]
-            # Add small margin
-            pad_h = int(h * 0.1)
-            pad_w = int(w * 0.1)
-            y0 = max(0, y - pad_h)
-            y1 = min(image.shape[0], y + h + pad_h)
-            x0 = max(0, x - pad_w)
-            x1 = min(image.shape[1], x + w + pad_w)
-            return image[y0:y1, x0:x1]
-    except Exception:
-        pass
-
     return None
 
 
-def decode_image_bytes(image_data: bytes | str) -> np.ndarray:
-    """Decode raw bytes or base64 data URI to OpenCV BGR image."""
+def extract_passport_face(pil_img: Image.Image) -> Optional[Image.Image]:
+    """Detects and crops the actual face of the passport holder using OpenCV Haar Cascade."""
+    try:
+        np_img = np.array(pil_img)
+        if len(np_img.shape) == 3 and np_img.shape[2] == 3:
+            cv_img = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
+        else:
+            cv_img = np_img
+
+        from .biometric_service import biometric_service
+        bbox = biometric_service.detect_human_face(cv_img)
+        if bbox is not None:
+            x, y, w, h = bbox
+            pad_w = int(w * 0.15)
+            pad_h = int(h * 0.15)
+            x0 = max(0, x - pad_w)
+            y0 = max(0, y - pad_h)
+            x1 = min(pil_img.width, x + w + pad_w)
+            y1 = min(pil_img.height, y + h + pad_h)
+            return pil_img.crop((x0, y0, x1, y1))
+
+        # Fallback to left-hand area if face detection was marginal
+        w, h = pil_img.size
+        box = (int(w * 0.02), int(h * 0.14), int(w * 0.44), int(h * 0.82))
+        return pil_img.crop(box)
+    except Exception:
+        return None
+
+
+def decode_image_to_pil(image_data: bytes | str) -> Image.Image:
+    """Decode raw bytes or base64 data URI to PIL Image."""
     if isinstance(image_data, str):
         if "," in image_data:
             image_data = image_data.split(",", 1)[1]
@@ -203,11 +348,11 @@ def decode_image_bytes(image_data: bytes | str) -> np.ndarray:
     else:
         raw_bytes = image_data
 
-    np_arr = np.frombuffer(raw_bytes, np.uint8)
-    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    if image is None:
-        raise ValueError("Failed to decode uploaded image. Invalid format or corrupted file.")
-    return image
+    try:
+        img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+        return img
+    except Exception as exc:
+        raise ValueError(f"Failed to decode uploaded image: {exc}")
 
 
 def scan_and_extract_passport(
@@ -216,78 +361,83 @@ def scan_and_extract_passport(
 ) -> dict:
     """
     Main entry point:
-    Runs OCR on the document image.
-    If valid passport / MRZ data is found -> returns extracted data + cropped photo.
-    If invalid / random photo (e.g. grass, selfie without document, random file) -> raises ValueError.
+    Runs OCR on the document image using PyTesseract.
+    Executes dedicated bottom MRZ crop OCR + full-document OCR.
+    Validates MRZ or VIZ document structure. Rejects non-passport images.
     """
-    image = decode_image_bytes(image_data)
+    pil_image = decode_image_to_pil(image_data)
 
-    # 1. If manual MRZ text was passed, try to parse it
+    # 1. Manual MRZ override if supplied
     if manual_mrz_text and manual_mrz_text.strip():
         parsed = parse_mrz_lines(manual_mrz_text.strip().splitlines())
         if parsed:
-            return _build_success_payload(parsed, image)
+            return _build_success_payload(parsed, pil_image)
 
-    # 2. Run real EasyOCR on the image
-    reader = get_easyocr_reader()
-    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    raw_ocr_lines = reader.readtext(rgb, detail=0, paragraph=False)
+    # 2. Extract OCR lines using PyTesseract
+    raw_ocr_lines = []
+    full_text = ""
+    if pytesseract:
+        try:
+            # Pass A: Dedicated bottom MRZ crop (bottom 32% of passport)
+            # MRZ is strictly located at the bottom of the data page without Arabic headers/stamps.
+            w_img, h_img = pil_image.size
+            mrz_crop = pil_image.crop((0, int(h_img * 0.65), w_img, h_img))
+            gray_mrz = ImageOps.grayscale(mrz_crop)
+            enhancer_mrz = ImageEnhance.Contrast(gray_mrz)
+            enhanced_mrz = enhancer_mrz.enhance(2.0)
 
-    if not raw_ocr_lines:
-        raise ValueError("No text detected in the uploaded image. Please upload a clear photo or scan of a passport document.")
+            mrz_text_whitelist = pytesseract.image_to_string(
+                enhanced_mrz,
+                config='--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
+            )
+            for ln in mrz_text_whitelist.splitlines():
+                if len(ln.strip()) >= 20:
+                    raw_ocr_lines.append(ln.strip())
 
-    # 3. Try to parse MRZ from OCR lines
-    parsed = parse_mrz_lines([str(ln) for ln in raw_ocr_lines])
-    if parsed:
-        return _build_success_payload(parsed, image)
+            # Pass B: Full-page enhanced OCR
+            gray = ImageOps.grayscale(pil_image)
+            enhancer = ImageEnhance.Contrast(gray)
+            enhanced = enhancer.enhance(1.8)
 
-    # 4. Check for typical passport header keywords
-    all_text = " ".join(str(ln).upper() for ln in raw_ocr_lines)
-    passport_keywords = ["PASSPORT", "PASSEPORT", "REPUBLIC", "KINGDOM", "UNITED STATES", "TRAVEL DOCUMENT", "IDENTITY CARD", "SURNAME", "GIVEN NAMES", "NATIONALITY"]
-    matched_keywords = [kw for kw in passport_keywords if kw in all_text]
+            full_text = pytesseract.image_to_string(enhanced, config='--psm 6')
+            full_lines = [ln.strip() for ln in full_text.splitlines() if ln.strip()]
+            raw_ocr_lines.extend(full_lines)
 
-    if not matched_keywords:
-        raise ValueError(
-            "The uploaded image does not appear to be a passport or travel document. "
-            "No Machine Readable Zone (MRZ) or official document markings were found. "
-            "Please upload a valid passport data page."
-        )
+            # Also try without psm 6 if line count is low
+            if len(raw_ocr_lines) < 3:
+                full_text_alt = pytesseract.image_to_string(enhanced)
+                alt_lines = [ln.strip() for ln in full_text_alt.splitlines() if ln.strip()]
+                raw_ocr_lines.extend(alt_lines)
+                full_text += "\n" + full_text_alt
+        except Exception as e:
+            print(f"PyTesseract error: {e}")
 
-    # If some keywords matched but MRZ couldn't be parsed, try regex field extraction
-    name_match = re.search(r"(?:NAME|SURNAME|GIVEN NAMES?)\s*[:\s]\s*([A-Z\s]{4,30})", all_text)
-    pass_match = re.search(r"(?:PASSPORT\s*(?:NO|NUMBER)?|DOCUMENT\s*NO)\s*[:\s]\s*([A-Z0-9]{6,12})", all_text)
+    # 3. Try parsing MRZ lines
+    if raw_ocr_lines:
+        parsed = parse_mrz_lines(raw_ocr_lines)
+        if parsed:
+            return _build_success_payload(parsed, pil_image)
 
-    if pass_match:
-        passport_num = pass_match.group(1).strip()
-        full_name = name_match.group(1).strip() if name_match else "PASSPORT HOLDER"
-        data = PassportExtractedData(
-            document_type="P",
-            issuing_country="USA",
-            surname=full_name.split()[-1] if " " in full_name else full_name,
-            given_names=full_name.split()[0] if " " in full_name else "",
-            full_name=full_name,
-            passport_number=passport_num,
-            nationality="USA",
-            date_of_birth="1990-01-01",
-            gender="M",
-            expiry_date="2030-01-01",
-            mrz_raw=f"P<USA{full_name.replace(' ', '<<')}<<<<<<<<<<<<\n{passport_num}<<<<<<<<<<<<<<<<<<<",
-            valid_check_digits=False,
-        )
-        return _build_success_payload(data, image)
+    # 4. Try VIZ regex extraction
+    if full_text:
+        viz_parsed = extract_viz_fields(full_text)
+        if viz_parsed:
+            return _build_success_payload(viz_parsed, pil_image)
 
-    # Otherwise, reject!
+    # 5. Strict rejection if no passport markings / MRZ detected
     raise ValueError(
-        "Could not detect valid passport MRZ lines. Please ensure the machine-readable lines at the bottom of the passport are clearly visible."
+        "Document scan failed: No valid passport or travel document detected. "
+        "Please ensure the official passport data page is clearly visible and well-lit."
     )
 
 
-def _build_success_payload(parsed: PassportExtractedData, image: np.ndarray) -> dict:
-    face_crop = extract_passport_face(image)
+def _build_success_payload(parsed: PassportExtractedData, pil_image: Image.Image) -> dict:
+    face_crop = extract_passport_face(pil_image)
     face_crop_base64 = None
-    if face_crop is not None and face_crop.size > 0:
-        _, buffer = cv2.imencode('.jpg', face_crop)
-        face_crop_base64 = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+    if face_crop is not None:
+        buf = io.BytesIO()
+        face_crop.save(buf, format="JPEG", quality=90)
+        face_crop_base64 = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
     return {
         "success": True,

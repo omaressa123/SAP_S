@@ -70,6 +70,12 @@ app.include_router(reports_controller.router, prefix="/api/v1/reports", tags=["1
 app.include_router(ai_controller.router, prefix="/api/v1/ai", tags=["14. AI Center"])
 app.include_router(agent_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
 
+from fastapi.staticfiles import StaticFiles
+import os
+_data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+os.makedirs(_data_dir, exist_ok=True)
+app.mount("/data", StaticFiles(directory=_data_dir), name="data")
+
 @app.get("/health", tags=["Health"])
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok"}

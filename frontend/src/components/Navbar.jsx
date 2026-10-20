@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const links = [
   { to: '/', label: 'Overview' },
   { to: '/egate', label: '✈ E-Gate Kiosk' },
+  { to: '/gate-boarding', label: '🚪 Gate B22 Boarding' },
   { to: '/passengers', label: 'Passengers' },
   { to: '/flights', label: 'Flights' },
   { to: '/baggage', label: 'Baggage' },

@@ -206,9 +206,9 @@ export default function EventCenter() {
                   </div>
                   <span style={{ color: STATUS_COLOR[evt.status] || '#4a5a75', fontWeight: 600, fontSize: '0.75rem' }}>{evt.status}</span>
                 </div>
-                ))}
-            </div>
-        </FadeIn>
+              ))
+            )}
+          </div>
         </Card>
       </FadeIn>
     </div>

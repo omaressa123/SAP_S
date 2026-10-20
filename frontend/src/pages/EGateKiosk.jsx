@@ -54,6 +54,7 @@ export default function EGateKiosk() {
   // DOM Refs
   const countdownTimerRef = useRef(null)
   const videoRef = useRef(null)
+  const streamRef = useRef(null)
   const passportFileInputRef = useRef(null)
   const faceFileInputRef = useRef(null)
 
@@ -99,6 +100,18 @@ export default function EGateKiosk() {
     return () => clearInterval(countdownTimerRef.current)
   }, [currentStep])
 
+  // Attach stream to video element when useWebcam changes
+  useEffect(() => {
+    if (useWebcam && videoRef.current && streamRef.current) {
+      try {
+        videoRef.current.srcObject = streamRef.current
+        videoRef.current.play().catch((e) => console.warn('Video play warning:', e))
+      } catch (err) {
+        console.warn('Attach stream error:', err)
+      }
+    }
+  }, [useWebcam])
+
   // Cleanup webcam stream on step change or unmount
   useEffect(() => {
     if (currentStep !== 3 && useWebcam) {
@@ -107,9 +120,11 @@ export default function EGateKiosk() {
   }, [currentStep])
 
   function stopWebcam() {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks()
-      tracks.forEach((track) => track.stop())
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null
     }
     setUseWebcam(false)
@@ -118,17 +133,59 @@ export default function EGateKiosk() {
   async function startWebcam() {
     setWebcamError(null)
     setCustomFaceImage(null)
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setWebcamError(
+        'Camera API not supported or requires secure context (https:// or localhost). Please import a face photo below.'
+      )
+      return
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
       }
+
+      let stream = null
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          audio: false,
+        })
+      } catch {
+        // Fallback for simple virtual/integrated cameras that reject width/height/facingMode
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        })
+      }
+
+      streamRef.current = stream
       setUseWebcam(true)
+
+      if (videoRef.current) {
+        videoRef.current.muted = true
+        videoRef.current.playsInline = true
+        videoRef.current.srcObject = stream
+        try {
+          await videoRef.current.play()
+        } catch (playErr) {
+          console.warn('Initial play warning:', playErr)
+        }
+      }
     } catch (err) {
-      setWebcamError(err.message || 'Unable to access camera')
+      console.error('Camera error:', err)
+      let msg = 'Unable to access camera.'
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = 'Camera permission denied! Please click the lock or camera icon in your address bar and allow camera access, then try again.'
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'No camera found. Please plug in a webcam or click "Import Face Photo" to test with an image.'
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = 'Camera is currently in use by another application. Please close other camera apps and retry.'
+      } else {
+        msg = err.message || msg
+      }
+      setWebcamError(msg)
       setUseWebcam(false)
     }
   }
@@ -235,6 +292,7 @@ export default function EGateKiosk() {
 
       setOcrExtractedData(ocrInfo)
 
+      const booking = scanRes.matchingPassenger?.linkedBooking || {}
       setPassenger((prev) => ({
         ...prev,
         name: ocrInfo.fullName,
@@ -243,6 +301,10 @@ export default function EGateKiosk() {
         dob: ocrInfo.dateOfBirth,
         expiryDate: ocrInfo.expiryDate,
         gender: ocrInfo.gender,
+        flightNumber: booking.flightNumber || prev.flightNumber,
+        destination: booking.destination || prev.destination,
+        seat: booking.seatNumber ? `${booking.seatNumber} (${booking.group || 'Zone 2'})` : prev.seat,
+        gate: booking.gate ? `Gate ${booking.gate}` : prev.gate,
         faceUrl: scanRes.faceCropBase64 || prev.faceUrl,
       }))
 
@@ -278,13 +340,17 @@ export default function EGateKiosk() {
     try {
       let liveFaceImg = customFaceImage
       if (useWebcam && videoRef.current) {
+        const video = videoRef.current
+        if (video.videoWidth === 0 || video.videoHeight === 0 || video.readyState < 2) {
+          throw new Error('Camera stream is still starting up. Please face the camera and click Verify again in 1-2 seconds.')
+        }
         try {
           const canvas = document.createElement('canvas')
-          canvas.width = videoRef.current.videoWidth || 640
-          canvas.height = videoRef.current.videoHeight || 480
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
           const ctx = canvas.getContext('2d')
-          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
-          liveFaceImg = canvas.toDataURL('image/jpeg', 0.9)
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          liveFaceImg = canvas.toDataURL('image/jpeg', 0.92)
         } catch {}
       }
 
@@ -331,7 +397,10 @@ export default function EGateKiosk() {
         match_threshold: 0.6,
       }).catch(() => {})
 
-      await SmartGateApi.enrollBiometrics({ passengerId: dbSavedStatus?.passengerId || 1 }).catch(() => {})
+      await SmartGateApi.enrollBiometrics({
+        passengerId: dbSavedStatus?.passengerId || 1,
+        capturedFaceBase64: liveFaceImg
+      }).catch(() => {})
 
       // If matched, advance to clearance
       setFaceMatching(false)
@@ -877,7 +946,7 @@ export default function EGateKiosk() {
                 {/* Live Webcam Video OR Passenger Photo */}
                 <video
                   ref={videoRef}
-                  className={`w-full h-full object-cover ${useWebcam ? 'block' : 'hidden'}`}
+                  className="w-full h-full object-cover"
                   autoPlay
                   playsInline
                   muted
@@ -1067,17 +1136,25 @@ export default function EGateKiosk() {
                   className={`h-12 px-6 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 ${
                     verificationFailed
                       ? 'bg-error text-on-error hover:bg-error/90'
+                      : !useWebcam && !customFaceImage
+                      ? 'bg-primary/80 text-on-primary hover:bg-primary'
                       : 'bg-primary text-on-primary hover:bg-primary-container'
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">
-                    {verificationFailed ? 'refresh' : 'face'}
+                    {verificationFailed
+                      ? 'refresh'
+                      : !useWebcam && !customFaceImage
+                      ? 'photo_camera'
+                      : 'face'}
                   </span>
                   <span>
                     {faceMatching
                       ? 'Analyzing Biometrics…'
                       : verificationFailed
                       ? 'Re-attempt Face Match'
+                      : !useWebcam && !customFaceImage
+                      ? 'Start Camera / Upload Face to Verify'
                       : 'Confirm Face Match & Verify'}
                   </span>
                 </button>
