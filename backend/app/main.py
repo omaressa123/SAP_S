@@ -49,6 +49,7 @@ def init_agent_service():
         smoke_fire_url=settings.SMOKE_FIRE_URL,
         fall_detection_url=settings.FULL_DETECTION_URL,
         twin_base_url="http://localhost:8100",
+        twin_auth_token=settings.TWIN_AUTH_TOKEN,
     )
 
 # Register all routers

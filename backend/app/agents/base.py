@@ -40,6 +40,7 @@ class AgentResult:
     confidence: Optional[float] = None
     requires_human_review: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
+    service_unavailable: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,6 +50,7 @@ class AgentResult:
             "confidence": self.confidence,
             "requires_human_review": self.requires_human_review,
             "metadata": self.metadata,
+            "service_unavailable": self.service_unavailable,
         }
 
 

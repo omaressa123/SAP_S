@@ -6,7 +6,8 @@ Endpoints (all under /api/v1/agents):
   GET    /agents/tasks/{task_id}   — task status
   GET    /agents/workflows/{id}    — workflow status
   GET    /agents/workflows         — list recent workflows
-  GET    /agents/events            — recent airport events
+  GET    /agents/events            — recent airport events (filterable)
+  GET    /agents/health            — twin + agent service connectivity
   POST   /agents/events            — ingest a new airport event
   POST   /agents/agents/{agent_id}/heartbeat — agent heartbeat
   GET    /agents/snapshot          — full observability snapshot
@@ -17,7 +18,7 @@ endpoints). No sensitive passenger data is exposed through public endpoints.
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, Query
 from pydantic import BaseModel
 
 from ..utils.auth import verify_api_key
@@ -102,11 +103,90 @@ def list_workflows(limit: int = 50):
 
 
 @router.get("/events", dependencies=[Depends(verify_api_key)])
-def recent_events(limit: int = 50):
-    """List recent airport events."""
+def recent_events(
+    limit: int = Query(50, ge=1, le=500),
+    event_type: Optional[str] = Query(None, description="Filter by event type (e.g. face_verify, baggage_scan, fall_detected)"),
+    severity: Optional[str] = Query(None, description="Filter by severity (info, low, medium, high, critical)"),
+    status: Optional[str] = Query(None, description="Filter by status (received, processing, resolved, dismissed)"),
+    source: Optional[str] = Query(None, description="Filter by source (api, ai_service, iot_device, agent, system)"),
+):
+    """List recent airport events with optional filtering."""
     try:
         es = agent_service.get_event_system()
-        return success_response(data=es.get_recent(limit=limit))
+        return success_response(data=es.get_recent(
+            limit=limit,
+            event_type=event_type,
+            severity=severity,
+            status=status,
+            source=source,
+        ))
+    except RuntimeError as exc:
+        return error_response(code="AGENT_SERVICE_NOT_READY", message=str(exc), status_code=503)
+
+
+@router.get("/health", dependencies=[Depends(verify_api_key)])
+def agent_health():
+    """Agent service + Digital Twin connectivity health."""
+    try:
+        reg = agent_service.get_registry()
+        snapshot = reg.snapshot()
+
+        # Twin connectivity check: attempt a lightweight publish to /api/twin/ingest
+        twin = agent_service.get_twin_publisher()
+        twin_result = None
+        try:
+            import asyncio
+            result = asyncio.get_event_loop().run_until_complete(
+                twin.publish_state_change(
+                    entity_code="dashboard-health",
+                    entity_type="dashboard",
+                    status="online",
+                    payload={"check": "connectivity", "source": "backend-agent-service"},
+                )
+            )
+            if isinstance(result, dict):
+                twin_delivered = result.get("delivered", False)
+                twin_error = result.get("error")
+                twin_auth_error = result.get("auth_error", False)
+            else:
+                # Backward-compatible bool return
+                twin_delivered = bool(result)
+                twin_error = None if twin_delivered else "unknown"
+                twin_auth_error = False
+        except Exception as exc:  # noqa: BLE001
+            twin_delivered = False
+            twin_error = str(exc)
+            twin_auth_error = False
+
+        # Agent health summary
+        agents = snapshot.get("agents", [])
+        agent_statuses = {}
+        for a in agents:
+            agent_statuses[a["agent_id"]] = {
+                "status": a["status"],
+                "capabilities": [c["name"] for c in a.get("capabilities", [])],
+                "requires_human_review": any(c.get("requires_human_review", False) for c in a.get("capabilities", [])),
+            }
+
+        overall = "healthy"
+        if not twin_delivered:
+            overall = "degraded"
+        for a in agents:
+            if a["status"] != "active":
+                overall = "degraded"
+
+        return success_response(data={
+            "overall": overall,
+            "agents": agent_statuses,
+            "agent_count": len(agents),
+            "active_agents": snapshot.get("active", 0),
+            "twin": {
+                "url": agent_service.twin_publisher.twin_base_url,
+                "delivered": twin_delivered,
+                "error": twin_error,
+                "auth_error": twin_auth_error,
+            },
+        })
     except RuntimeError as exc:
         return error_response(code="AGENT_SERVICE_NOT_READY", message=str(exc), status_code=503)
 

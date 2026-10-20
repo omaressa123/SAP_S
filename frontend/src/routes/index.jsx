@@ -13,12 +13,15 @@ const Monitoring = lazy(() => import('../pages/Monitoring'))
 const DigitalTwin = lazy(() => import('../pages/DigitalTwin'))
 const Reports = lazy(() => import('../pages/Reports'))
 const AiCenter = lazy(() => import('../pages/AiCenter'))
+const AIMonitor = lazy(() => import('../pages/AIMonitor'))
 const FaceKiosk = lazy(() => import('../pages/FaceKiosk'))
 const BaggageAI = lazy(() => import('../pages/BaggageAI'))
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const IoTCenter = lazy(() => import('../pages/IoTCenter'))
 const EGateKiosk = lazy(() => import('../pages/EGateKiosk'))
+const EventCenter = lazy(() => import('../pages/EventCenter'))
+const WorkflowMonitor = lazy(() => import('../pages/WorkflowMonitor'))
 
 export default function AppRoutes() {
   return (
@@ -37,7 +40,10 @@ export default function AppRoutes() {
           <Route path="/ai/baggage" element={<BaggageAI />} />
           <Route path="/ai/smoke-fire" element={<SmokeFire />} />
           <Route path="/ai/full-detection" element={<FullDetection />} />
+          <Route path="/ai-monitor" element={<AIMonitor />} />
           <Route path="/iot" element={<IoTCenter />} />
+          <Route path="/events" element={<EventCenter />} />
+          <Route path="/workflows" element={<WorkflowMonitor />} />
         </Route>
         {/* Full-screen Terminal Kiosk Views */}
         <Route path="/egate" element={<EGateKiosk />} />

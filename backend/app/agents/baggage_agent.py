@@ -149,6 +149,7 @@ class BaggageAgent(AgentInterface):
                     success=False,
                     error=threat_result.error or "Threat evaluation failed",
                     requires_human_review=True,
+                    service_unavailable=threat_result.service_unavailable,
                 )
 
             screening_result = threat_result.detection  # SAFE / MANUAL_REVIEW

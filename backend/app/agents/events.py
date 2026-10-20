@@ -185,17 +185,28 @@ class EventSystem:
         finally:
             db.close()
 
-    def get_recent(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_recent(
+        self,
+        limit: int = 50,
+        event_type: Optional[str] = None,
+        severity: Optional[str] = None,
+        status: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         from ..models.agents import AirportEvent as EventModel
 
         db = self._session_factory()
         try:
-            rows = (
-                db.query(EventModel)
-                .order_by(EventModel.created_at.desc())
-                .limit(limit)
-                .all()
-            )
+            q = db.query(EventModel).order_by(EventModel.created_at.desc())
+            if event_type:
+                q = q.filter(EventModel.event_type == event_type)
+            if severity:
+                q = q.filter(EventModel.severity == severity)
+            if status:
+                q = q.filter(EventModel.status == status)
+            if source:
+                q = q.filter(EventModel.source == source)
+            rows = q.limit(limit).all()
             return [
                 {
                     "event_id": r.event_id,

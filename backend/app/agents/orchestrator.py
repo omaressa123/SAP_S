@@ -39,7 +39,7 @@ from ..models.admin_cameras import MonitoringAlert as MMonitoringAlert
 from .base import AgentInterface, AgentResult, AgentStatus
 from .registry import AgentRegistry
 from .events import AirportEvent, EventSystem, EventSource, EventSeverity
-from .twin_publisher import TwinPublisher
+from .twin_publisher import TwinPublisher, TwinDeliveryResult
 
 
 class WorkflowStatus(str, Enum):
@@ -55,6 +55,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    NEEDS_REVIEW = "needs_review"
 
 
 # Deterministic routing: event_type -> required capability name
@@ -133,8 +134,34 @@ class AgentOrchestrator:
         passenger_id: Optional[int] = None,
         bag_id: Optional[int] = None,
         flight_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
     ) -> AirportEvent:
-        """Create, persist, and route an airport event."""
+        """Create, persist, and route an airport event.
+
+        Idempotency: if a workflow already exists for this event_id (or
+        correlation_id), the existing workflow is returned unchanged — retries
+        do not duplicate emergency events, baggage inspections, or Twin events.
+        """
+        # Check for an existing workflow for this event (cross-restart idempotency)
+        existing_wf = self._find_existing_workflow(event_type, correlation_id, payload)
+        if existing_wf is not None:
+            # Return a lightweight event referencing the existing workflow
+            event = AirportEvent.create(
+                event_type=event_type,
+                source=source,
+                payload=payload or {},
+                source_id=source_id,
+                correlation_id=existing_wf.get("correlation_id") or correlation_id,
+                severity=severity,
+                zone_id=zone_id,
+                camera_id=camera_id,
+                passenger_id=passenger_id,
+                bag_id=bag_id,
+                flight_id=flight_id,
+            )
+            event.event_id = f"evt_{existing_wf['workflow_id'][3:]}"  # reuse workflow suffix
+            return event
+
         event = AirportEvent.create(
             event_type=event_type,
             source=source,
@@ -159,6 +186,53 @@ class AgentOrchestrator:
             import logging
             logging.getLogger(__name__).error(f"Route error: {exc}")
         return event
+
+    def _find_existing_workflow(
+        self,
+        event_type: str,
+        correlation_id: Optional[str],
+        payload: Dict[str, Any] | None,
+    ) -> Optional[Dict[str, Any]]:
+        """Look up an existing workflow for this event to support idempotency."""
+        db = SessionLocal()
+        try:
+            # Match by correlation_id first (most specific)
+            if correlation_id:
+                row = (
+                    db.query(MWorkflowExecution)
+                    .filter(MWorkflowExecution.correlation_id == correlation_id)
+                    .order_by(MWorkflowExecution.started_at.desc())
+                    .first()
+                )
+                if row:
+                    return {
+                        "workflow_id": row.workflow_id,
+                        "name": row.name,
+                        "status": row.status,
+                        "correlation_id": row.correlation_id,
+                    }
+
+            # Fall back: match by event_type + payload bag_id/passenger_id
+            payload_str = json.dumps(payload or {}, sort_keys=True)
+            rows = (
+                db.query(MWorkflowExecution)
+                .filter(MWorkflowExecution.name == self._workflow_name_for(event_type))
+                .filter(MWorkflowExecution.input_payload == payload_str)
+                .order_by(MWorkflowExecution.started_at.desc())
+                .limit(5)
+                .all()
+            )
+            if rows:
+                row = rows[0]
+                return {
+                    "workflow_id": row.workflow_id,
+                    "name": row.name,
+                    "status": row.status,
+                    "correlation_id": row.correlation_id,
+                }
+            return None
+        finally:
+            db.close()
 
     # ----- routing -----
 
@@ -220,6 +294,22 @@ class AgentOrchestrator:
             ctx.status = WorkflowStatus.FAILED.value
             ctx.error_message = step.error or "unknown failure"
 
+        # Determine final workflow status based on step outcome
+        if step.status == TaskStatus.COMPLETED.value:
+            # Step 2: publish result to Digital Twin + downstream systems
+            await self._publish_step_result(ctx, step, event)
+            ctx.status = WorkflowStatus.COMPLETED.value
+        elif step.status == TaskStatus.NEEDS_REVIEW.value:
+            # Successful inference but requires human review (e.g. MANUAL_REVIEW)
+            await self._publish_step_result(ctx, step, event)
+            ctx.status = WorkflowStatus.COMPLETED.value
+        elif step.status == TaskStatus.FAILED.value:
+            ctx.status = WorkflowStatus.FAILED.value
+            ctx.error_message = step.error
+        else:
+            ctx.status = WorkflowStatus.FAILED.value
+            ctx.error_message = step.error or "unknown failure"
+
         ctx.completed_at = datetime.now(timezone.utc)
         self._persist_workflow(ctx)
         self.event_system.mark_resolved(event.event_id)
@@ -231,7 +321,16 @@ class AgentOrchestrator:
         agent: AgentInterface,
         event: AirportEvent,
     ) -> WorkflowStep:
-        """Execute a single deterministic step with timeout and retry guard."""
+        """Execute a single deterministic step with timeout, retry guard, and
+        bounded retries.
+
+        Retry policy:
+          - Service failures (service_unavailable=True) are retried up to
+            max_retries times.
+          - Valid negatives (success=True, detection=no_fall/SAFE/no_event)
+            are NOT retried — they are legitimate results.
+          - Input validation failures are NOT retried.
+        """
         guard_key = (ctx.workflow_id, f"step_{step_index}")
         if guard_key in self._step_guard:
             return WorkflowStep(
@@ -257,57 +356,121 @@ class AgentOrchestrator:
         task_id = f"task_{uuid4().hex[:12]}"
         task_type = EVENT_CAPABILITY_MAP.get(event.event_type, event.event_type)
 
-        # Persist task
+        # Persist task (RUNNING, retry_count=0, max_retries=3)
         self._persist_task(task_id, ctx.workflow_id, agent.agent_id, event.event_id, task_type, event.payload)
 
+        max_retries = 3
+        attempt = 0
         result: AgentResult
-        try:
-            result = await asyncio.wait_for(
-                agent.execute_with_guard(
-                    event_type=event.event_type,
-                    payload={**event.payload, "event_type": event.event_type},
-                ),
-                timeout=DEFAULT_TIMEOUT_SECONDS,
+        last_error: Optional[str] = None
+
+        while attempt <= max_retries:
+            attempt += 1
+            try:
+                result = await asyncio.wait_for(
+                    agent.execute_with_guard(
+                        event_type=event.event_type,
+                        payload={**event.payload, "event_type": event.event_type},
+                    ),
+                    timeout=DEFAULT_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                last_error = "execution timeout"
+                if attempt > max_retries:
+                    break
+                continue
+            except Exception as exc:  # noqa: BLE001
+                last_error = str(exc)
+                if attempt > max_retries:
+                    break
+                continue
+
+            # Inference completed (success or valid negative)
+            if result.success:
+                # Determine task status: needs_review if human review required
+                task_status = (
+                    TaskStatus.NEEDS_REVIEW.value
+                    if result.requires_human_review
+                    else TaskStatus.COMPLETED.value
+                )
+                self._update_task_status(
+                    task_id,
+                    task_status,
+                    output=json.dumps(result.to_dict()),
+                    error=None,
+                    attempt=attempt,
+                )
+                # Record decision audit
+                self._record_decision(ctx.workflow_id, task_id, agent.agent_id, result)
+                return WorkflowStep(
+                    step_index=step_index,
+                    task_id=task_id,
+                    agent_id=agent.agent_id,
+                    task_type=task_type,
+                    status=task_status,
+                    result=result.to_dict(),
+                    error=result.error,
+                )
+
+            # Inference failed — distinguish service failure from valid negative
+            if result.service_unavailable:
+                # Retryable service failure
+                last_error = result.error or "service unavailable"
+                if attempt >= max_retries:
+                    # Exhausted retries — mark as failed, never convert to SAFE
+                    self._update_task_status(
+                        task_id,
+                        TaskStatus.FAILED.value,
+                        output=json.dumps(result.to_dict()),
+                        error=f"service unavailable after {max_retries} retries: {last_error}",
+                        attempt=attempt,
+                    )
+                    self._record_decision(ctx.workflow_id, task_id, agent.agent_id, result)
+                    return WorkflowStep(
+                        step_index=step_index,
+                        task_id=task_id,
+                        agent_id=agent.agent_id,
+                        task_type=task_type,
+                        status=TaskStatus.FAILED.value,
+                        result=result.to_dict(),
+                        error=f"service unavailable after {max_retries} retries: {last_error}",
+                    )
+                # Retry
+                continue
+
+            # Non-service failure (validation error, no handler, etc.) — not retryable
+            self._update_task_status(
+                task_id,
+                TaskStatus.FAILED.value,
+                output=json.dumps(result.to_dict()),
+                error=result.error,
+                attempt=attempt,
             )
-        except asyncio.TimeoutError:
-            self._update_task_status(task_id, TaskStatus.FAILED.value, error="execution timeout")
+            self._record_decision(ctx.workflow_id, task_id, agent.agent_id, result)
             return WorkflowStep(
                 step_index=step_index,
                 task_id=task_id,
                 agent_id=agent.agent_id,
                 task_type=task_type,
                 status=TaskStatus.FAILED.value,
-                error="execution timeout",
-            )
-        except Exception as exc:  # noqa: BLE001
-            self._update_task_status(task_id, TaskStatus.FAILED.value, error=str(exc))
-            return WorkflowStep(
-                step_index=step_index,
-                task_id=task_id,
-                agent_id=agent.agent_id,
-                task_type=task_type,
-                status=TaskStatus.FAILED.value,
-                error=str(exc),
+                result=result.to_dict(),
+                error=result.error,
             )
 
+        # Exhausted retries without a successful result
         self._update_task_status(
             task_id,
-            TaskStatus.COMPLETED.value if result.success else TaskStatus.FAILED.value,
-            output=json.dumps(result.to_dict()),
-            error=result.error,
+            TaskStatus.FAILED.value,
+            error=last_error or "execution failed after retries",
+            attempt=attempt,
         )
-
-        # Record decision audit
-        self._record_decision(ctx.workflow_id, task_id, agent.agent_id, result)
-
         return WorkflowStep(
             step_index=step_index,
             task_id=task_id,
             agent_id=agent.agent_id,
             task_type=task_type,
-            status=TaskStatus.COMPLETED.value if result.success else TaskStatus.FAILED.value,
-            result=result.to_dict(),
-            error=result.error,
+            status=TaskStatus.FAILED.value,
+            error=last_error or "execution failed after retries",
         )
 
     async def _publish_step_result(
@@ -316,7 +479,12 @@ class AgentOrchestrator:
         step: WorkflowStep,
         event: AirportEvent,
     ) -> None:
-        """Publish agent result to Digital Twin and notification systems."""
+        """Publish agent result to Digital Twin and notification systems.
+
+        Twin delivery status is tracked separately from inference success:
+        inference may succeed while Twin delivery fails (network, auth, etc.).
+        Both outcomes are recorded in the workflow output.
+        """
         if not step.result:
             return
 
@@ -347,11 +515,12 @@ class AgentOrchestrator:
         # Push the structured state change to the Digital Twin REST API
         # (airport-twin :8100). Failure here is non-fatal: the twin is
         # visualization-only and the agent workflow continues.
+        twin_delivery = {"delivered": False, "error": None, "auth_error": False}
         if self.twin_publisher is not None:
             import asyncio as _asyncio
 
             try:
-                await _asyncio.wait_for(
+                result = await _asyncio.wait_for(
                     self.twin_publisher.publish_agent_event(
                         asset_code=f"bag-{event.bag_id}" if event.bag_id else "bag-unknown",
                         event_type=f"{event.event_type}.completed",
@@ -359,9 +528,45 @@ class AgentOrchestrator:
                     ),
                     timeout=10.0,
                 )
-            except Exception:  # noqa: BLE001
-                # Twin unreachable — non-fatal; event is still persisted above.
-                pass
+                if isinstance(result, TwinDeliveryResult):
+                    twin_delivery = {
+                        "delivered": result.delivered,
+                        "error": result.error,
+                        "auth_error": result.auth_error,
+                    }
+                else:
+                    # Backward compatibility with bool return
+                    twin_delivery = {"delivered": bool(result), "error": None, "auth_error": False}
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc)
+                twin_delivery["error"] = msg
+                if "401" in msg or "403" in msg or "unauthorized" in msg.lower():
+                    twin_delivery["auth_error"] = True
+
+        # Merge twin delivery status into workflow output for auditability
+        if ctx.output_payload:
+            try:
+                existing = json.loads(ctx.output_payload)
+            except Exception:
+                existing = {}
+        else:
+            existing = {}
+        existing["twin_delivery"] = twin_delivery
+        ctx.output_payload = json.dumps(existing)
+
+        # Update the persisted workflow output
+        db = SessionLocal()
+        try:
+            row = (
+                db.query(MWorkflowExecution)
+                .filter(MWorkflowExecution.workflow_id == ctx.workflow_id)
+                .first()
+            )
+            if row:
+                row.output_payload = ctx.output_payload
+                db.commit()
+        finally:
+            db.close()
 
     # ----- persistence helpers -----
 
@@ -434,6 +639,8 @@ class AgentOrchestrator:
                 status=TaskStatus.RUNNING.value,
                 input_payload=json.dumps(input_payload),
                 timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+                retry_count=0,
+                max_retries=3,
             )
             db.add(row)
             db.commit()
@@ -446,6 +653,7 @@ class AgentOrchestrator:
         status: str,
         output: Optional[str] = None,
         error: Optional[str] = None,
+        attempt: Optional[int] = None,
     ) -> None:
         db = SessionLocal()
         try:
@@ -457,6 +665,8 @@ class AgentOrchestrator:
                     row.output_payload = output
                 if error is not None:
                     row.error_message = error
+                if attempt is not None:
+                    row.retry_count = attempt - 1
                 db.commit()
         finally:
             db.close()

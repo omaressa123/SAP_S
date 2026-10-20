@@ -149,36 +149,42 @@ class SafetyAgent(AgentInterface):
         # Persist incident records
         db = SessionLocal()
         try:
-            # Determine emergency event type
-            if event_type in ("smoke_detected", "fire_detected"):
-                ee_type = "smoke_fire"
-            elif event_type == "fall_detected":
-                ee_type = "fall"
-            elif event_type == "unattended_bag":
-                ee_type = "suspicious_bag"
-            elif event_type == "restricted_area":
-                ee_type = "security_breach"
-            elif event_type == "overcrowding":
-                ee_type = "crowding"
-            else:
-                ee_type = event_type
+            is_confirmed_fall = adapter_result.detection == "confirmed_fall"
+            emergency = None
+            if is_confirmed_fall:
+                # Determine emergency event type
+                if event_type in ("smoke_detected", "fire_detected"):
+                    ee_type = "smoke_fire"
+                elif event_type == "fall_detected":
+                    ee_type = "fall"
+                elif event_type == "unattended_bag":
+                    ee_type = "suspicious_bag"
+                elif event_type == "restricted_area":
+                    ee_type = "security_breach"
+                elif event_type == "overcrowding":
+                    ee_type = "crowding"
+                else:
+                    ee_type = event_type
 
-            emergency = EmergencyEvent(
-                event_type=ee_type,
-                zone_id=zone_id,
-                status="detected",
-                detected_time=datetime.utcnow(),
-            )
-            db.add(emergency)
-            db.flush()
+                emergency = EmergencyEvent(
+                    event_type=ee_type,
+                    zone_id=zone_id,
+                    status="detected",
+                    detected_time=datetime.utcnow(),
+                )
+                db.add(emergency)
+                db.flush()
 
+            # Monitoring alert is always recorded for traceability; only a
+            # confirmed fall carries high severity and an emergency link.
+            alert_severity = severity if is_confirmed_fall else "info"
             db.add(MonitoringAlert(
                 camera_id=camera_id,
                 zone_id=zone_id,
                 behavior_type=event_type,
-                severity=severity,
+                severity=alert_severity,
                 status="open",
-                linked_emergency_event_id=emergency.event_id,
+                linked_emergency_event_id=emergency.event_id if emergency else None,
                 timestamp=datetime.utcnow(),
             ))
             db.commit()
@@ -250,7 +256,7 @@ class SafetyAgent(AgentInterface):
             db.commit()
 
             return AgentResult(
-                success=True,
+                success=not service_unavailable,
                 data={
                     "event_type": event_type,
                     "emergency_event_id": emergency.event_id,
@@ -262,6 +268,7 @@ class SafetyAgent(AgentInterface):
                 },
                 confidence=None,
                 requires_human_review=True,
+                service_unavailable=service_unavailable,
                 metadata={"service_unavailable": service_unavailable},
             )
         finally:

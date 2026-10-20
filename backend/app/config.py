@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     MQTT_PASSWORD: str = os.getenv("MQTT_PASSWORD", "")
     # MQTT topic filter, e.g. "airport/#" (convention: airport/{module}/{device_id}/{event}).
     MQTT_TOPIC_FILTER: str = os.getenv("MQTT_TOPIC_FILTER", "airport/#")
+    # Digital Twin API bearer token (operator role) for authenticated ingest.
+    # Obtain via POST /api/twin/auth/token (operator:op123 by default).
+    TWIN_AUTH_TOKEN: str = os.getenv("TWIN_AUTH_TOKEN", "")
 
     class Config:
         env_file = ".env"

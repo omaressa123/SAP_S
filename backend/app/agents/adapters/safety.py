@@ -26,8 +26,11 @@ from .base import BaseModelAdapter, AdapterResult
 SEVERITY_MAP = {
     "smoke_fire": "critical",
     "fire": "critical",
+    "fire_detected": "critical",
     "smoke": "critical",
+    "smoke_detected": "critical",
     "fall": "high",
+    "fall_detected": "high",
     "confirmed_fall": "high",
     "unattended_bag": "high",
     "restricted_area": "high",
@@ -293,11 +296,15 @@ class SafetyAdapter(BaseModelAdapter):
                             summary = job.get("summary", "")
                             events = job.get("events", [])
                             return AdapterResult(
-                                success=confirmed,
+                                # success = inference completed successfully,
+                                # regardless of whether a fall was found.
+                                success=True,
                                 model_id=self.model_id,
                                 detection="confirmed_fall" if confirmed else "no_fall",
                                 confidence=None,  # RF model doesn't expose per-event confidence
                                 verified_event="fall_candidate" if confirmed else "no_event",
+                                # Only a confirmed fall needs human review; a clean
+                                # negative does not create an emergency.
                                 requires_human_review=confirmed,
                                 metadata={
                                     "job_id": job_id,

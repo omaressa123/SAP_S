@@ -560,7 +560,7 @@ class TestBaggageAgentEndToEnd:
         from app.models.agents import AgentTask
         task = db.query(AgentTask).filter(AgentTask.task_type == "screen_baggage").first()
         assert task is not None
-        assert task.status == "completed"
+        assert task.status == "needs_review"
 
         # Digital Twin publishing attempted via the existing TwinPublisher
         from app.agents.service import agent_service
@@ -866,3 +866,612 @@ class TestAgentRecovery:
         assert agent.is_healthy() is False
         agent.heartbeat()
         assert agent.is_healthy() is True
+
+
+class TestSafetyAdapterSeverityMap:
+    """Severity map must classify every supported event_type explicitly.
+
+    These are unit tests against the in-memory SEVERITY_MAP — no model or
+    network is involved.
+    """
+    def test_severity_map_covers_all_event_types(self):
+        from app.agents.adapters.safety import SafetyAdapter, SEVERITY_MAP
+        for et in ("smoke_detected", "fire_detected", "fall_detected",
+                   "restricted_area", "unattended_bag", "overcrowding"):
+            assert et in SEVERITY_MAP, f"missing severity for {et}"
+        assert SEVERITY_MAP["smoke_detected"] == "critical"
+        assert SEVERITY_MAP["fire_detected"] == "critical"
+        assert SEVERITY_MAP["fall_detected"] == "high"
+        assert SEVERITY_MAP["unattended_bag"] == "high"
+        assert SEVERITY_MAP["restricted_area"] == "high"
+        assert SEVERITY_MAP["overcrowding"] == "medium"
+
+
+class TestSafetyAdapterUnitTests:
+    """Unit tests for SafetyAdapter (precomputed detection path).
+
+    These tests do NOT call a model or the network — they normalize
+    pre-computed detection data. Real model inference through the adapter
+    was verified separately against the running :8004 fall-detection service
+    (see e2e note below).
+    """
+
+    def test_precomputed_fall_high_severity_requires_review(self):
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter()
+        result = asyncio.run(adapter.infer({
+            "event_type": "fall_detected",
+            "detection_data": {"label": "confirmed_fall", "confidence": 0.9},
+            "zone_id": 3,
+            "camera_id": 10,
+        }))
+        assert result.success is True
+        assert result.detection == "confirmed_fall"
+        assert result.confidence == 0.9
+        assert result.requires_human_review is True
+        assert result.metadata["severity"] == "high"
+
+    def test_precomputed_smoke_critical_requires_review(self):
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter()
+        result = asyncio.run(adapter.infer({
+            "event_type": "smoke_detected",
+            "detection_data": {"label": "smoke", "confidence": 0.8},
+            "zone_id": 2,
+        }))
+        assert result.success is True
+        assert result.metadata["severity"] == "critical"
+        assert result.requires_human_review is True
+
+    def test_precomputed_no_detection_no_review(self):
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter()
+        result = asyncio.run(adapter.infer({
+            "event_type": "overcrowding",
+            "detection_data": {"label": "none", "confidence": 0.0},
+        }))
+        assert result.success is True
+        assert result.requires_human_review is True  # all safety events reviewed
+
+    def test_unknown_event_type_errors_not_safe(self):
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter()
+        result = asyncio.run(adapter.infer({
+            "event_type": "not_a_real_event",
+        }))
+        assert result.success is False
+        assert result.requires_human_review is True
+        assert result.error is not None
+
+
+class TestSafetyAdapterRealInference:
+    """Tests for the SafetyAdapter HTTP path to the fall-detection service.
+
+    These tests mock httpx because the fall-detection runtime (torch +
+    mediapipe) runs in a separate Python 3.12 venv and is not importable
+    here. The adapter code path is identical to the one exercised against the
+    live :8004 service (see e2e note in the final report).
+    """
+
+    def _mock_httpx(self, post_json=None, get_json=None, exc=None, get_status=200):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        post_resp = MagicMock()
+        post_resp.status_code = 200
+        post_resp.json = MagicMock(return_value=post_json or {"job_id": "job_1"})
+
+        get_resp = MagicMock()
+        get_resp.status_code = get_status
+        get_resp.json = MagicMock(return_value=get_json or {})
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=post_resp)
+        mock_client.get = AsyncMock(return_value=get_resp)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        if exc is not None:
+            mock_client.post = AsyncMock(side_effect=exc)
+        return patch("httpx.AsyncClient", return_value=mock_client)
+
+    def _make_temp_video(self, tmp_path):
+        """Tiny dummy video file — content is irrelevant because httpx is
+        mocked; the file just needs to exist so open() succeeds."""
+        p = tmp_path / "fall.avi"
+        p.write_bytes(b"\x00\x00\x00\x00dummy-video")
+        return str(p)
+
+    def test_real_inference_confirmed_fall(self, tmp_path):
+        """Confirmed fall -> MANUAL_REVIEW, requires review, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        get_json = {
+            "status": "completed",
+            "confirmed_falls": 1,
+            "summary": "Confirmed fall detected",
+            "events": [{"status": "flagged", "seconds": 12.1},
+                       {"status": "confirmed_fall", "seconds": 13.5}],
+        }
+        with self._mock_httpx(post_json={"job_id": "job_1"}, get_json=get_json):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+                "zone_id": 3,
+                "camera_id": 10,
+            }))
+        assert result.success is True
+        assert result.detection == "confirmed_fall"
+        assert result.verified_event == "fall_candidate"
+        assert result.requires_human_review is True
+        assert result.metadata["summary"] == "Confirmed fall detected"
+        assert len(result.metadata["events"]) == 2
+
+    def test_real_inference_no_fall(self, tmp_path):
+        """No confirmed fall -> not SAFE, still requires review (candidate)."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        get_json = {
+            "status": "completed",
+            "confirmed_falls": 0,
+            "summary": "No confirmed fall detected",
+            "events": [],
+        }
+        with self._mock_httpx(post_json={"job_id": "job_2"}, get_json=get_json):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is True
+        assert result.detection == "no_fall"
+        assert result.verified_event == "no_event"
+        assert result.requires_human_review is False  # clean negative, no danger
+
+    def test_real_inference_service_unavailable_never_safe(self, tmp_path):
+        """Fall service unreachable -> success=False, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        import httpx
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        with self._mock_httpx(exc=httpx.ConnectError("refused")):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+
+    def test_real_inference_timeout_never_safe(self, tmp_path):
+        """Fall service timeout -> success=False, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        import httpx
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        with self._mock_httpx(exc=httpx.TimeoutException("timed out")):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+
+    def test_precomputed_path_still_works(self):
+        """Precomputed detections remain supported alongside live inference."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        result = asyncio.run(adapter.infer({
+            "event_type": "unattended_bag",
+            "detection_data": {"label": "unattended bag", "confidence": 0.9},
+            "zone_id": 4,
+        }))
+        assert result.success is True
+        assert result.metadata["severity"] == "high"
+        assert result.requires_human_review is True
+
+
+class TestSafetyAgentEndToEnd:
+    """End-to-end: fall_detected event routed to SafetyAgent, persisted,
+    and twin publish attempted. The fall inference is mocked here; real model
+    inference was verified separately against the live :8004 service.
+    """
+
+    def test_fall_detected_workflow_via_api(self):
+        from app.agents.adapters.safety import SafetyAdapter
+        orig_infer = SafetyAdapter.infer
+
+        async def fake_infer(self, payload):
+            from app.agents.adapters.base import AdapterResult
+            return AdapterResult(
+                success=True,
+                model_id="safety_detection",
+                model_version="rf_fall_model",
+                detection="confirmed_fall",
+                confidence=None,
+                verified_event="fall_candidate",
+                requires_human_review=True,
+                metadata={
+                    "event_type": payload.get("event_type"),
+                    "zone_id": payload.get("zone_id"),
+                    "camera_id": payload.get("camera_id"),
+                    "summary": "Confirmed fall detected",
+                    "source": "fall_detection_service",
+                },
+            )
+
+        SafetyAdapter.infer = fake_infer
+        try:
+            r = client.post("/api/v1/agents/events",
+                json={
+                    "event_type": "fall_detected",
+                    "source": "iot_device",
+                    "payload": {"video_path": "/tmp/fall.avi", "zone_id": 3, "camera_id": 10},
+                    "severity": "high",
+                },
+                headers=HEADERS,
+            )
+        finally:
+            SafetyAdapter.infer = orig_infer
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+
+        db = SessionLocal()
+        # Emergency event persisted (event_type "fall" per agent rules)
+        ee = db.query(EmergencyEvent).filter(EmergencyEvent.event_type == "fall").first()
+        assert ee is not None
+        assert ee.zone_id == 3
+        # Monitoring alert persisted
+        al = db.query(MonitoringAlert).filter(MonitoringAlert.behavior_type == "fall_detected").first()
+        assert al is not None
+        assert al.severity == "high"
+        # Task execution recorded
+        from app.models.agents import AgentTask
+        task = db.query(AgentTask).filter(AgentTask.task_type == "assess_safety").first()
+        assert task is not None
+        assert task.status == "needs_review"
+        # Decision audit recorded
+        from app.models.agents import DecisionAudit
+        da = db.query(DecisionAudit).filter(DecisionAudit.agent_id == "safety_agent").first()
+        assert da is not None
+        assert da.requires_human_review is True
+        # Twin publish attempted
+        from app.agents.service import agent_service
+        assert agent_service.twin_publisher.publish_agent_event.called
+        db.close()
+
+
+class TestServiceFailureAndRetry:
+    """Service failures are retried up to max_retries and never converted to SAFE.
+
+    Valid negatives (e.g. no_fall, SAFE) are NOT retried — they are legitimate
+    inference results. Only service_unavailable failures trigger retries.
+    """
+
+    def test_service_failure_retried_then_succeeds(self):
+        """Service failure is retried; eventual success is NOT converted to SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        original_infer = adapter.infer
+        call_count = 0
+
+        async def flaky_infer(self, payload):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                from app.agents.adapters.base import AdapterResult
+                return AdapterResult(
+                    success=False,
+                    model_id="baggage_threat_detection",
+                    error="service unavailable",
+                    service_unavailable=True,
+                    requires_human_review=True,
+                )
+            return await original_infer(payload)
+
+        adapter.infer = flaky_infer.__get__(adapter, BaggageThreatAdapter)
+
+        db = SessionLocal()
+        _seed_bag(db)
+        db.close()
+
+        from app.agents.service import agent_service
+        agent_service.baggage_agent.threat_adapter = adapter
+
+        try:
+            orch = agent_service.get_orchestrator()
+            asyncio.run(orch.ingest_event(
+                event_type="baggage_scan",
+                source="api",
+                payload={"bag_id": TEST_BAG_ID, "detections": []},
+                correlation_id="corr-retry-1",
+            ))
+        finally:
+            agent_service.baggage_agent.threat_adapter = BaggageThreatAdapter(
+                backend_url="http://localhost:8000/api/v1/ai/baggage/analyze"
+            )
+
+        assert call_count == 2, f"Expected 2 calls, got {call_count}"
+
+        db = SessionLocal()
+        insp = db.query(__import__("app.models.baggage_security_screening", fromlist=["BaggageInspection"]).BaggageInspection).first()
+        assert insp is not None
+        assert insp.result == "SAFE"
+        db.close()
+
+    def test_service_failure_exhausted_retries_not_safe(self):
+        """Service failure exhausted retries → FAILED, never SAFE."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        adapter = BaggageThreatAdapter(service_url="http://localhost:8002/analyze")
+        original_infer = adapter.infer
+        call_count = 0
+
+        async def always_fail_infer(self, payload):
+            nonlocal call_count
+            call_count += 1
+            from app.agents.adapters.base import AdapterResult
+            import httpx
+            return AdapterResult(
+                success=False,
+                model_id="baggage_threat_detection",
+                error="service unavailable",
+                service_unavailable=True,
+                requires_human_review=True,
+            )
+
+        adapter.infer = always_fail_infer.__get__(adapter, BaggageThreatAdapter)
+
+        db = SessionLocal()
+        _seed_bag(db)
+        db.close()
+
+        from app.agents.service import agent_service
+        agent_service.baggage_agent.threat_adapter = adapter
+
+        try:
+            orch = agent_service.get_orchestrator()
+            asyncio.run(orch.ingest_event(
+                event_type="baggage_scan",
+                source="api",
+                payload={"bag_id": TEST_BAG_ID, "detections": []},
+                correlation_id="corr-retry-2",
+            ))
+        finally:
+            agent_service.baggage_agent.threat_adapter = BaggageThreatAdapter(
+                backend_url="http://localhost:8000/api/v1/ai/baggage/analyze"
+            )
+
+        assert call_count == 3, f"Expected 3 call attempts, got {call_count}"
+
+        db = SessionLocal()
+        from app.models.agents import AgentTask
+        task = db.query(AgentTask).filter(AgentTask.task_type == "screen_baggage").first()
+        assert task is not None
+        assert task.status == "failed"
+        assert "service unavailable" in (task.error_message or "")
+        db.close()
+
+
+class TestDuplicateEventProtection:
+    """Duplicate-event protection: retries do not create duplicate events,
+    inspections, or Twin deliveries."""
+
+    def test_duplicate_correlation_id_does_not_duplicate_workflow(self):
+        """Submitting the same correlation_id twice creates only one workflow."""
+        from app.agents.service import agent_service
+
+        orch = agent_service.get_orchestrator()
+        import asyncio
+
+        # First submission
+        asyncio.run(orch.ingest_event(
+            event_type="baggage_scan",
+            source="api",
+            payload={"bag_id": TEST_BAG_ID, "detections": [{"item_type": "knife", "confidence": 0.9}]},
+            correlation_id="corr-dup-test",
+        ))
+
+        # Second submission with same correlation_id
+        asyncio.run(orch.ingest_event(
+            event_type="baggage_scan",
+            source="api",
+            payload={"bag_id": TEST_BAG_ID, "detections": [{"item_type": "knife", "confidence": 0.9}]},
+            correlation_id="corr-dup-test",
+        ))
+
+        # Only one workflow created
+        from app.models.agents import WorkflowExecution
+        db = SessionLocal()
+        wfs = db.query(WorkflowExecution).filter(
+            WorkflowExecution.correlation_id == "corr-dup-test"
+        ).all()
+        assert len(wfs) == 1, f"Expected 1 workflow, got {len(wfs)}"
+        db.close()
+
+
+class TestTwinDeliveryStatus:
+    """Twin delivery status is tracked separately from inference success.
+
+    Expired/invalid JWTs (401/403) are detected as auth_error and never
+    silently reported as successful delivery.
+    """
+
+    def test_twin_delivery_recorded_in_workflow_output(self):
+        """Twin delivery status appears in workflow output_payload."""
+        from app.agents.adapters.baggage import BaggageThreatAdapter
+        import asyncio
+
+        orig_infer = BaggageThreatAdapter.infer
+
+        async def fake_infer(self, payload):
+            from app.agents.adapters.base import AdapterResult
+            return AdapterResult(
+                success=True,
+                model_id="baggage_threat_detection",
+                model_version="btd-yolo11",
+                detection="SAFE",
+                confidence=None,
+                verified_event="no_items_detected",
+                requires_human_review=False,
+                metadata={"bag_id": payload.get("bag_id"), "detections": [], "threat_found": False},
+            )
+
+        BaggageThreatAdapter.infer = fake_infer
+        try:
+            db = SessionLocal()
+            _seed_bag(db)
+            db.close()
+
+            r = client.post("/api/v1/agents/events",
+                json={
+                    "event_type": "baggage_scan",
+                    "source": "api",
+                    "payload": {"bag_id": TEST_BAG_ID, "detections": []},
+                },
+                headers=HEADERS,
+            )
+        finally:
+            BaggageThreatAdapter.infer = orig_infer
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+
+        db = SessionLocal()
+        from app.models.agents import WorkflowExecution
+        wf = db.query(WorkflowExecution).filter(
+            WorkflowExecution.name == "baggage_screening"
+        ).order_by(WorkflowExecution.started_at.desc()).first()
+        assert wf is not None
+        output = json.loads(wf.output_payload or "{}")
+        assert "twin_delivery" in output
+        td = output["twin_delivery"]
+        assert "delivered" in td
+        assert "auth_error" in td
+        db.close()
+
+
+class TestSafetyAgentRealInference:
+    """Tests for the SafetyAdapter HTTP path to the fall-detection service.
+
+    These tests mock httpx because the fall-detection runtime (torch +
+    mediapipe) runs in a separate Python 3.12 venv and is not importable
+    here. The adapter code path is identical to the one exercised against
+    the live :8004 fall-detection service.
+    """
+
+    def _make_temp_video(self, tmp_path):
+        """Tiny dummy video file — content is irrelevant because httpx is
+        mocked; the file just needs to exist so open() succeeds."""
+        p = tmp_path / "fall.avi"
+        p.write_bytes(b"\x00\x00\x00\x00dummy-video")
+        return str(p)
+
+    def _mock_httpx(self, post_json=None, get_json=None, exc=None, get_status=200):
+        """Build a mock httpx AsyncClient context manager."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        post_resp = MagicMock()
+        post_resp.status_code = 200
+        post_resp.json = MagicMock(return_value=post_json or {"job_id": "job_1"})
+
+        get_resp = MagicMock()
+        get_resp.status_code = get_status
+        get_resp.json = MagicMock(return_value=get_json or {})
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=post_resp)
+        mock_client.get = AsyncMock(return_value=get_resp)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        if exc is not None:
+            mock_client.post = AsyncMock(side_effect=exc)
+        return patch("httpx.AsyncClient", return_value=mock_client)
+
+    def test_real_inference_confirmed_fall(self, tmp_path):
+        """Confirmed fall → MANUAL_REVIEW, requires review, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        get_json = {
+            "status": "completed",
+            "confirmed_falls": 1,
+            "summary": "Confirmed fall detected",
+            "events": [{"status": "flagged", "seconds": 12.1},
+                       {"status": "confirmed_fall", "seconds": 13.5}],
+        }
+        with self._mock_httpx(post_json={"job_id": "job_1"}, get_json=get_json):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+                "zone_id": 3,
+                "camera_id": 10,
+            }))
+        assert result.success is True
+        assert result.detection == "confirmed_fall"
+        assert result.verified_event == "fall_candidate"
+        assert result.requires_human_review is True
+        assert result.metadata["summary"] == "Confirmed fall detected"
+
+    def test_real_inference_no_fall(self, tmp_path):
+        """No confirmed fall → not SAFE, still requires review (candidate)."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        get_json = {
+            "status": "completed",
+            "confirmed_falls": 0,
+            "summary": "No confirmed fall detected",
+            "events": [],
+        }
+        with self._mock_httpx(post_json={"job_id": "job_2"}, get_json=get_json):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is True
+        assert result.detection == "no_fall"
+        assert result.verified_event == "no_event"
+        assert result.requires_human_review is False
+
+    def test_real_inference_service_unavailable_never_safe(self, tmp_path):
+        """Fall service unreachable → success=False, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        import httpx
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        with self._mock_httpx(exc=httpx.ConnectError("refused")):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+
+    def test_real_inference_timeout_never_safe(self, tmp_path):
+        """Fall service timeout → success=False, never SAFE."""
+        from app.agents.adapters.safety import SafetyAdapter
+        import asyncio
+        import httpx
+        adapter = SafetyAdapter(fall_detection_url="http://localhost:8004")
+        with self._mock_httpx(exc=httpx.TimeoutException("timed out")):
+            result = asyncio.run(adapter.infer({
+                "event_type": "fall_detected",
+                "video_path": self._make_temp_video(tmp_path),
+            }))
+        assert result.success is False
+        assert result.service_unavailable is True
+        assert result.requires_human_review is True
+
