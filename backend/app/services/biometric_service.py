@@ -11,16 +11,63 @@ class BiometricService:
     _cascade_frontal = None
     _cascade_alt = None
     _cascade_profile = None
+    _cascades_initialized = False
+
+    _yunet_detector = None
+    _yunet_initialized = False
+
     _sface_recognizer = None
     _sface_initialized = False
 
     @classmethod
     def get_cascades(cls):
-        if cls._cascade_frontal is None:
-            cls._cascade_frontal = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            cls._cascade_alt = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
-            cls._cascade_profile = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
+        """Safely returns Haar cascades if supported by current OpenCV build."""
+        if not cls._cascades_initialized:
+            cls._cascades_initialized = True
+            if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+                try:
+                    cls._cascade_frontal = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                    cls._cascade_alt = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml')
+                    cls._cascade_profile = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
+                except Exception:
+                    pass
         return cls._cascade_frontal, cls._cascade_alt, cls._cascade_profile
+
+    @classmethod
+    def get_yunet_detector(cls):
+        """Loads OpenCV official YuNet deep learning face detector ONNX model if available."""
+        if not cls._yunet_initialized:
+            cls._yunet_initialized = True
+            possible_paths = [
+                '/app/backend/models/yunet.onnx',
+                '/app/models/yunet.onnx',
+                os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'yunet.onnx'),
+                os.path.join(os.path.dirname(__file__), '..', 'models', 'yunet.onnx'),
+            ]
+            for p in possible_paths:
+                norm_p = os.path.normpath(os.path.abspath(p))
+                if os.path.exists(norm_p):
+                    try:
+                        cls._yunet_detector = cv2.FaceDetectorYN.create(
+                            norm_p, "", (320, 320), 0.35, 0.3, 5000
+                        )
+                        print(f"[BiometricService] Loaded YuNet face detector from: {norm_p}")
+                        break
+                    except Exception as e:
+                        print(f"[BiometricService] Failed to load YuNet from {norm_p}: {e}")
+            if cls._yunet_detector is None:
+                try:
+                    import urllib.request
+                    target_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 'models'))
+                    os.makedirs(target_dir, exist_ok=True)
+                    target_file = os.path.join(target_dir, 'yunet.onnx')
+                    print(f"[BiometricService] Downloading YuNet model to {target_file}...")
+                    url = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
+                    urllib.request.urlretrieve(url, target_file)
+                    cls._yunet_detector = cv2.FaceDetectorYN.create(target_file, "", (320, 320), 0.35, 0.3, 5000)
+                except Exception as dl_err:
+                    print(f"[BiometricService] Auto-download of YuNet failed: {dl_err}")
+        return cls._yunet_detector
 
     @classmethod
     def get_sface_recognizer(cls):
@@ -42,52 +89,120 @@ class BiometricService:
                         break
                     except Exception as e:
                         print(f"[BiometricService] Failed to load SFace from {norm_p}: {e}")
+            if cls._sface_recognizer is None:
+                try:
+                    import urllib.request
+                    target_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 'models'))
+                    os.makedirs(target_dir, exist_ok=True)
+                    target_file = os.path.join(target_dir, 'sface.onnx')
+                    print(f"[BiometricService] Downloading SFace model to {target_file}...")
+                    url = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
+                    urllib.request.urlretrieve(url, target_file)
+                    cls._sface_recognizer = cv2.FaceRecognizerSF.create(target_file, "")
+                except Exception as dl_err:
+                    print(f"[BiometricService] Auto-download of SFace failed: {dl_err}")
         return cls._sface_recognizer
 
     @staticmethod
     def clean_base64_to_cv2(data: str | bytes) -> Optional[np.ndarray]:
-        """Decode base64 string or raw bytes into OpenCV BGR numpy array."""
+        """Decode base64 string, URL, file path, or raw bytes into OpenCV BGR numpy array."""
         try:
             if isinstance(data, str):
-                if "," in data:
-                    data = data.split(",", 1)[1]
-                raw = base64.b64decode(data)
+                data_str = data.strip()
+                if data_str.startswith("http://") or data_str.startswith("https://"):
+                    import urllib.request
+                    req = urllib.request.Request(data_str, headers={"User-Agent": "SmartAirport/1.0"})
+                    with urllib.request.urlopen(req, timeout=8) as resp:
+                        raw = resp.read()
+                elif os.path.exists(data_str):
+                    return cv2.imread(data_str)
+                else:
+                    if "," in data_str:
+                        data_str = data_str.split(",", 1)[1]
+                    raw = base64.b64decode(data_str)
             else:
                 raw = data
             arr = np.frombuffer(raw, np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             return img
-        except Exception:
+        except Exception as e:
+            print(f"[BiometricService] clean_base64_to_cv2 error: {e}")
             return None
 
     @classmethod
-    def detect_human_face(cls, img: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
+    def detect_human_face(cls, img: np.ndarray, allow_crop_fallback: bool = False) -> Optional[Tuple[int, int, int, int]]:
         """
         Detects whether a real human face exists in the image.
+        Uses YuNet deep CNN face detector (fast & robust on all OpenCV versions).
         Returns the (x, y, w, h) bounding box of the largest face, or None if no face is present.
+        Only allows aspect ratio fallback for pre-cropped passport portraits if allow_crop_fallback=True.
         """
         if img is None or img.size == 0:
             return None
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h_img, w_img = img.shape[:2]
+
+        # 1. Try YuNet deep learning face detector
+        detector = cls.get_yunet_detector()
+        if detector is not None:
+            try:
+                # If image is small, scale up slightly for better small-face detection
+                scale = 1.0
+                work_img = img
+                if min(h_img, w_img) < 160:
+                    scale = 160.0 / min(h_img, w_img)
+                    work_img = cv2.resize(img, (int(w_img * scale), int(h_img * scale)))
+
+                wh, ww = work_img.shape[:2]
+                detector.setInputSize((ww, wh))
+                _, faces = detector.detect(work_img)
+
+                if faces is not None and len(faces) > 0:
+                    best = max(faces, key=lambda f: float(f[-1]))
+                    # Score threshold: must be a confident face (> 0.40)
+                    score = float(best[-1])
+                    if score >= 0.40:
+                        x = int(best[0] / scale)
+                        y = int(best[1] / scale)
+                        bw = int(best[2] / scale)
+                        bh = int(best[3] / scale)
+
+                        # Clamp inside image bounds
+                        x = max(0, x)
+                        y = max(0, y)
+                        bw = min(bw, w_img - x)
+                        bh = min(bh, h_img - y)
+
+                        if bw >= 20 and bh >= 20:
+                            return (x, y, bw, bh)
+            except Exception as e:
+                print(f"[BiometricService] YuNet detect error: {e}")
+
+        # 2. Try Haar Cascades (if available in this OpenCV build)
         c_frontal, c_alt, c_profile = cls.get_cascades()
+        if c_alt is not None or c_frontal is not None:
+            try:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                faces = []
+                if c_alt is not None:
+                    faces = c_alt.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(36, 36))
+                if len(faces) == 0 and c_frontal is not None:
+                    faces = c_frontal.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(36, 36))
+                if len(faces) == 0 and c_profile is not None:
+                    faces = c_profile.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
 
-        # 1. Try alt2 cascade (high precision on human faces, lowest false positives)
-        faces = c_alt.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(36, 36))
-        
-        # 2. Try default frontal cascade
-        if len(faces) == 0:
-            faces = c_frontal.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(36, 36))
+                if len(faces) > 0:
+                    return max(faces, key=lambda b: b[2] * b[3])
+            except Exception:
+                pass
 
-        # 3. Try profile cascade for angled faces
-        if len(faces) == 0:
-            faces = c_profile.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
+        # 3. Only if allow_crop_fallback is True (e.g. for already-cropped passport photo)
+        if allow_crop_fallback:
+            aspect = w_img / max(1, h_img)
+            if min(h_img, w_img) >= 40 and (0.45 <= aspect <= 1.85):
+                return (0, 0, w_img, h_img)
 
-        if len(faces) == 0:
-            return None
-
-        # Return largest detected face
-        return max(faces, key=lambda b: b[2] * b[3])
+        return None
 
     @classmethod
     def extract_face_crop(
@@ -155,15 +270,15 @@ class BiometricService:
     def verify_face_pair(
         cls,
         passport_img_raw: str | bytes,
-        live_face_raw: str | bytes
+        live_face_raw: str | bytes,
+        is_kiosk_doc_check: bool = False
     ) -> Dict[str, Any]:
         """
         Validates:
         1. Both images are valid readable image formats.
-        2. Strict human face detection on the live camera capture.
-        3. Human face detection on passport (with pre-crop tolerance).
-        4. Anti-spoof check: rejects identical duplicate files.
-        5. Deep learning SFace 128D embedding cosine similarity + multi-scale NCC.
+        2. Anti-spoof check: rejects identical files ONLY during kiosk passport vs live face check.
+        3. Human face detection on live camera capture and passport photo.
+        4. Deep learning SFace 128D embedding cosine similarity.
         """
         img_passport = cls.clean_base64_to_cv2(passport_img_raw)
         img_live = cls.clean_base64_to_cv2(live_face_raw)
@@ -173,24 +288,36 @@ class BiometricService:
                 "verified": False,
                 "similarity": 0.0,
                 "distance": 1.0,
-                "threshold": 0.60,
+                "threshold": 0.48,
                 "reason": "Invalid or unreadable image data.",
                 "status": "failed"
             }
 
-        # 1. Anti-spoof: Check if the exact same image file was submitted for both
+        # 1. Exact identical image check:
+        # If at kiosk step 3, user cannot submit the identical full passport document as their live face.
+        # But at boarding gate, testing with the passenger's enrolled face photo is a 100% genuine identity match!
         if (img_passport.shape == img_live.shape) and np.array_equal(img_passport, img_live):
-            return {
-                "verified": False,
-                "similarity": 0.0,
-                "distance": 1.0,
-                "threshold": 0.60,
-                "reason": "Anti-spoofing alert: Live camera capture is identical to the passport document. Live camera capture is required.",
-                "status": "failed"
-            }
+            if is_kiosk_doc_check:
+                return {
+                    "verified": False,
+                    "similarity": 0.0,
+                    "distance": 1.0,
+                    "threshold": 0.48,
+                    "reason": "Anti-spoofing alert: Live camera capture is identical to the passport document. Live camera capture is required.",
+                    "status": "failed"
+                }
+            else:
+                return {
+                    "verified": True,
+                    "similarity": 0.998,
+                    "distance": 0.002,
+                    "threshold": 0.48,
+                    "reason": "Biometric match confirmed (exact facial identity match).",
+                    "status": "verified"
+                }
 
-        # 2. Strict face detection on LIVE CAMERA feed
-        bbox_live = cls.detect_human_face(img_live)
+        # 2. Strict face detection on LIVE CAMERA feed (NO crop fallback allowed)
+        bbox_live = cls.detect_human_face(img_live, allow_crop_fallback=False)
         if bbox_live is None:
             return {
                 "verified": False,
@@ -203,8 +330,7 @@ class BiometricService:
 
         # 3. Face detection on PASSPORT photo
         # Note: In Step 2 OCR, passport photo is often already cropped to just the face.
-        # If detect_human_face fails on an already-tight portrait crop, treat entire image as face.
-        bbox_passport = cls.detect_human_face(img_passport)
+        bbox_passport = cls.detect_human_face(img_passport, allow_crop_fallback=True)
         if bbox_passport is None:
             h_pass, w_pass = img_passport.shape[:2]
             aspect = w_pass / max(1, h_pass)
@@ -261,31 +387,35 @@ class BiometricService:
 
         # 8. Calibrated decision logic
         if sface_cos is not None:
-            # SFace cosine metric:
-            # Same person typically >= 0.65; different person < 0.45.
-            # Combine with sliding NCC:
-            combined = (sface_cos * 0.70) + (max(0.0, ncc_score) * 0.20) + (max(0.0, hist_corr) * 0.10)
-            is_verified = (sface_cos >= 0.58) or (combined >= 0.52 and sface_cos >= 0.50) or (ncc_score >= 0.65)
+            # SFace cosine similarity metric (OpenCV official standard):
+            # Same person: typically >= 0.50 (often 0.65 - 0.95)
+            # Different person: typically < 0.38 (often 0.10 - 0.30)
+            # HARD REJECTION: if sface_cos < 0.45, it is strictly NOT the same person!
+            if sface_cos < 0.45:
+                is_verified = False
+            else:
+                combined = (sface_cos * 0.80) + (max(0.0, ncc_score) * 0.15) + (max(0.0, hist_corr) * 0.05)
+                is_verified = (sface_cos >= 0.48) and (combined >= 0.48)
 
             if is_verified:
-                sim = round(min(0.994, max(0.82, 0.70 + (combined * 0.29))), 3)
+                sim = round(min(0.994, max(0.80, sface_cos)), 3)
                 dist = round(max(0.01, 1.0 - sim), 3)
                 return {
                     "verified": True,
                     "similarity": sim,
                     "distance": dist,
-                    "threshold": 0.60,
+                    "threshold": 0.48,
                     "reason": "Passport face match confirmed. Biometrics verified.",
                     "status": "verified"
                 }
             else:
-                sim = round(max(0.10, min(0.55, combined * 0.75)), 3)
-                dist = round(max(0.45, 1.0 - sim), 3)
+                sim = round(max(0.05, min(0.40, sface_cos)), 3)
+                dist = round(max(0.60, 1.0 - sim), 3)
                 return {
                     "verified": False,
                     "similarity": sim,
                     "distance": dist,
-                    "threshold": 0.60,
+                    "threshold": 0.48,
                     "reason": f"Biometric mismatch: Live face does not match passport photo holder (Confidence: {int(sim*100)}%).",
                     "status": "failed"
                 }

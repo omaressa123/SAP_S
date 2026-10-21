@@ -34,6 +34,7 @@ outputs/
 # Keep small model weights? Uncomment to allow .pt <100MB:
 # !smoke_fire_detection/yolo*.pt
 # !fulldetection/models/**
+!backend/models/*.onnx
 
 # PlatformIO build artifacts (cover both IOT/ and iot/)
 .pio/

@@ -102,6 +102,7 @@ export default function GateBoarding() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        videoRef.current.play().catch(() => {})
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play().catch(() => {})
         }
@@ -132,14 +133,38 @@ export default function GateBoarding() {
     setWebcamActive(false)
   }
 
+  // Whenever returning to State 1 (Next Passenger or auto-close), ensure live camera is active and attached
   useEffect(() => {
-    if (webcamActive && videoRef.current && streamRef.current) {
-      try {
-        videoRef.current.srcObject = streamRef.current
-        videoRef.current.play().catch(() => {})
-      } catch {}
+    if (currentState === 1) {
+      setUploadedFacePreview(null)
+      setScanError(null)
+
+      const attachOrStart = async () => {
+        const stream = streamRef.current
+        const hasLiveTrack = stream && stream.active && stream.getVideoTracks().some(tr => tr.readyState === 'live')
+
+        if (hasLiveTrack) {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            try {
+              await videoRef.current.play()
+            } catch (e) {
+              console.warn('Video play error on reattach:', e)
+            }
+          }
+          setWebcamActive(true)
+        } else {
+          await startWebcam()
+        }
+      }
+
+      const tId = setTimeout(() => {
+        attachOrStart()
+      }, 50)
+
+      return () => clearTimeout(tId)
     }
-  }, [webcamActive])
+  }, [currentState])
 
   useEffect(() => {
     startWebcam()
@@ -250,7 +275,7 @@ export default function GateBoarding() {
           setSecondsRemaining(prev => {
             if (prev <= 1) {
               clearInterval(timerRef.current)
-              setCurrentState(1)
+              handleNextPassenger()
               return 10
             }
             return prev - 1
@@ -270,20 +295,33 @@ export default function GateBoarding() {
     }
   }
 
-  // Manual State Toolbar Switcher
-  const handleToolbarState = async (stateNum, barcode = '') => {
+  // Clean transition to Next Passenger: resets photo upload, errors, and reopens camera
+  const handleNextPassenger = () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    setSecondsRemaining(10)
+    setScanError(null)
+    setEnrollSuccess(null)
+    setUploadedFacePreview(null)
+    setCurrentState(1)
+  }
+
+  const handleStateTransition = (stateNum) => {
     if (timerRef.current) clearInterval(timerRef.current)
     setScanError(null)
+    setEnrollSuccess(null)
+    if (stateNum === 1) {
+      handleNextPassenger()
+      return
+    }
     setCurrentState(stateNum)
 
     if (stateNum === 2) {
-      // Simulate Approved state
       setSecondsRemaining(10)
       timerRef.current = setInterval(() => {
         setSecondsRemaining(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current)
-            setCurrentState(1)
+            handleNextPassenger()
             return 10
           }
           return prev - 1
@@ -292,13 +330,7 @@ export default function GateBoarding() {
     }
   }
 
-  const badgeLabels = [
-    '',
-    'State 1 • Biometric DB Query',
-    'State 2 • Cleared & Gate Open',
-    'State 3 • Denied (Flight Mismatch)',
-    'State 4 • Optical Scanner Fallback'
-  ]
+  const handleToolbarState = handleStateTransition
 
   return (
     <div className="bg-[#faf8ff] text-[#131b2e] min-h-screen flex flex-col justify-between selection:bg-[#006194] selection:text-white" dir={currentLang === 'AR' ? 'rtl' : 'ltr'}>
@@ -354,74 +386,7 @@ export default function GateBoarding() {
         </div>
       </header>
 
-      {/* Hardware Simulation Toolbar */}
-      <aside className="w-full bg-[#e2e7ff]/90 backdrop-blur-md px-6 py-2.5 z-40 flex flex-wrap items-center justify-between gap-3 shadow-sm shrink-0 border-b border-[#dae2fd]">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#006c49] animate-pulse"></div>
-            <span className="text-xs font-bold text-[#131b2e] tracking-wider uppercase">Gate Engine:</span>
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold text-white transition-colors ${
-              currentState === 2 ? 'bg-[#006c49]' : currentState === 3 ? 'bg-[#ba1a1a]' : 'bg-[#006194]'
-            }`}>
-              {badgeLabels[currentState]}
-            </span>
-          </div>
 
-          {/* Test Persona Mode Selector */}
-          <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-lg border border-[#bfc7d2]">
-            <span className="text-xs font-bold text-[#4a5a75]">Test Mode:</span>
-            <select
-              value={personaMode}
-              onChange={(e) => setPersonaMode(e.target.value)}
-              className="text-xs bg-transparent font-semibold text-[#131b2e] outline-none cursor-pointer"
-            >
-              <option value="real">📷 Live Camera Face (Actual)</option>
-              <option value="valid">👤 Valid Passenger (Yehia / QR-082)</option>
-              <option value="wrong_flight">⚠️ Wrong Flight (Alex Smith / EK-204)</option>
-              <option value="unknown">❌ Unregistered / Unknown Person</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-          <button
-            onClick={() => handleToolbarState(1)}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-              currentState === 1 ? 'bg-[#131b2e] text-white' : 'bg-white text-[#131b2e] hover:bg-[#eaedff]'
-            }`}
-          >
-            1. Camera Scan
-          </button>
-          <button
-            onClick={() => handleToolbarState(2)}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-              currentState === 2 ? 'bg-[#131b2e] text-white' : 'bg-white text-[#131b2e] hover:bg-[#eaedff]'
-            }`}
-          >
-            2. Approved
-          </button>
-          <button
-            onClick={() => handleToolbarState(3)}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-              currentState === 3 ? 'bg-[#131b2e] text-white' : 'bg-white text-[#131b2e] hover:bg-[#eaedff]'
-            }`}
-          >
-            3. Refused
-          </button>
-          <button
-            onClick={() => handleToolbarState(4)}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-              currentState === 4 ? 'bg-[#131b2e] text-white' : 'bg-white text-[#131b2e] hover:bg-[#eaedff]'
-            }`}
-          >
-            4. Barcode Scan
-          </button>
-        </div>
-      </aside>
 
       {/* Main Viewport Container */}
       <main className="w-full flex-1 flex flex-col justify-center items-center px-6 py-6">
@@ -462,7 +427,15 @@ export default function GateBoarding() {
                 
                 {/* 1. HTML5 Video Tag */}
                 <video
-                  ref={videoRef}
+                  ref={(el) => {
+                    videoRef.current = el
+                    if (el && streamRef.current && streamRef.current.active) {
+                      if (el.srcObject !== streamRef.current) {
+                        el.srcObject = streamRef.current
+                        el.play().catch(() => {})
+                      }
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted
@@ -715,7 +688,7 @@ export default function GateBoarding() {
               <div className="w-full max-w-md flex items-center gap-3 mt-4">
                 <button
                   type="button"
-                  onClick={() => handleToolbarState(1)}
+                  onClick={handleNextPassenger}
                   className="w-full h-12 rounded-xl bg-white text-[#131b2e] hover:bg-[#eaedff] transition-all font-bold text-sm shadow-sm border border-[#bfc7d2]/50 flex items-center justify-center gap-2"
                 >
                   <span>Next Passenger in Queue →</span>
@@ -781,14 +754,14 @@ export default function GateBoarding() {
               <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4">
                 <button
                   type="button"
-                  onClick={() => handleToolbarState(1)}
+                  onClick={handleNextPassenger}
                   className="h-12 rounded-xl bg-white text-[#131b2e] hover:bg-[#eaedff] transition-all font-bold text-xs flex items-center justify-center border border-[#bfc7d2]"
                 >
                   Retry Face Scan
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleToolbarState(4)}
+                  onClick={() => handleStateTransition(4)}
                   className="h-12 rounded-xl bg-white text-[#131b2e] hover:bg-[#eaedff] transition-all font-bold text-xs flex items-center justify-center border border-[#bfc7d2]"
                 >
                   Scan Paper Pass
@@ -869,7 +842,7 @@ export default function GateBoarding() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleToolbarState(1)}
+                  onClick={handleNextPassenger}
                   className="text-xs font-semibold text-[#006194] hover:underline text-center py-1 mt-1"
                 >
                   ← Return to Facial Biometric Scan

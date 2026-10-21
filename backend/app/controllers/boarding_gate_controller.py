@@ -176,9 +176,37 @@ def execute_boarding_verification(payload: BoardingGateVerifyRequest, db: Sessio
         })
 
     # 4. Real biometric identification against Flight manifest
-    p_id = payload.passengerId
-    if not p_id:
-        # Check active flight manifest
+    p_id = None
+    match_score = 95.0
+
+    # If a specific passengerId was provided, verify live frame against their enrolled face
+    if payload.passengerId:
+        target_fe = db.query(FaceEnrollment).filter(
+            FaceEnrollment.passenger_id == payload.passengerId,
+            FaceEnrollment.status == "active"
+        ).first()
+        if target_fe and target_fe.face_embedding_ref:
+            try:
+                res = biometric_service.verify_face_pair(target_fe.face_embedding_ref, frame)
+                if res.get("verified"):
+                    p_id = target_fe.passenger_id
+                    sim = res.get("similarity", 0.95)
+                    match_score = round(sim * 100, 1)
+                else:
+                    return success_response(data={
+                        "cleared": False,
+                        "verificationResult": "face_mismatch",
+                        "state": 1,
+                        "title": "Biometric Identity Mismatch",
+                        "message": f"Biometric verification failed: Live face does not match passenger #{payload.passengerId}. Turnstile remains locked.",
+                        "barrierStatus": "LOCKED & SEALED",
+                        "timestamp": now.isoformat() + "Z"
+                    })
+            except Exception as e:
+                print(f"[BoardingGate] Face match error for passenger {payload.passengerId}: {e}")
+
+    # If no passengerId or 1-to-N search on active flight manifest
+    if not p_id and not payload.passengerId:
         fl = db.query(Flight).filter(Flight.flight_number == gate_flight).first()
         if fl:
             bookings = db.query(Booking).filter(Booking.flight_id == fl.flight_id).all()
@@ -189,16 +217,27 @@ def execute_boarding_verification(payload: BoardingGateVerifyRequest, db: Sessio
             ).all()
 
             for fe in enrollments:
+                match_targets = []
                 if fe.face_embedding_ref:
+                    match_targets.append(fe.face_embedding_ref)
+                doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == fe.passenger_id).first()
+                if doc and doc.document_image_url and doc.document_image_url not in match_targets:
+                    match_targets.append(doc.document_image_url)
+
+                for target in match_targets:
                     try:
-                        res = biometric_service.verify_face_pair(fe.face_embedding_ref, frame)
+                        res = biometric_service.verify_face_pair(target, frame, is_kiosk_doc_check=False)
                         if res.get("verified"):
                             p_id = fe.passenger_id
+                            sim = res.get("similarity", 0.95)
+                            match_score = round(sim * 100, 1)
                             break
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[BoardingGate] Face match error for passenger {fe.passenger_id}: {e}")
+                if p_id:
+                    break
 
-        # If not on this flight, check if passenger is Alex Smith on EK-204
+        # If not on this flight, check if passenger is Alex Smith on EK-204 (Wrong Flight scenario)
         if not p_id:
             p_alex = db.query(Passenger).filter(Passenger.full_name.ilike("%alex smith%")).first()
             if p_alex:
@@ -211,24 +250,19 @@ def execute_boarding_verification(payload: BoardingGateVerifyRequest, db: Sessio
                     except Exception:
                         pass
 
-        # If still not identified, use latest enrolled passenger
-        if not p_id:
-            fe_latest = db.query(FaceEnrollment).order_by(FaceEnrollment.enrollment_id.desc()).first()
-            if fe_latest:
-                p_id = fe_latest.passenger_id
-
+    # If still not verified, STRICTLY REJECT: turnstile remains locked!
     if not p_id:
         return success_response(data={
             "cleared": False,
             "verificationResult": "unrecognized_face",
             "state": 1,
             "title": "Face Not Recognized",
-            "message": f"Biometric match failed: Face does not match any registered passenger for Flight {gate_flight}.",
+            "message": f"Biometric match failed: Face does not match any registered passenger for Flight {gate_flight}. Turnstile remains locked.",
             "barrierStatus": "LOCKED & SEALED",
             "timestamp": now.isoformat() + "Z"
         })
 
-    return approve_passenger(db, passenger_id=p_id, gate_flight=gate_flight, gate_id=payload.boardingGateId, now=now, method="biometric")
+    return approve_passenger(db, passenger_id=p_id, gate_flight=gate_flight, gate_id=payload.boardingGateId, now=now, method="biometric", match_score=match_score)
 
 
 def reject_wrong_flight(gate_flight: str, now: datetime):
@@ -250,7 +284,7 @@ def reject_wrong_flight(gate_flight: str, now: datetime):
     })
 
 
-def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str, gate_id: Optional[int], now: datetime, method: str = "biometric"):
+def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str, gate_id: Optional[int], now: datetime, method: str = "biometric", match_score: float = 95.0):
     """Approves passenger boarding for Gate B22 with real database-backed details."""
     passenger = db.query(Passenger).filter(Passenger.passenger_id == passenger_id).first()
     if not passenger:
@@ -310,7 +344,7 @@ def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str
         "destination": "Doha Intl (DOH)",
         "cabinClass": cabin,
         "priorityBoarding": True,
-        "biometricMatchScore": 99.4,
+        "biometricMatchScore": match_score,
         "checkedBaggage": "2 / 2 Loaded (Holds A-04 Checked)",
         "gatePathway": "Jetbridge Open (Door 2L Direct)",
         "barrierStatus": "RETRACTED & UNLOCKED",

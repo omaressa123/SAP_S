@@ -69,7 +69,6 @@ export const SmartGateApi = {
     body: JSON.stringify({
       boardingGateId: 22,
       flightId: 1,
-      passengerId: 4,
       ...payload
     })
   }),

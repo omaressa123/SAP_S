@@ -13,3 +13,5 @@ httpx
 pytest
 cloudinary
 Pillow
+opencv-python-headless
+pytesseract

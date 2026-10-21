@@ -306,6 +306,7 @@ export default function EGateKiosk() {
         seat: booking.seatNumber ? `${booking.seatNumber} (${booking.group || 'Zone 2'})` : prev.seat,
         gate: booking.gate ? `Gate ${booking.gate}` : prev.gate,
         faceUrl: scanRes.faceCropBase64 || prev.faceUrl,
+        documentUrl: scanRes.matchingPassenger?.documentUrl || scanRes.documentUrl || prev.documentUrl,
       }))
 
       setDbSavedStatus({

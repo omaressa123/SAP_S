@@ -380,7 +380,7 @@ def compare_face_match(payload: CompareFaceMatchRequest, db: Session = Depends(g
 
     try:
         from ..services.biometric_service import biometric_service
-        result = biometric_service.verify_face_pair(img1_raw, img2_raw)
+        result = biometric_service.verify_face_pair(img1_raw, img2_raw, is_kiosk_doc_check=True)
         return success_response(data=result)
     except Exception as exc:
         return success_response(data={
@@ -473,11 +473,19 @@ def scan_passport_image(payload: ScanPassportImageRequest, db: Session = Depends
                 db.refresh(new_p)
                 p_id = new_p.passenger_id
 
+                p_exp = None
+                if passport.get("expiry_date"):
+                    try:
+                        p_exp = datetime.strptime(passport["expiry_date"], "%Y-%m-%d").date()
+                    except Exception:
+                        pass
+
                 new_doc = TravelDocument(
                     passenger_id=new_p.passenger_id,
                     document_type="passport",
                     document_number=passport["passport_number"],
                     issuing_country_code=nat,
+                    expiry_date=p_exp,
                     mrz_hash=passport.get("mrz_raw", "")[:64],
                     is_primary=True,
                     created_at=datetime.utcnow(),
@@ -487,7 +495,34 @@ def scan_passport_image(payload: ScanPassportImageRequest, db: Session = Depends
                 db.commit()
                 db_saved = True
 
-            # Also upload cropped passport face to Cloudinary and link in FaceEnrollment
+            # 1. Upload scanned passport document image to Cloudinary & save URL in DB
+            doc_cloud_url = None
+            if payload.image_base64 and p_id:
+                try:
+                    doc_cloud_url = storage_service.upload_document(
+                        payload.image_base64,
+                        passenger_id=p_id,
+                        doc_type="passport"
+                    )
+                    doc_record = db.query(TravelDocument).filter(
+                        TravelDocument.passenger_id == p_id,
+                        TravelDocument.document_number == passport.get("passport_number")
+                    ).first() or db.query(TravelDocument).filter(TravelDocument.passenger_id == p_id).first()
+
+                    if doc_record and doc_cloud_url:
+                        doc_record.document_image_url = doc_cloud_url
+                        if passport.get("expiry_date"):
+                            try:
+                                doc_record.expiry_date = datetime.strptime(passport["expiry_date"], "%Y-%m-%d").date()
+                            except Exception:
+                                pass
+                        db.commit()
+                    result["documentUrl"] = doc_cloud_url
+                except Exception as exc:
+                    db.rollback()
+                    print(f"[Cloudinary] Document upload failed: {exc}")
+
+            # 2. Upload cropped passport face to Cloudinary and link in FaceEnrollment
             if result.get("faceCropBase64") and p_id:
                 try:
                     face_cloud_url = storage_service.upload_face(result["faceCropBase64"], passenger_id=p_id)
@@ -548,6 +583,7 @@ def scan_passport_image(payload: ScanPassportImageRequest, db: Session = Depends
                         "fullName": passport.get("full_name") or (p_record.full_name if p_record else "PASSPORT HOLDER"),
                         "passportNumber": passport.get("passport_number", ""),
                         "nationality": passport.get("nationality", "USA"),
+                        "documentUrl": doc_cloud_url,
                         "linkedBooking": {
                             "bookingId": b.booking_id if b else 101,
                             "bookingReference": b.booking_reference if b else f"QR82-P{p_id}",

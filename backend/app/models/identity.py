@@ -41,6 +41,7 @@ class TravelDocument(Base):
     expiry_date = Column(Date)
     mrz_hash = Column(String)
     is_primary = Column(Boolean)
+    document_image_url = Column(String, nullable=True)
     created_at = Column(DateTime)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
