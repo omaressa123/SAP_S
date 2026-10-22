@@ -19,7 +19,7 @@ const links = [
 
 export default function Navbar() {
   return (
-    <nav>
+    <nav className="legacy-navbar">
       <strong className="brand">Smart Airport Operations</strong>
       {links.map((l) => (
         <NavLink key={l.to} to={l.to} end={l.to === '/'}>
