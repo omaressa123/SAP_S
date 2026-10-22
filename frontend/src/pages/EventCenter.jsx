@@ -7,11 +7,13 @@
  * event_type, severity, status, source, limit.
  */
 import { useCallback, useState } from 'react'
-import { Filter, Search } from 'lucide-react'
+import { Filter, Search, ArrowRight, RefreshCw } from 'lucide-react'
 import Card from '../components/Card'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
+import { Loading, ErrorState } from '../components/States'
 import PulseDot from '../components/animations/PulseDot'
+import FadeIn from '../components/animations/FadeIn'
 
 const EVENT_TYPE_LABEL = {
   face_verify: 'Face Verify',
@@ -42,12 +44,54 @@ const STATUS_COLOR = {
   dismissed: '#8b93a7',
 }
 
-const SOURCE_ICON = {
-  ai_service: BrainCircuit,
-  iot_device: Radio,
-  api: ShieldAlert,
-  agent: Luggage,
-  system: Clock,
+const FILTER_OPTIONS = {
+  event_type: [
+    { value: 'face_verify', label: 'Face Verify' },
+    { value: 'passport_scan', label: 'Passport Scan' },
+    { value: 'baggage_scan', label: 'Baggage Scan' },
+    { value: 'baggage_tracking', label: 'Baggage Tracking' },
+    { value: 'smoke_detected', label: 'Smoke Detected' },
+    { value: 'fire_detected', label: 'Fire Detected' },
+    { value: 'fall_detected', label: 'Fall Detected' },
+    { value: 'restricted_area', label: 'Restricted Area' },
+    { value: 'unattended_bag', label: 'Unattended Bag' },
+    { value: 'overcrowding', label: 'Overcrowding' },
+    { value: 'iot_telemetry', label: 'IoT Telemetry' },
+  ],
+  severity: [
+    { value: 'critical', label: 'Critical' },
+    { value: 'high', label: 'High' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'low', label: 'Low' },
+    { value: 'info', label: 'Info' },
+  ],
+  status: [
+    { value: 'received', label: 'Received' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'dismissed', label: 'Dismissed' },
+  ],
+  source: [
+    { value: 'api', label: 'API' },
+    { value: 'ai_service', label: 'AI Service' },
+    { value: 'iot_device', label: 'IoT Device' },
+    { value: 'agent', label: 'Agent' },
+    { value: 'system', label: 'System' },
+  ],
+}
+
+function relativeTime(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return String(ts)
+  const now = new Date()
+  const secs = Math.floor((now - d) / 1000)
+  if (secs < 60) return 'just now'
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hours ago`
+  return d.toLocaleDateString()
 }
 
 export default function EventCenter() {
@@ -85,128 +129,101 @@ export default function EventCenter() {
   const rows = events.data || []
 
   return (
-    <div className="ops-bg">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <h1>Event Center</h1>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button
-            className="btn"
-            onClick={() => setFilters({ event_type: '', severity: '', status: '', source: '' })}
-          >
-            Clear filters
-          </button>
-          <button className="btn accent" onClick={retry}>
-            <Search size={16} /> Refresh
-          </button>
-        </div>
-      </div>
-
+    <div className="dashboard-page">
       <FadeIn delay={0}>
+        <div className="dash-top-row">
+          <div className="dash-welcome">
+            <h1>Event Center</h1>
+            <p>View, filter, and track airport events from the agent event system.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn"
+              onClick={() => setFilters({ event_type: '', severity: '', status: '', source: '' })}
+            >
+              <RefreshCw size={14} /> Clear filters
+            </button>
+            <button className="btn accent" onClick={retry}>
+              <Search size={14} /> Refresh
+            </button>
+          </div>
+        </div>
+      </FadeIn>
+
+      {/* Filter chips */}
+      <FadeIn delay={60}>
         <Card className="lift" title="Filter Events">
-          <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ flex: 0.25, fontSize: '0.85rem', color: '#4a5a75' }}>Event type</span>
-              <select
-                value={filters.event_type}
-                onChange={(e) => setFilters({ ...filters, event_type: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }}
-              >
-                <option value="">All types</option>
-                <option value="face_verify">Face Verify</option>
-                <option value="passport_scan">Passport Scan</option>
-                <option value="baggage_scan">Baggage Scan</option>
-                <option value="baggage_tracking">Baggage Tracking</option>
-                <option value="smoke_detected">Smoke Detected</option>
-                <option value="fire_detected">Fire Detected</option>
-                <option value="fall_detected">Fall Detected</option>
-                <option value="restricted_area">Restricted Area</option>
-                <option value="unattended_bag">Unattended Bag</option>
-                <option value="overcrowding">Overcrowding</option>
-                <option value="iot_telemetry">IoT Telemetry</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ flex: 0.25, fontSize: '0.85rem', color: '#4a5a75' }}>Severity</span>
-              <select
-                value={filters.severity}
-                onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }}
-              >
-                <option value="">All severities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-                <option value="info">Info</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ flex: 0.25, fontSize: '0.85rem', color: '#4a5a75' }}>Status</span>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }}
-              >
-                <option value="">All statuses</option>
-                <option value="received">Received</option>
-                <option value="processing">Processing</option>
-                <option value="resolved">Resolved</option>
-                <option value="dismissed">Dismissed</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ flex: 0.25, fontSize: '0.85rem', color: '#4a5a75' }}>Source</span>
-              <select
-                value={filters.source}
-                onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-                style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }}
-              >
-                <option value="">All sources</option>
-                <option value="api">API</option>
-                <option value="ai_service">AI Service</option>
-                <option value="iot_device">IoT Device</option>
-                <option value="agent">Agent</option>
-                <option value="system">System</option>
-              </select>
-            </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            {Object.entries(FILTER_OPTIONS).map(([key, options]) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '0.7rem', color: '#4a5a75', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{key.replace(/_/g, ' ')}</span>
+                <select
+                  value={filters[key]}
+                  onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '6px 10px',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 8,
+                    background: '#fff',
+                    color: '#071739',
+                    minWidth: 130,
+                  }}
+                >
+                  <option value="">All {key.replace(/_/g, ' ')}s</option>
+                  {options.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
           </div>
         </Card>
       </FadeIn>
 
-      <FadeIn delay={200}>
+      {/* Events list */}
+      <FadeIn delay={120}>
         <Card className="lift" title={`Events (${rows.length})`}>
-          <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {rows.length === 0 ? (
-              <p style={{ color: '#4a5a75', fontSize: '0.85rem', padding: '24px', textAlign: 'center' }}>
+              <p style={{ color: '#4a5a75', fontSize: '0.8rem', padding: '16px', textAlign: 'center' }}>
                 No events match the current filters.
               </p>
             ) : (
-              rows.map((evt) => (
-                <div
-                  key={evt.event_id}
-                  style={{
-                    display: 'flex',
-                    gap: 10,
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    background: '#ffffff',
-                    borderBottom: '1px solid var(--color-border)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  <PulseDot status={evt.status} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: '#071739' }}>{EVENT_TYPE_LABEL[evt.event_type] || evt.event_type}</div>
-                    <div style={{ color: '#4a5a75', fontSize: '0.75rem', marginTop: 2 }}>
-                      Source: {evt.source} &nbsp;|&nbsp; Severity: {evt.severity} &nbsp;|&nbsp; Correlation: {evt.correlation_id}
+              rows.map((evt) => {
+                const et = EVENT_TYPE_LABEL[evt.event_type] || evt.event_type
+                return (
+                  <div
+                    key={evt.event_id}
+                    style={{
+                      display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px',
+                      borderRadius: 10, border: '1px solid var(--color-border)', background: '#ffffff',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eef0fa' }}>
+                      <PulseDot status={evt.status} pulse={false} style={{ transform: 'scale(1.1)' }} />
                     </div>
-                    <div style={{ color: '#4a5a75', fontSize: '0.75rem', marginTop: 2 }}>
-                      {evt.created_at ? new Date(evt.created_at).toLocaleString() : '—'}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: '#071739', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{et}</div>
+                      <div style={{ color: '#4a5a75', fontSize: '0.72rem', marginTop: 2 }}>
+                        <span style={{ whiteSpace: 'nowrap' }}>Source: {evt.source}</span>
+                        <span style={{ margin: '0 6px', color: '#bfc7d2' }}>|</span>
+                        <span style={{ whiteSpace: 'nowrap', color: SEVERITY_COLOR[evt.severity] || '#4a5a75', fontWeight: 600 }}>{evt.severity}</span>
+                        <span style={{ margin: '0 6px', color: '#bfc7d2' }}>|</span>
+                        <span style={{ whiteSpace: 'nowrap' }}>Corr: {evt.correlation_id || '—'}</span>
+                      </div>
+                      <div style={{ color: '#4a5a75', fontSize: '0.72rem', marginTop: 2 }}>
+                        {evt.created_at ? new Date(evt.created_at).toLocaleString() : '—'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <div style={{ color: '#4a5a75', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{relativeTime(evt.created_at)}</div>
+                      <span style={{ color: STATUS_COLOR[evt.status] || '#4a5a75', fontWeight: 600, fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{evt.status}</span>
                     </div>
                   </div>
-                  <span style={{ color: STATUS_COLOR[evt.status] || '#4a5a75', fontWeight: 600, fontSize: '0.75rem' }}>{evt.status}</span>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </Card>
@@ -214,6 +231,3 @@ export default function EventCenter() {
     </div>
   )
 }
-
-import FadeIn from '../components/animations/FadeIn'
-import { Loading, EmptyState, ErrorState } from '../components/States'
