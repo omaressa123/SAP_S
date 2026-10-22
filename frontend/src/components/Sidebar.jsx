@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  ChevronLeft, ChevronRight, LayoutDashboard, IdCard, Plane, Users, Luggage,
+  ChevronDown, ChevronLeft, LayoutDashboard, IdCard, Plane, Users, Luggage,
   ShieldCheck, BrainCircuit, Activity, Wifi, Bell, GitBranch, Monitor, FileText,
   User, Settings,
 } from 'lucide-react'
@@ -40,24 +41,46 @@ const NAV_GROUPS = [
   },
 ]
 
-export default function Sidebar({ collapsed, onToggleCollapse, drawerOpen, onCloseDrawer }) {
+export default function Sidebar({ collapsed, onToggleCollapse }) {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+
+  const closeAccountMenu = () => {
+    setAccountMenuOpen(false)
+  }
+
   return (
-    <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${drawerOpen ? 'sidebar-open' : ''}`}>
+    <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
-        <div className="brand">
-          <span className="brand-mark">✈</span>
-          {!collapsed && <span className="brand-text">Smart Green Airport</span>}
+        <div className="sidebar-workspace">
+          {collapsed ? (
+            <button
+              className="sidebar-brand-trigger"
+              onClick={() => onToggleCollapse(false)}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <span className="sidebar-brand-mark" aria-hidden>✈</span>
+            </button>
+          ) : (
+            <span className="sidebar-brand-mark" aria-hidden>✈</span>
+          )}
+          {!collapsed && (
+            <span className="sidebar-workspace-copy">
+              <span className="sidebar-workspace-name">Smart Green Airport</span>
+              <span className="sidebar-workspace-subtitle">Airport Operations</span>
+            </span>
+          )}
         </div>
         <button
           className="sidebar-toggle"
-          onClick={() => onToggleCollapse(!collapsed)}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => onToggleCollapse(true)}
+          aria-label="Collapse sidebar"
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <ChevronLeft size={16} />
         </button>
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-label="Main navigation">
         {NAV_GROUPS.map((group) => (
           <div key={group.label} className="nav-group">
             {!collapsed && (
@@ -71,6 +94,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, drawerOpen, onClo
                     <NavLink
                       to={item.to}
                       end={item.to === '/'}
+                      title={collapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         `nav-item ${isActive ? 'nav-item-active' : ''}`
                       }
@@ -89,14 +113,36 @@ export default function Sidebar({ collapsed, onToggleCollapse, drawerOpen, onClo
       </nav>
 
       <div className="sidebar-footer">
-        <button className="nav-item nav-item-outline" onClick={onCloseDrawer} aria-label="User profile">
-          <span className="nav-icon"><User size={20} aria-hidden /></span>
-          {!collapsed && <span className="nav-label">Profile</span>}
+        <button
+          className="sidebar-account"
+          onClick={() => setAccountMenuOpen((open) => !open)}
+          aria-label="Open account menu"
+          aria-expanded={accountMenuOpen}
+          title={collapsed ? 'Operations Officer' : undefined}
+        >
+          <span className="sidebar-account-avatar">OJ</span>
+          {!collapsed && (
+            <>
+              <span className="sidebar-account-copy">
+                <span className="sidebar-account-name">Operations Officer</span>
+                <span className="sidebar-account-email">Airport Command</span>
+              </span>
+              <ChevronDown className="sidebar-account-chevron" size={16} aria-hidden />
+            </>
+          )}
         </button>
-        <button className="nav-item nav-item-outline" onClick={onCloseDrawer} aria-label="Settings">
-          <span className="nav-icon"><Settings size={20} aria-hidden /></span>
-          {!collapsed && <span className="nav-label">Settings</span>}
-        </button>
+        {accountMenuOpen && (
+          <div className="sidebar-account-menu">
+            <button className="sidebar-account-action" onClick={closeAccountMenu}>
+              <User size={16} aria-hidden />
+              <span>Profile</span>
+            </button>
+            <button className="sidebar-account-action" onClick={closeAccountMenu}>
+              <Settings size={16} aria-hidden />
+              <span>Settings</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )

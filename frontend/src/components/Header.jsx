@@ -1,12 +1,9 @@
-import { Menu, Bell, User } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
-export default function Header({ onToggleDrawer }) {
+export default function Header() {
   return (
     <header className="app-header">
       <div className="header-left">
-        <button className="icon-btn hamburger" onClick={onToggleDrawer} aria-label="Open main navigation">
-          <Menu size={20} />
-        </button>
         <div className="brand">
           <div className="brand-mark">✈</div>
           <div className="brand-text">
