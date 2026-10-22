@@ -1,13 +1,20 @@
 """Agent package for the Smart Green Airport autonomous multi-agent system.
 
-This layer sits on top of the existing backend, AI microservices, database,
-and Digital Twin. It does NOT retrain or replace any existing model — it
-wraps them in typed adapters and orchestrates deterministic workflows.
+This layer coordinates the multi-agent system across Phase 1 core security,
+Phase 2 autonomous domain operations (Flight Ops, Maintenance, Notifications,
+and Sustainability), and Phase 3 distributed cognitive extensions.
 """
 from .base import AgentInterface, AgentStatus, AgentCapability, AgentResult
 from .registry import AgentRegistry
 from .events import AirportEvent, EventSystem
 from .orchestrator import AgentOrchestrator
+from .identity_agent import IdentityAgent
+from .baggage_agent import BaggageAgent
+from .safety_agent import SafetyAgent
+from .flight_ops_agent import FlightOpsAgent
+from .maintenance_agent import MaintenanceAgent
+from .notification_agent import NotificationAgent
+from .sustainability_agent import SustainabilityAgent
 
 __all__ = [
     "AgentInterface",
@@ -18,4 +25,11 @@ __all__ = [
     "AirportEvent",
     "EventSystem",
     "AgentOrchestrator",
+    "IdentityAgent",
+    "BaggageAgent",
+    "SafetyAgent",
+    "FlightOpsAgent",
+    "MaintenanceAgent",
+    "NotificationAgent",
+    "SustainabilityAgent",
 ]

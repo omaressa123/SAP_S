@@ -60,6 +60,7 @@ class TaskStatus(str, Enum):
 
 # Deterministic routing: event_type -> required capability name
 EVENT_CAPABILITY_MAP: Dict[str, str] = {
+    # Phase 1: Identity, Baggage, Safety
     "face_verify": "verify_identity",
     "passport_scan": "verify_identity",
     "baggage_scan": "screen_baggage",
@@ -71,6 +72,28 @@ EVENT_CAPABILITY_MAP: Dict[str, str] = {
     "unattended_bag": "assess_safety",
     "overcrowding": "assess_safety",
     "iot_telemetry": "assess_safety",
+    # Phase 2: Flight Operations
+    "flight_delay": "propagate_delay",
+    "gate_change": "assign_gate",
+    "aircraft_arrival": "update_flight_status",
+    "aircraft_departure": "update_flight_status",
+    "turnaround_milestone": "update_flight_status",
+    # Phase 2: Maintenance
+    "equipment_telemetry": "process_telemetry",
+    "health_check_failure": "create_work_order",
+    "vibration_anomaly": "process_telemetry",
+    "conveyor_jam": "process_telemetry",
+    "escalator_fault": "process_telemetry",
+    # Phase 2: Notification
+    "boarding_call": "broadcast_gate_call",
+    "gate_announcement": "broadcast_gate_call",
+    "baggage_carousel_ready": "send_push_notification",
+    "emergency_broadcast": "send_push_notification",
+    # Phase 2: Sustainability
+    "occupancy_update": "optimize_energy",
+    "solar_peak_yield": "calculate_footprint",
+    "peak_demand_tariff_start": "optimize_energy",
+    "zone_empty_powerdown": "optimize_energy",
 }
 
 MAX_WORKFLOW_STEPS = 10

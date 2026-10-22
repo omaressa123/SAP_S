@@ -11,6 +11,10 @@ from .orchestrator import AgentOrchestrator
 from .identity_agent import IdentityAgent
 from .baggage_agent import BaggageAgent
 from .safety_agent import SafetyAgent
+from .flight_ops_agent import FlightOpsAgent
+from .maintenance_agent import MaintenanceAgent
+from .notification_agent import NotificationAgent
+from .sustainability_agent import SustainabilityAgent
 from .twin_publisher import TwinPublisher
 from .adapters.face import FaceVerificationAdapter
 from .adapters.baggage import BaggageThreatAdapter
@@ -27,6 +31,10 @@ class AgentService:
         self.identity_agent: Optional[IdentityAgent] = None
         self.baggage_agent: Optional[BaggageAgent] = None
         self.safety_agent: Optional[SafetyAgent] = None
+        self.flight_ops_agent: Optional[FlightOpsAgent] = None
+        self.maintenance_agent: Optional[MaintenanceAgent] = None
+        self.notification_agent: Optional[NotificationAgent] = None
+        self.sustainability_agent: Optional[SustainabilityAgent] = None
         self.twin_publisher: Optional[TwinPublisher] = None
         self.initialized = False
 
@@ -76,11 +84,19 @@ class AgentService:
             smoke_fire_url=smoke_fire_url,
             fall_detection_url=fall_detection_url,
         )
+        self.flight_ops_agent = FlightOpsAgent()
+        self.maintenance_agent = MaintenanceAgent()
+        self.notification_agent = NotificationAgent()
+        self.sustainability_agent = SustainabilityAgent()
 
         # Register agents
         self.registry.register(self.identity_agent)
         self.registry.register(self.baggage_agent)
         self.registry.register(self.safety_agent)
+        self.registry.register(self.flight_ops_agent)
+        self.registry.register(self.maintenance_agent)
+        self.registry.register(self.notification_agent)
+        self.registry.register(self.sustainability_agent)
 
         # Subscribe event system to orchestrator routing
         # (orchestrator handles routing via ingest_event)
