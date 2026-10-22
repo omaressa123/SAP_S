@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     MQTT_PASSWORD: str = os.getenv("MQTT_PASSWORD", "")
     # MQTT topic filter, e.g. "airport/#" (convention: airport/{module}/{device_id}/{event}).
     MQTT_TOPIC_FILTER: str = os.getenv("MQTT_TOPIC_FILTER", "airport/#")
+    # Digital Twin API base URL. In Docker this resolves to the `twin` compose
+    # service; locally it defaults to localhost:8100.
+    TWIN_BASE_URL: str = os.getenv("TWIN_BASE_URL", "http://localhost:8100")
     # Digital Twin API bearer token (operator role) for authenticated ingest.
     # Obtain via POST /api/twin/auth/token (operator:op123 by default).
     TWIN_AUTH_TOKEN: str = os.getenv("TWIN_AUTH_TOKEN", "")

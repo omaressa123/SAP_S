@@ -1,50 +1,61 @@
 import { useState } from 'react'
-import Card from '../components/Card'
-import Button from '../components/Button'
-import { api } from '../services/api'
-import { KvGrid, StatusBadge } from '../components/ai/AiVisuals'
 
 export default function DigitalTwin() {
-  const [form, setForm] = useState({ equipmentId: '', x: '', y: '', z: '', status: 'active' })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
-
-  const submit = async (e) => {
-    e.preventDefault()
-    try {
-      setResult(await api('/api/v1/digital-twin/position', {
-        method: 'POST',
-        body: JSON.stringify({ ...form, x: Number(form.x), y: Number(form.y), z: Number(form.z) }),
-      }))
-      setError(null)
-    } catch (err) {
-      setError(err.message)
-    }
-  }
+  const [ready, setReady] = useState(false)
 
   return (
-    <>
-      <h1>Digital Twin</h1>
-      <Card title="Update equipment position">
-        <form onSubmit={submit}>
-          {Object.keys(form).map((k) => (
-            <input key={k} placeholder={k} value={form[k]} onChange={set(k)} />
-          ))}
-          <Button>Update</Button>
-        </form>
-        {error && <p className="error">{error}</p>}
-        {result && (
-          <div style={{ marginTop: 10 }}>
-            <p><StatusBadge tone="good">POSITION UPDATED</StatusBadge></p>
-            <KvGrid items={[
-              { k: 'Equipment', v: form.equipmentId },
-              { k: 'Position', v: `(${form.x}, ${form.y}, ${form.z})` },
-              { k: 'Status', v: form.status },
-            ]} />
-          </div>
-        )}
-      </Card>
-    </>
+    <div
+      style={{
+        width: '100%',
+        height: '100vh',
+        minHeight: 600,
+        background: '#050a14',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <header
+        style={{
+          padding: '10px 18px',
+          background: '#0b1121',
+          borderBottom: '1px solid #1f2a44',
+          color: '#e8eef7',
+          fontSize: '1rem',
+          fontWeight: 700,
+          letterSpacing: '-0.01em',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#22d3ee' }}>
+          ⬢
+        </span>
+        Digital Twin — Live 3D Airport
+        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#8b9bb5', fontWeight: 500 }}>
+          Powered by Babylon.js · wss://localhost:8100/ws/twin
+        </span>
+      </header>
+
+      <iframe
+        src="/twin/"
+        title="Smart Airport Digital Twin"
+        style={{
+          flex: 1,
+          width: '100%',
+          border: 0,
+          background: '#050a14',
+          display: 'block',
+        }}
+        onLoad={() => setReady(true)}
+      />
+
+      {!ready && (
+        <p style={{ padding: '12px 18px', color: '#6e7a97', fontSize: '0.85rem' }}>
+          Loading 3D airport environment…
+        </p>
+      )}
+    </div>
   )
 }

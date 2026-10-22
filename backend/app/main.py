@@ -48,7 +48,7 @@ def init_agent_service():
         btd_inference_url=settings.BTD_INFERENCE_URL,
         smoke_fire_url=settings.SMOKE_FIRE_URL,
         fall_detection_url=settings.FULL_DETECTION_URL,
-        twin_base_url="http://localhost:8100",
+        twin_base_url=settings.TWIN_BASE_URL,
         twin_auth_token=settings.TWIN_AUTH_TOKEN,
     )
 
