@@ -27,7 +27,7 @@ from app.main import app
 from app.database import Base, engine, SessionLocal
 from app.models import (  # noqa: F401
     identity, flights, check_in, baggage_security_screening, security,
-    wayfinding, staff, admin_cameras, devices, sustainability, agents,
+    wayfinding, staff, admin_cameras, devices, sustainability, agents, hitl,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -73,7 +73,11 @@ def clean_tables():
     db = SessionLocal()
     try:
         # Delete in dependency order
-        for tbl in ["decisionaudit", "agenteexecution", "agenttask", "airportevent", "workflowexecution", "agentdefinition"]:
+        for tbl in ["disruptionproposal", "hitlreview", "sagacompensation", "sagastep", "sagainstance",
+                    "decisionaudit", "agenteexecution", "agenttask", "airportevent",
+                    "workflowexecution", "agentdefinition", "staffrole", "staff",
+                    "role", "department", "booking", "flight", "boardinggate", "equipment",
+                    "zone", "airline", "airport", "passengers"]:
             db.execute(text(f"DELETE FROM {tbl}"))
         db.commit()
     finally:

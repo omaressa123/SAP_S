@@ -5,6 +5,7 @@ import { Loading } from '../components/States'
 
 // Lazy-loaded route components: keeps the initial bundle lean and each
 // AI module's CSS-3D scenes only mount when their route is visited.
+const DisruptionPlanner = lazy(() => import('../pages/DisruptionPlanner'))
 const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Flights = lazy(() => import('../pages/Flights'))
 const Passengers = lazy(() => import('../pages/Passengers'))
@@ -45,6 +46,7 @@ export default function AppRoutes() {
           <Route path="/iot" element={<IoTCenter />} />
           <Route path="/events" element={<EventCenter />} />
           <Route path="/workflows" element={<WorkflowMonitor />} />
+          <Route path="/disruption" element={<DisruptionPlanner />} />
         </Route>
         {/* Full-screen Terminal Kiosk Views */}
         <Route path="/egate" element={<EGateKiosk />} />

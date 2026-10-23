@@ -135,6 +135,29 @@ services:
       backend:
         condition: service_healthy
 
+  mqtt-bridge:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-airport-mqtt-bridge
+    restart: unless-stopped
+    networks: [airport-network]
+    environment: *backend-env
+    volumes:
+      - ./backend/app:/app/backend/app
+      - ./backend/models:/app/backend/models
+    # Publishes commands to field devices and ingests telemetry/acks.
+    entrypoint: ["python", "-m", "app.services.mqtt_bridge"]
+    healthcheck:
+      test: ["NONE"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
   unified-detection:
     build:
       context: ./AI/unified_detection

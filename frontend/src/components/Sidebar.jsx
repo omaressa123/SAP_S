@@ -3,12 +3,12 @@ import { NavLink } from 'react-router-dom'
 import {
   ChevronDown, ChevronLeft, LayoutDashboard, IdCard, Plane, Users, Luggage,
   ShieldCheck, BrainCircuit, Activity, Wifi, Bell, GitBranch, Monitor, FileText,
-  User, Settings,
+  User, Settings, AlertTriangle,
 } from 'lucide-react'
 
 const ICONS = {
   LayoutDashboard, IdCard, Plane, Users, Luggage, ShieldCheck, BrainCircuit,
-  Activity, Wifi, Bell, GitBranch, Monitor, FileText, User, Settings,
+  Activity, Wifi, Bell, GitBranch, Monitor, FileText, User, Settings, AlertTriangle,
 }
 
 const NAV_GROUPS = [
@@ -37,6 +37,7 @@ const NAV_GROUPS = [
       { to: '/workflows', label: 'Workflows', icon: 'GitBranch' },
       { to: '/digital-twin', label: 'Digital Twin', icon: 'Monitor' },
       { to: '/reports', label: 'Reports', icon: 'FileText' },
+      { to: '/disruption', label: 'Disruption Planner', icon: 'AlertTriangle' },
     ],
   },
 ]

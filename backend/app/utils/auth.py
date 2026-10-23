@@ -1,4 +1,4 @@
-from fastapi import Depends, Security, HTTPException
+from fastapi import Depends, Security, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 from typing import List, Optional
 import jwt
@@ -15,9 +15,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security_bearer)):
+def get_current_user(request: Request):
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        raise AirportException(code="INVALID_TOKEN", message="Missing or invalid bearer token", status_code=401)
+    token = auth[len("Bearer "):]
     try:
-        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
         raise AirportException(code="TOKEN_EXPIRED", message="JWT token has expired", status_code=401)

@@ -2,9 +2,9 @@
 
 Smart Green Airport Ecosystem
 
-**Version:** 3.1.0  
+**Version:** 3.2.0  
 **Location:** `backend/app/agents/`  
-**Status:** Phase 1 (Finished & Tested) | Phase 2 (Finished & Tested) | Phase 3 (Architected & Specified)
+**Status:** Phase 1 (Finished & Tested) | Phase 2 (Finished & Tested) | Phase 3 (NOT implemented)
 
 ---
 
@@ -332,11 +332,20 @@ Airport Events
 
 ---
 
-## 5. Multi-Step Workflow Engine & Saga Orchestration
+### 5. Multi-Step Workflow Engine & Saga Orchestration
+
+**Implementation status (M2.5): Finished & Tested.** Implemented in
+`backend/app/agents/saga.py` (SagaWorkflowEngine), exposed via
+`backend/app/controllers/saga_controller.py`, persisted in
+`backend/app/models/saga.py` (sagainstance, sagastep, sagacompensation),
+registered in `backend/app/agents/service.py`, and wired into the agent
+startup. Verified by `backend/app/tests/test_saga.py` (12 tests, all passing).
+
+The passenger journey is implemented as a stateful, compensable Saga
+transaction. If any step fails critically, compensating actions reverse or
+mitigate previous downstream side-effects.
 
 ### 5.1 End-to-End Passenger Journey Saga
-
-The passenger journey is implemented as a stateful, compensable Saga transaction. If any step fails critically, compensating actions reverse or mitigate previous downstream side-effects.
 
 ```mermaid
 stateDiagram-v2
@@ -407,6 +416,17 @@ class PassengerJourneySaga:
 ---
 
 ## 6. LLM-Assisted Disruption Recovery Planner (Phase 2)
+
+**Implementation status (M2.8): Finished & Tested.** Implemented in
+`backend/app/agents/disruption_planner.py` (DisruptionPlanner), exposed via
+`backend/app/controllers/disruption_controller.py`, persisted in
+`backend/app/models/disruption.py` (disruptionproposal), registered in
+`backend/app/agents/service.py`. Verified by `backend/app/tests/test_disruption.py`
+(13 tests, all passing) and a frontend review page at
+`frontend/src/pages/DisruptionPlanner.jsx`. An LLM is used only when
+`DISRUPTION_LLM_BASE_URL` / `DISRUPTION_LLM_API_KEY` are configured; otherwise a
+deterministic heuristic fallback builds the plan. Model output is never executed
+directly.
 
 During major irregular airport operations (IRROPS)—such as runway icing, severe convective weather, or emergency ground stops—deterministic logic becomes insufficient due to combinatorially explosive constraints.
 
@@ -481,6 +501,16 @@ During major irregular airport operations (IRROPS)—such as runway icing, sever
 
 ## 7. Cross-System IoT Action Triggering (Bidirectional MQTT)
 
+**Implementation status (M2.6): Finished & Tested.** Implemented in
+`backend/app/agents/iot_bridge.py` (IoTMqttBridge), run as the dedicated
+`mqtt-bridge` compose service (`backend/app/services/mqtt_bridge.py`), exposed
+via `backend/app/controllers/iot_controller.py`, persisted in
+`backend/app/models/iot.py` (iotcommandlog, iottelemetrylog), registered in
+`backend/app/agents/service.py`. Verified by `backend/app/tests/test_iot_bridge.py`
+(13 tests, all passing). Mosquitto (:1883) was already present in
+`docker-compose.yml`; a `mqtt-bridge` service was added. No Redis/Kafka was
+introduced.
+
 Phase 2 connects agents directly to physical edge hardware and Wokwi simulation modules over Mosquitto MQTT (:1883).
 
 ### 7.1 Actuation Channel Architecture
@@ -517,6 +547,14 @@ IoTMqttBridge.on_telemetry_received() -> Ingested by MaintenanceAgent & TwinPubl
 
 ## 8. Human-in-the-Loop (HITL) Escalation Architecture
 
+**Implementation status (M2.7): Finished & Tested.** Implemented in
+`backend/app/agents/hitl.py` (HitlManager), exposed via
+`backend/app/controllers/hitl_controller.py`, persisted in
+`backend/app/models/hitl.py` (hitlreview), registered in
+`backend/app/agents/service.py`. Verified by `backend/app/tests/test_hitl.py`
+(10 tests, all passing). Review requests persist pending/approved/rejected/expired/escalated;
+expired reviews escalate to an explicit safe state (never silently approved).
+
 When biometric similarity falls between 0.70 and 0.85, or when baggage threats have ambiguous YOLO confidence (0.40–0.65), execution halts in a dedicated pending state and is streamed to the `WorkflowMonitor.jsx` operator console.
 
 ### 8.1 HITL Escalation Lifecycle
@@ -546,6 +584,13 @@ sequenceDiagram
 ---
 
 ## 9. Phase 3: Distributed Fabric & Cognitive Intelligence
+
+**IMPORTANT (implementation status): Phase 3 is NOT implemented.** The following
+sections (§9.1–§9.4) describe the original architecture intent only. None of
+Redis Streams, Kafka, Contract Net Protocol, federated learning, or Kubernetes
+HPA autoscaling was built as part of Phase 2. The existing local in-process
+PostgreSQL event bus remains the message bus, and no new infrastructure
+dependencies were introduced.
 
 ### 9.1 Distributed Event Bus (Redis Streams & Kafka)
 
@@ -678,12 +723,30 @@ CREATE TABLE IF NOT EXISTS agentnegotiation (
 | `GET` | `/api/v1/agents/registry` | List all registered agents (Phase 1 & 2) and capability map | 1 | X-API-KEY |
 | `GET` | `/api/v1/agents/health` | Comprehensive agent health summary + circuit breaker states | 1 | X-API-KEY |
 | `GET` | `/api/v1/agents/snapshot` | Snapshot of tasks, queue depths, active workflows | 1 | X-API-KEY |
-| `POST` | `/api/v1/agents/workflows/journey/start` | Initiates multi-step Passenger Journey Saga | 2 | X-API-KEY |
-| `GET` | `/api/v1/agents/workflows/{saga_id}` | Detailed status of a running multi-step Saga | 2 | X-API-KEY |
-| `POST` | `/api/v1/agents/disruption/plan` | Triggers LLM disruption recovery analysis for active IRROPS | 2 | JWT Admin |
-| `GET` | `/api/v1/agents/hitl/pending` | Retrieves items requiring human supervisor review | 2 | JWT Staff |
-| `POST` | `/api/v1/agents/hitl/resolve` | Submits human decision override to resume agent workflow | 2 | JWT Staff |
-| `POST` | `/api/v1/agents/iot/dispatch` | Dispatches manual or autonomous MQTT command to field IoT | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/sagas/journey/start` | Initiates (idempotently) a Passenger Journey Saga | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/sagas/{saga_id}` | Detailed status of a Saga (steps, compensations) | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/sagas` | List recent sagas | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/sagas/correlation/{correlation_id}` | Find a saga by correlation id | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/sagas/{saga_id}/resume` | Resume a paused/failed Saga | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/sagas/{saga_id}/cancel` | Cancel a Saga and compensate completed steps | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/sagas/{saga_id}/steps/{step_name}/approve` | Approve a needs-review Saga step (HITL) | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/sagas/{saga_id}/steps/{step_name}/reject` | Reject a needs-review Saga step and compensate (HITL) | 2 | JWT Staff/Admin |
+| `GET` | `/api/v1/agents/sagas/steps` | Document the fixed ordered journey steps | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/disruption/plan` | Generate a validated disruption recovery proposal | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/disruption/plan/{id}` | Proposal detail | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/disruption/plans` | List recovery proposals | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/disruption/plan/{id}/approve` | Human approve a validated proposal | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/disruption/plan/{id}/execute` | Execute an approved proposal through agents | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/disruption/plan/{id}/reject` | Reject a proposal | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/hitl/reviews` | Create a human-review request | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/hitl/pending` | List pending human reviews | 2 | JWT Staff/Admin |
+| `GET` | `/api/v1/agents/hitl/reviews/{id}` | Review detail | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/hitl/reviews/{id}/decision` | Submit approve/reject decision | 2 | JWT Staff/Admin |
+| `POST` | `/api/v1/agents/hitl/expire` | Expire overdue reviews (escalate to safe state) | 2 | X-API-KEY |
+| `POST` | `/api/v1/agents/iot/dispatch` | Dispatch a validated MQTT command to field IoT | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/iot/health` | MQTT bridge + command health summary | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/iot/commands` | List command logs with ack state | 2 | X-API-KEY |
+| `GET` | `/api/v1/agents/iot/commands/{id}` | Single command detail | 2 | X-API-KEY |
 | `GET` | `/api/v1/agents/negotiations/active`| Monitors active Contract Net Protocol bidding rounds | 3 | X-API-KEY |
 | `POST` | `/api/v1/agents/federated/round` | Triggers federated edge model aggregation cycle | 3 | X-API-KEY |
 
@@ -696,27 +759,35 @@ Run all unit, integration, and scenario tests for Phase 1 and Phase 2:
 ```bash
 # Execute full multiagent testing suite inside virtual environment
 cd /home/omaressa/omar/air_ai
-PYTHONPATH=backend backend/.venv/bin/pytest backend/app/tests/test_agents.py backend/app/tests/test_phase2_agents.py -v
+PYTHONPATH=backend backend/.venv/bin/pytest backend/app/tests/ -v
 ```
 
 #### Latest Test Execution Results
 ```
 ============================= test session starts ==============================
 platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
-collected 69 items
+collected 117 items
 
 backend/app/tests/test_agents.py ....................................... [ 56%]
 .........................                                                [ 92%]
 backend/app/tests/test_phase2_agents.py .....                            [100%]
+backend/app/tests/test_saga.py ....................                      [100%]
+backend/app/tests/test_iot_bridge.py ........                            [100%]
+backend/app/tests/test_hitl.py .............                             [100%]
+backend/app/tests/test_disruption.py .........                           [100%]
 
-======================== 69 passed, 164 warnings in 9.05s =======================
+======================= 117 passed, 244 warnings in 11.57s =======================
 ```
 
 | Test Suite | File | Focus Areas | Result |
 |---|---|---|---|
 | **Phase 1 Core Suite** | `backend/app/tests/test_agents.py` | Identity validation, BTD threat scan, Safety alarms, Deduplication, Twin sync | **64 / 64 Passed** |
 | **Phase 2 Domain Suite** | `backend/app/tests/test_phase2_agents.py` | FlightOps delays/gates, Maintenance telemetry, Notification push, Sustainability | **5 / 5 Passed** |
-| **Total Test Coverage** | Both suites | Complete end-to-end multiagent pipeline | **69 / 69 Passed (100%)** |
+| **M2.5 Saga Suite** | `backend/app/tests/test_saga.py` | Persistence, transitions, compensation, retry, idempotency, resume, HITL | **12 / 12 Passed** |
+| **M2.6 IoT MQTT Suite** | `backend/app/tests/test_iot_bridge.py` | Command publish/ack, duplicate protection, timeouts, bounded retries, telemetry routing, health | **13 / 13 Passed** |
+| **M2.7 HITL Suite** | `backend/app/tests/test_hitl.py` | Review persistence, authorization, duplicate decisions, safe expiry escalation, saga resume/compensate | **10 / 10 Passed** |
+| **M2.8 Disruption Planner Suite** | `backend/app/tests/test_disruption.py` | Snapshot, heuristic plan, validation, approve/execute/reject, controller API | **13 / 13 Passed** |
+| **Total Test Coverage** | All suites | Complete end-to-end multiagent pipeline | **117 / 117 Passed (100%)** |
 
 ### 12.2 Verification CLI Commands
 
@@ -769,11 +840,11 @@ backend/app/tests/test_phase2_agents.py .....                            [100%]
 | **M2.2** | NotificationAgent (Push notifications, Boarding calls, Gate broadcasts) | Phase 2 | **Finished & Tested** | `notification_agent.py`, `test_phase2_agents.py` |
 | **M2.3** | SustainabilityAgent (Occupancy HVAC regulation, Solar yield, Carbon footprint) | Phase 2 | **Finished & Tested** | `sustainability_agent.py`, `test_phase2_agents.py` |
 | **M2.4** | Event Capability Map Expansion (29 event types routed in Orchestrator) | Phase 2 | **Finished & Tested** | `orchestrator.py` (`EVENT_CAPABILITY_MAP`) |
-| **M2.5** | Saga Multi-Step Workflow Engine with Compensating Rollbacks | Phase 2 | **Specified & Designed** | `MULTIAGENT_DESIGN.md` §5 |
-| **M2.6** | Bidirectional IoT MQTT Command Bridge (E-Gates, Baggage Diverters) | Phase 2 | **Specified & Designed** | `MULTIAGENT_DESIGN.md` §7 |
-| **M2.7** | Human-in-the-Loop (HITL) WebSocket Escalation Bridge | Phase 2 | **Specified & Designed** | `MULTIAGENT_DESIGN.md` §8 |
-| **M2.8** | LLM-Assisted IRROPS Disruption Recovery Planner | Phase 2 | **Specified & Designed** | `MULTIAGENT_DESIGN.md` §6 |
-| **M3.0** | Distributed Redis Streams / Kafka Event Fabric | Phase 3 | **Architecture Specified** | `MULTIAGENT_DESIGN.md` §9.1 |
-| **M3.1** | Contract Net Protocol (CNP) Multi-Agent Resource Negotiation | Phase 3 | **Architecture Specified** | `MULTIAGENT_DESIGN.md` §9.2 |
-| **M3.2** | Federated Edge Learning Pipeline for Privacy-Preserving AI Updates | Phase 3 | **Architecture Specified** | `MULTIAGENT_DESIGN.md` §9.3 |
-| **M3.3** | Elastic Kubernetes HPA Worker Auto-Scaling on Queue Depth | Phase 3 | **Architecture Specified** | `MULTIAGENT_DESIGN.md` §9.4 |
+| **M2.5** | Saga Multi-Step Workflow Engine with Compensating Rollbacks | Phase 2 | **Finished & Tested** | `backend/app/agents/saga.py`, `backend/app/controllers/saga_controller.py`, `backend/app/models/saga.py`, `backend/app/tests/test_saga.py` |
+| **M2.6** | Bidirectional IoT MQTT Command Bridge (E-Gates, Baggage Diverters) | Phase 2 | **Finished & Tested** | `backend/app/agents/iot_bridge.py`, `backend/app/services/mqtt_bridge.py`, `backend/app/controllers/iot_controller.py`, `backend/app/models/iot.py`, `docker-compose.yml` (mqtt-bridge service), `backend/app/tests/test_iot_bridge.py` |
+| **M2.7** | Human-in-the-Loop (HITL) WebSocket Escalation Bridge | Phase 2 | **Finished & Tested** | `backend/app/agents/hitl.py`, `backend/app/controllers/hitl_controller.py`, `backend/app/models/hitl.py`, `backend/app/tests/test_hitl.py` |
+| **M2.8** | LLM-Assisted IRROPS Disruption Recovery Planner | Phase 2 | **Finished & Tested** | `backend/app/agents/disruption_planner.py`, `backend/app/controllers/disruption_controller.py`, `backend/app/models/disruption.py`, `backend/app/tests/test_disruption.py`, `frontend/src/pages/DisruptionPlanner.jsx`, `frontend/src/services/api.js` (DisruptionApi), `frontend/src/routes/index.jsx`, `frontend/src/components/Sidebar.jsx` |
+| **M3.0** | Distributed Redis Streams / Kafka Event Fabric | Phase 3 | **NOT implemented** | Explicitly excluded from Phase 2. The existing local in-process PostgreSQL event bus is used. |
+| **M3.1** | Contract Net Protocol (CNP) Multi-Agent Resource Negotiation | Phase 3 | **NOT implemented** | Explicitly excluded from Phase 2. |
+| **M3.2** | Federated Edge Learning Pipeline for Privacy-Preserving AI Updates | Phase 3 | **NOT implemented** | Explicitly excluded from Phase 2. |
+| **M3.3** | Elastic Kubernetes HPA Worker Auto-Scaling on Queue Depth | Phase 3 | **NOT implemented** | Explicitly excluded from Phase 2. No Kubernetes deployed. |

@@ -8,6 +8,10 @@ from ..database import SessionLocal
 from .registry import AgentRegistry
 from .events import EventSystem
 from .orchestrator import AgentOrchestrator
+from .saga import SagaWorkflowEngine
+from .iot_bridge import IoTMqttBridge
+from .hitl import HitlManager
+from .disruption_planner import DisruptionPlanner
 from .identity_agent import IdentityAgent
 from .baggage_agent import BaggageAgent
 from .safety_agent import SafetyAgent
@@ -36,6 +40,10 @@ class AgentService:
         self.notification_agent: Optional[NotificationAgent] = None
         self.sustainability_agent: Optional[SustainabilityAgent] = None
         self.twin_publisher: Optional[TwinPublisher] = None
+        self.saga_engine: Optional[SagaWorkflowEngine] = None
+        self.mqtt_bridge: Optional[IoTMqttBridge] = None
+        self.hitl_manager: Optional[HitlManager] = None
+        self.disruption_planner: Optional[DisruptionPlanner] = None
         self.initialized = False
 
     def init(
@@ -54,6 +62,9 @@ class AgentService:
         # Core infrastructure
         self.registry = AgentRegistry()
         self.event_system = EventSystem(db_session_factory=SessionLocal)
+
+        # Disruption recovery planner (M2.8)
+        self.disruption_planner = DisruptionPlanner(registry=self.registry)
         self.twin_publisher = TwinPublisher(
             twin_base_url=twin_base_url,
             auth_token=twin_auth_token,
@@ -63,6 +74,18 @@ class AgentService:
             event_system=self.event_system,
             twin_publisher=self.twin_publisher,
         )
+
+        # Persistent Saga workflow engine (M2.5)
+        self.hitl_manager = HitlManager(saga_engine=None)  # placeholder; wired below
+        self.saga_engine = SagaWorkflowEngine(
+            registry=self.registry,
+            event_system=self.event_system,
+            twin_publisher=self.twin_publisher,
+            hitl_manager=self.hitl_manager,
+        )
+        # Wire the saga engine back into the HITL manager so decisions can
+        # resume/reject/compensate workflows.
+        self.hitl_manager.saga_engine = self.saga_engine
 
         # Model adapters (wrap existing AI services)
         face_adapter = FaceVerificationAdapter(service_url=face_service_url)
@@ -122,6 +145,21 @@ class AgentService:
         if not self.initialized or not self.twin_publisher:
             raise RuntimeError("AgentService not initialized")
         return self.twin_publisher
+
+    def get_mqtt_bridge(self) -> IoTMqttBridge:
+        if not self.initialized or self.mqtt_bridge is None:
+            raise RuntimeError("MQTT bridge not initialized")
+        return self.mqtt_bridge
+
+    def get_hitl_manager(self) -> HitlManager:
+        if not self.initialized or self.hitl_manager is None:
+            raise RuntimeError("HITL manager not initialized")
+        return self.hitl_manager
+
+    def get_disruption_planner(self) -> DisruptionPlanner:
+        if not self.initialized or self.disruption_planner is None:
+            raise RuntimeError("Disruption planner not initialized")
+        return self.disruption_planner
 
     def snapshot(self) -> dict:
         if not self.initialized:

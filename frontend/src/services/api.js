@@ -140,3 +140,23 @@ export const AirportApi = {
     body: JSON.stringify(data)
   })
 }
+
+export const DisruptionApi = {
+  listPlans: () => api('/api/v1/agents/disruption/plans'),
+  getPlan: (id) => api(`/api/v1/agents/disruption/plan/${id}`),
+  createPlan: (payload) => api('/api/v1/agents/disruption/plan', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  approvePlan: (id, reason) => api(`/api/v1/agents/disruption/plan/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  }),
+  executePlan: (id) => api(`/api/v1/agents/disruption/plan/${id}/execute`, {
+    method: 'POST'
+  }),
+  rejectPlan: (id, reason) => api(`/api/v1/agents/disruption/plan/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  }),
+}
