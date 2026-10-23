@@ -135,6 +135,30 @@ services:
       backend:
         condition: service_healthy
 
+  unified-detection:
+    build:
+      context: ./AI/unified_detection
+      dockerfile: Dockerfile
+    container_name: smart-airport-unified-detection
+    restart: unless-stopped
+    networks: [airport-network]
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - STARTUP_BACKEND_URL=http://backend:8000
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./AI/unified_detection:/app/unified_detection
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8004/health')\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+
   frontend:
     build:
       context: ./frontend
@@ -161,8 +185,11 @@ services:
     environment:
       DATABASE_URL: ${TWIN_DATABASE_URL:-${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}}}
       TWIN_SIMULATION: ${TWIN_SIMULATION:-true}
-    ports:
-      - "8100:8100"
+    # Twin is reachable only via the internal Docker network (twin:8100) and
+    # through the frontend nginx proxy on host port 80 (/api/twin, /ws/twin).
+    # Its host port is deliberately NOT published: the twin is an internal
+    # admin system and, with JWT authentication removed, must not be exposed
+    # directly to the host/network.
     depends_on:
       postgres:
         condition: service_healthy

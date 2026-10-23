@@ -1,0 +1,100 @@
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior: none;
+  }
+  main > :first-child {
+    margin-top: 0 !important;
+  }
+  main > :last-child {
+    margin-bottom: 0 !important;
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.baggage-step {
+  display: none;
+}
+
+.baggage-step.active {
+  display: block;
+}
+
+.baggage-step-btn {
+  transition: all 0.2s ease;
+}
+
+.baggage-step-btn.active {
+  background-color: #006194;
+  color: #ffffff;
+}
+
+.baggage-step-btn.completed {
+  background-color: #6ffbbe;
+  color: #002113;
+  font-weight: bold;
+}
+
+.baggage-step-btn.pending {
+  background-color: #f2f3ff;
+  color: #3f4850;
+}
+
+.baggage-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background-color: rgba(40, 48, 68, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.baggage-toast {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  background-color: #283044;
+  color: #eef0ff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.baggage-toast.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.baggage-bounce {
+  animation: baggageBounce 1s infinite;
+}
+
+@keyframes baggageBounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}

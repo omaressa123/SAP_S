@@ -1,0 +1,34 @@
+# Unified person + fall detection pipeline configuration.
+# All values have sensible defaults; override via environment or CLI.
+
+paths:
+  fall_model: AI/fulldetection/models/rf_fall_model.joblib
+  pose_model: AI/fulldetection/models/pose_landmarker_lite.task
+  person_model: yolov8n.pt
+
+capture:
+  target_fps: 15          # continuous processing rate — falls are fast (~1s), no polling
+
+detection:
+  confidence_threshold: 0.35
+  person_model: yolov8n.pt
+
+fall_detection:
+  model_path: AI/fulldetection/models/rf_fall_model.joblib
+
+windowing:
+  window_frames: 30       # ~1-2 sec at 15fps
+  stride: 5
+
+confirmation:
+  stillness_check_seconds: 2.5
+  stillness_movement_threshold: 0.015
+
+cooldown:
+  fall_cooldown_seconds: 30.0   # suppress duplicate fall alerts per camera+person
+
+stream:
+  max_idle_seconds: 60.0    # cleanup fall detector when person absent this long
+
+backend:
+  url: ${BACKEND_URL:-}      # set to http://backend:8000 to push events to agent bus

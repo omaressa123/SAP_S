@@ -4,7 +4,7 @@ import { Asset, buildMeshes, loadRegistry } from './assets/registry';
 import { createWorld } from './engine/createScene';
 import { colorBeacon, STATUS } from './twin/status';
 import { AIRCRAFT_VIEWS, PLACES, followAt, locateOnMap, setView, teleportTo, teleportToPlace } from './navigation/navigation';
-import { connect, fetchFlights, fetchMode, fetchStates, login as loginApi } from './services/api';
+import { connect, fetchFlights, fetchMode, fetchStates } from './services/api';
 import type { Cameras, ViewMode } from './camera/cameras';
 import DetailsPanel from './ui/DetailsPanel';
 
@@ -24,8 +24,6 @@ export default function App() {
   const [view, setViewMode] = useState<ViewMode>('fp');
   const [q, setQ] = useState('');
   const [sim, setSim] = useState<boolean | null>(null);
-  const [needLogin, setNeedLogin] = useState(false);
-  const [loginErr, setLoginErr] = useState('');
   const [debug, setDebug] = useState(false);
   const [crowd, setCrowd] = useState<{ total: number; zones: { name: string; count: number }[] } | null>(null);
   const [flights, setFlights] = useState<{ flight: string; destination: string; stand: string; gate: string; phase: string; pax: number; fuel_pct: number }[]>([]);
@@ -132,8 +130,6 @@ export default function App() {
         setFlights(await fetchFlights());
         setSim((await fetchMode()).simulation);
       } catch (e) {
-        // Step 5: backend requires JWT — show the login gate instead of failing silent.
-        if (`${e}`.includes('unauthorized')) setNeedLogin(true);
         /* backend offline: scene still works */
       }
       off = connect((e) => {
@@ -223,24 +219,6 @@ export default function App() {
       <Minimap assets={assets} player={player ? { x: player.x, z: player.z } : null} sel={sel} onPick={(id) => { select(id); focusId(id); }} />
       {debug && cur && <DebugBox a={cur} world={w.current} />}
       <div className="hint">WASD move · drag to look · Shift sprint · click object for details</div>
-      {needLogin && (
-        <div className="side" style={{ left: '50%', top: '30%', transform: 'translateX(-50%)', width: 280 }} role="dialog" aria-label="Login">
-          <strong>🔐 Twin login required</strong>
-          <div className="mute">Dev accounts: viewer/view123 · operator/op123 · admin/admin123</div>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target as HTMLFormElement);
-            loginApi(`${fd.get('u')}`, `${fd.get('p')}`)
-              .then(() => location.reload())
-              .catch(() => setLoginErr('Bad username or password'));
-          }}>
-            <input className="search" name="u" placeholder="username" autoComplete="username" style={{ marginBottom: 6 }} />
-            <input className="search" name="p" type="password" placeholder="password" autoComplete="current-password" style={{ marginBottom: 6 }} />
-            <button type="submit" style={{ width: '100%' }}>Log in</button>
-          </form>
-          {loginErr && <div className="mute" style={{ color: '#f87171' }}>{loginErr}</div>}
-        </div>
-      )}
     </>
   );
 }

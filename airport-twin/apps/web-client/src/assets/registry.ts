@@ -10,7 +10,7 @@ export interface Asset {
 }
 
 // Scene file = static transforms. Status comes from the Backend only.
-export const loadRegistry = async (): Promise<Asset[]> => (await fetch('/assets/registry.json')).json();
+export const loadRegistry = async (): Promise<Asset[]> => (await fetch('/twin/assets/registry.json')).json();
 
 function tag(node: Node, asset_id: string) {
   if (node instanceof Mesh) node.metadata = { ...(node.metadata ?? {}), asset_id };

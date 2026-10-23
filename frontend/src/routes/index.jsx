@@ -15,7 +15,7 @@ const Reports = lazy(() => import('../pages/Reports'))
 const AiCenter = lazy(() => import('../pages/AiCenter'))
 const AIMonitor = lazy(() => import('../pages/AIMonitor'))
 const FaceKiosk = lazy(() => import('../pages/FaceKiosk'))
-const BaggageAI = lazy(() => import('../pages/BaggageAI'))
+const BaggageThreatDetection = lazy(() => import('../pages/ai/baggage/BaggageThreatDetectionPage'))
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const IoTCenter = lazy(() => import('../pages/IoTCenter'))
@@ -38,7 +38,7 @@ export default function AppRoutes() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/ai" element={<AiCenter />} />
           <Route path="/ai/face" element={<FaceKiosk />} />
-          <Route path="/ai/baggage" element={<BaggageAI />} />
+          <Route path="/ai/baggage" element={<BaggageThreatDetection />} />
           <Route path="/ai/smoke-fire" element={<SmokeFire />} />
           <Route path="/ai/full-detection" element={<FullDetection />} />
           <Route path="/ai-monitor" element={<AIMonitor />} />

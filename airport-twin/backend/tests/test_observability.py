@@ -7,9 +7,7 @@ from models.db import Session, Asset, State
 from services import alerts as alerts_mod
 from services.logging import JsonFormatter
 from services.twin import hub
-from test_ingest import auth_headers, client
-
-OPERATOR = auth_headers("operator")
+from test_ingest import client
 
 
 def test_log_records_are_json():
@@ -30,7 +28,7 @@ def test_metrics_endpoint_and_ingest_counter():
         return float(m.group(1)) if m else 0.0
 
     n0 = accepted_count(before)
-    client.post("/api/twin/ingest", headers=OPERATOR,
+    client.post("/api/twin/ingest",
                 json={"asset_id": "SNS-001", "telemetry": {"rssi_dbm": -61}})
     n1 = accepted_count(client.get("/metrics").text)
     assert n1 == n0 + 1
@@ -53,7 +51,7 @@ async def _capture_broadcasts(coro):
 
 def test_watchdog_alerts_offline_device():
     import asyncio
-    client.post("/api/twin/ingest", headers=OPERATOR,
+    client.post("/api/twin/ingest",
                 json={"asset_id": "CONV-002", "status": "offline", "reason": "motor_failure"})
     raised, seen = asyncio.run(_capture_broadcasts(alerts_mod.check_once()))
     assert any(a["asset_id"] == "CONV-002" and a["kind"] == "offline" for a in raised)

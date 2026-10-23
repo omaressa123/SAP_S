@@ -1,0 +1,15 @@
+# Unified person + fall detection service dependencies.
+# These are NOT installed in the main backend image — this service has its own Dockerfile.
+fastapi
+uvicorn
+opencv-python-headless
+numpy
+pillow
+pydantic
+pydantic-settings
+httpx
+pyyaml
+ultralytics
+mediapipe
+joblib
+scikit-learn

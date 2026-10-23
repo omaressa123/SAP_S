@@ -8,7 +8,6 @@ from sqlalchemy import text
 from api.twin import router
 from models.db import Session
 from services.alerts import watch_alerts
-from services.auth import decode_token
 from services.config import SIMULATION_ENABLED
 from services.logging import get_logger
 from services.metrics import api_latency, render as render_metrics, ws_clients
@@ -66,14 +65,8 @@ def metrics():
 
 @app.websocket("/ws/twin")
 async def ws_twin(ws: WebSocket):
-    # Step 5: the socket needs the same JWT as REST (?token=<jwt>).
-    try:
-        user = decode_token(ws.query_params.get("token", ""))
-    except Exception:
-        await ws.close(code=4401)
-        return
     await ws.accept(); hub.clients.add(ws); ws_clients.inc()
-    log.info(f"ws connected ({len(hub.clients)} clients)", extra={"user": user.username})
+    log.info(f"ws connected ({len(hub.clients)} clients)")
     try:
         while True: await ws.receive_text()
     except WebSocketDisconnect: pass

@@ -1,29 +1,6 @@
 import type { Asset } from '../assets/registry';
 
-// Step 5: JWT auth. Token lives in localStorage; sent on REST + WS.
-export const getToken = () => localStorage.getItem('twin_token');
-export const setToken = (t: string | null) =>
-  t ? localStorage.setItem('twin_token', t) : localStorage.removeItem('twin_token');
-
-export async function login(username: string, password: string): Promise<{ role: string }> {
-  const r = await fetch('/api/twin/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username, password }),
-  });
-  if (!r.ok) throw new Error('login failed');
-  const d = await r.json();
-  setToken(d.access_token);
-  return { role: d.role };
-}
-
-const authHeaders = (): Record<string, string> => {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
-};
-
-const j = (u: string) => fetch(u, { headers: authHeaders() }).then((r) => {
-  if (r.status === 401) { setToken(null); throw new Error('unauthorized:' + u); }
+const j = (u: string) => fetch(u).then((r) => {
   if (!r.ok) throw new Error(u);
   return r.json();
 });
@@ -41,22 +18,17 @@ export interface TwinEvent {
 }
 
 export function connect(onEvent: (e: TwinEvent) => void, onState: (up: boolean) => void) {
-  let ws: WebSocket | null = null, stop = false;
+  let ws: WebSocket | null = null, stop = false, reconnectTimer: number | null = null;
   const open = () => {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    const token = getToken();
-    ws = new WebSocket(`${scheme}://${location.host}/ws/twin${token ? `?token=${encodeURIComponent(token)}` : ''}`);
-    ws.onopen = () => onState(true);
+    ws = new WebSocket(`${scheme}://${location.host}/ws/twin`);
+    ws.onopen = () => { onState(true); };
     ws.onmessage = (m) => onEvent(JSON.parse(m.data));
     ws.onclose = (e) => {
-      // 4401 = bad/missing token (or handshake 403 when closed before accept):
-      // don't hammer, surface via offline state. Same if not logged in yet.
       onState(false);
-      if ((e as CloseEvent).code === 4401) return;
-      if (!getToken()) return;
-      if (!stop) setTimeout(open, 2000);
+      if (!stop) reconnectTimer = window.setTimeout(open, 2000);
     };
   };
   open();
-  return () => { stop = true; ws?.close(); };
+  return () => { stop = true; if (reconnectTimer) window.clearTimeout(reconnectTimer); ws?.close(); };
 }
