@@ -14,17 +14,17 @@ const ICONS = {
 const NAV_GROUPS = [
   {
     label: 'Main',
-    items: [{ to: '/', label: 'Overview', icon: 'LayoutDashboard' }],
+    items: [{ view: 'overview', label: 'Overview', icon: 'LayoutDashboard' }],
   },
   {
     label: 'Airport Operations',
     items: [
-      { to: '/egate', label: 'E-Gate Kiosk', icon: 'IdCard' },
-      { to: '/gate-boarding', label: 'Gate B22 Boarding', icon: 'Plane' },
-      { to: '/passengers', label: 'Passengers', icon: 'Users' },
-      { to: '/flights', label: 'Flights', icon: 'Plane' },
-      { to: '/baggage', label: 'Baggage', icon: 'Luggage' },
-      { to: '/monitoring', label: 'Security', icon: 'ShieldCheck' },
+      { view: 'egate', label: 'E-Gate Kiosk', icon: 'IdCard' },
+      { view: 'gate-boarding', label: 'Gate B22 Boarding', icon: 'Plane' },
+      { view: 'passengers', label: 'Passengers', icon: 'Users' },
+      { view: 'flights', label: 'Flights', icon: 'Plane' },
+      { view: 'baggage', label: 'Baggage', icon: 'Luggage' },
+      { view: 'security', label: 'Security', icon: 'ShieldCheck' },
     ],
   },
   {
@@ -42,7 +42,7 @@ const NAV_GROUPS = [
   },
 ]
 
-export default function Sidebar({ collapsed, onToggleCollapse }) {
+export default function Sidebar({ collapsed, onToggleCollapse, workspaceView, onWorkspaceNavigate }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
 
   const closeAccountMenu = () => {
@@ -92,19 +92,33 @@ export default function Sidebar({ collapsed, onToggleCollapse }) {
                 const Icon = ICONS[item.icon]
                 return (
                   <li key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      end={item.to === '/'}
-                      title={collapsed ? item.label : undefined}
-                      className={({ isActive }) =>
-                        `nav-item ${isActive ? 'nav-item-active' : ''}`
-                      }
-                    >
-                      <span className="nav-icon">
-                        <Icon size={20} aria-hidden />
-                      </span>
-                      {!collapsed && <span className="nav-label">{item.label}</span>}
-                    </NavLink>
+                    {item.view ? (
+                      <button
+                        type="button"
+                        onClick={() => onWorkspaceNavigate(item.view)}
+                        title={collapsed ? item.label : undefined}
+                        aria-current={workspaceView === item.view ? 'page' : undefined}
+                        className={`nav-item ${workspaceView === item.view ? 'nav-item-active' : ''}`}
+                      >
+                        <span className="nav-icon">
+                          <Icon size={20} aria-hidden />
+                        </span>
+                        {!collapsed && <span className="nav-label">{item.label}</span>}
+                      </button>
+                    ) : (
+                      <NavLink
+                        to={item.to}
+                        title={collapsed ? item.label : undefined}
+                        className={({ isActive }) =>
+                          `nav-item ${isActive ? 'nav-item-active' : ''}`
+                        }
+                      >
+                        <span className="nav-icon">
+                          <Icon size={20} aria-hidden />
+                        </span>
+                        {!collapsed && <span className="nav-label">{item.label}</span>}
+                      </NavLink>
+                    )}
                   </li>
                 )
               })}

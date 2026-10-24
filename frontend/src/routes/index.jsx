@@ -6,11 +6,7 @@ import { Loading } from '../components/States'
 // Lazy-loaded route components: keeps the initial bundle lean and each
 // AI module's CSS-3D scenes only mount when their route is visited.
 const DisruptionPlanner = lazy(() => import('../pages/DisruptionPlanner'))
-const Dashboard = lazy(() => import('../pages/Dashboard'))
-const Flights = lazy(() => import('../pages/Flights'))
-const Passengers = lazy(() => import('../pages/Passengers'))
-const Baggage = lazy(() => import('../pages/Baggage'))
-const Monitoring = lazy(() => import('../pages/Monitoring'))
+const OperationsWorkspace = lazy(() => import('../pages/OperationsWorkspace'))
 const DigitalTwin = lazy(() => import('../pages/DigitalTwin'))
 const Reports = lazy(() => import('../pages/Reports'))
 const AiCenter = lazy(() => import('../pages/AiCenter'))
@@ -20,21 +16,19 @@ const BaggageThreatDetection = lazy(() => import('../pages/ai/baggage/BaggageThr
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const IoTCenter = lazy(() => import('../pages/IoTCenter'))
-const EGateKiosk = lazy(() => import('../pages/EGateKiosk'))
 const EventCenter = lazy(() => import('../pages/EventCenter'))
 const WorkflowMonitor = lazy(() => import('../pages/WorkflowMonitor'))
-const GateBoarding = lazy(() => import('../pages/GateBoarding'))
 
 export default function AppRoutes() {
   return (
     <Suspense fallback={<main><Loading label="Loading airport module…" /></main>}>
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/flights" element={<Flights />} />
-          <Route path="/passengers" element={<Passengers />} />
-          <Route path="/baggage" element={<Baggage />} />
-          <Route path="/monitoring" element={<Monitoring />} />
+          <Route path="/" element={<OperationsWorkspace />} />
+          <Route path="/flights" element={<Navigate to="/" state={{ workspaceView: 'flights' }} replace />} />
+          <Route path="/passengers" element={<Navigate to="/" state={{ workspaceView: 'passengers' }} replace />} />
+          <Route path="/baggage" element={<Navigate to="/" state={{ workspaceView: 'baggage' }} replace />} />
+          <Route path="/monitoring" element={<Navigate to="/" state={{ workspaceView: 'security' }} replace />} />
           <Route path="/digital-twin" element={<DigitalTwin />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/ai" element={<AiCenter />} />
@@ -47,11 +41,11 @@ export default function AppRoutes() {
           <Route path="/events" element={<EventCenter />} />
           <Route path="/workflows" element={<WorkflowMonitor />} />
           <Route path="/disruption" element={<DisruptionPlanner />} />
-          <Route path="/egate" element={<EGateKiosk />} />
-          <Route path="/kiosk" element={<EGateKiosk />} />
-          <Route path="/gate-boarding" element={<GateBoarding />} />
-          <Route path="/boarding-gate" element={<GateBoarding />} />
-          <Route path="/entry-gate" element={<GateBoarding />} />
+          <Route path="/egate" element={<Navigate to="/" state={{ workspaceView: 'egate' }} replace />} />
+          <Route path="/kiosk" element={<Navigate to="/" state={{ workspaceView: 'egate' }} replace />} />
+          <Route path="/gate-boarding" element={<Navigate to="/" state={{ workspaceView: 'gate-boarding' }} replace />} />
+          <Route path="/boarding-gate" element={<Navigate to="/" state={{ workspaceView: 'gate-boarding' }} replace />} />
+          <Route path="/entry-gate" element={<Navigate to="/" state={{ workspaceView: 'gate-boarding' }} replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
