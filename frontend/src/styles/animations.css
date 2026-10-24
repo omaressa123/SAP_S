@@ -209,6 +209,7 @@
 /* ---------- Reduced motion: keep only essential state changes ---------- */
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up, .anim-fade-in, .live-item, .anim-error { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .anim-fade-up, .anim-fade-in { opacity: 1; transform: none; }
   .status-dot.pulse::after,
   .flight-pill.boarding .bar::after,
   .flight-pill.delayed,
