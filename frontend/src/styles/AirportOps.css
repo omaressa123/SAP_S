@@ -1,0 +1,1750 @@
+.app-main:has(.flights-page),
+.app-main:has(.baggage-page),
+.app-main:has(.security-page) {
+  isolation: isolate;
+  color: #e8f3fb;
+  background-color: #071a2d;
+  background-image:
+    linear-gradient(110deg, rgba(2, 12, 25, .9), rgba(3, 16, 32, .86)),
+    repeating-linear-gradient(0deg, rgba(94, 177, 224, .09) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(94, 177, 224, .09) 0 1px, transparent 1px 40px),
+    url('/sidebarImage.jpeg');
+  background-position: center, center, center, center;
+  background-size: cover, 40px 40px, 40px 40px, cover;
+  background-attachment: fixed;
+}
+
+.app-main {
+  background-color: #eaf2f8;
+  background-image:
+    linear-gradient(110deg, rgba(238, 247, 252, .84), rgba(248, 251, 253, .78)),
+    repeating-linear-gradient(0deg, rgba(36, 112, 158, .08) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(36, 112, 158, .08) 0 1px, transparent 1px 40px),
+    url('/sidebarImage.jpeg');
+  background-position: center, center, center, center;
+  background-size: cover, 40px 40px, 40px 40px, cover;
+  background-attachment: fixed;
+}
+
+.app-main:has(.kiosk-page-shell) {
+  padding: 0;
+}
+
+.kiosk-page-shell {
+  width: 100%;
+  min-height: 100%;
+  flex: 1;
+  background: transparent;
+}
+
+.kiosk-page-header {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  border-bottom: 1px solid rgba(124, 159, 181, .28);
+  background: rgba(244, 250, 253, .72);
+  box-shadow: 0 4px 16px rgba(34, 67, 91, .06);
+  backdrop-filter: blur(14px);
+}
+
+.egate-page-header > div:last-child {
+  border-color: rgba(124, 159, 181, .23);
+  background: rgba(225, 239, 246, .72);
+  backdrop-filter: blur(12px);
+}
+
+.gate-boarding-header > div:first-child {
+  min-width: 0;
+}
+
+.kiosk-page-content {
+  min-height: 0;
+  background: transparent;
+}
+
+.kiosk-page-footer {
+  border-top: 1px solid rgba(124, 159, 181, .26);
+  background: rgba(244, 250, 253, .72);
+  backdrop-filter: blur(12px);
+}
+
+.app-shell:has(.flights-page) .app-header,
+.app-shell:has(.baggage-page) .app-header,
+.app-shell:has(.security-page) .app-header {
+  color: #eef6fc;
+  border-color: rgba(133, 187, 215, .18);
+  background: linear-gradient(105deg, #061a2e, #092b45);
+  box-shadow: 0 4px 20px rgba(0, 8, 20, .25);
+}
+
+.app-shell:has(.flights-page) .brand-name,
+.app-shell:has(.baggage-page) .brand-name,
+.app-shell:has(.security-page) .brand-name,
+.app-shell:has(.flights-page) .user-name,
+.app-shell:has(.baggage-page) .user-name,
+.app-shell:has(.security-page) .user-name {
+  color: #f0f7fd;
+}
+
+.app-shell:has(.flights-page) .brand-sub,
+.app-shell:has(.baggage-page) .brand-sub,
+.app-shell:has(.security-page) .brand-sub,
+.app-shell:has(.flights-page) .user-role,
+.app-shell:has(.baggage-page) .user-role,
+.app-shell:has(.security-page) .user-role {
+  color: #9fb7c9;
+}
+
+.app-shell:has(.flights-page) .system-chip,
+.app-shell:has(.baggage-page) .system-chip,
+.app-shell:has(.security-page) .system-chip {
+  border-color: rgba(133, 187, 215, .22);
+  background: rgba(255, 255, 255, .06);
+}
+
+.app-shell:has(.flights-page) .chip-label,
+.app-shell:has(.baggage-page) .chip-label,
+.app-shell:has(.security-page) .chip-label {
+  color: #d4e4ef;
+}
+
+.app-shell:has(.flights-page) .icon-btn,
+.app-shell:has(.baggage-page) .icon-btn,
+.app-shell:has(.security-page) .icon-btn {
+  color: #d6e7f2;
+  border-color: rgba(133, 187, 215, .22);
+  background: rgba(255, 255, 255, .06);
+}
+
+.app-shell:has(.flights-page) .sidebar,
+.app-shell:has(.baggage-page) .sidebar,
+.app-shell:has(.security-page) .sidebar {
+  color: #e7f1f8;
+  border-color: rgba(133, 187, 215, .17);
+  background:
+    linear-gradient(rgba(3, 15, 29, .82), rgba(3, 17, 32, .88)),
+    url('/sidebarImage.jpeg') center / cover no-repeat;
+}
+
+.app-shell:has(.flights-page) .sidebar-header,
+.app-shell:has(.baggage-page) .sidebar-header,
+.app-shell:has(.security-page) .sidebar-header {
+  border-bottom: 1px solid rgba(133, 187, 215, .15);
+  background: rgba(4, 17, 31, .9);
+}
+
+.app-shell:has(.flights-page) .sidebar-nav,
+.app-shell:has(.baggage-page) .sidebar-nav,
+.app-shell:has(.security-page) .sidebar-nav {
+  scrollbar-color: rgba(162, 199, 217, .35) transparent;
+}
+
+.app-shell:has(.flights-page) .nav-group-label,
+.app-shell:has(.baggage-page) .nav-group-label,
+.app-shell:has(.security-page) .nav-group-label {
+  color: #9bb1c0;
+}
+
+.app-shell:has(.flights-page) .nav-item,
+.app-shell:has(.baggage-page) .nav-item,
+.app-shell:has(.security-page) .nav-item {
+  color: #d8e5ed;
+}
+
+.app-shell:has(.flights-page) .nav-item:hover,
+.app-shell:has(.baggage-page) .nav-item:hover,
+.app-shell:has(.security-page) .nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .11);
+}
+
+.app-shell:has(.flights-page) .nav-item-active,
+.app-shell:has(.baggage-page) .nav-item-active,
+.app-shell:has(.security-page) .nav-item-active {
+  color: #fff;
+  background: linear-gradient(105deg, #5949e8, #644ef2);
+}
+
+.app-shell:has(.flights-page) .sidebar-footer,
+.app-shell:has(.baggage-page) .sidebar-footer,
+.app-shell:has(.security-page) .sidebar-footer {
+  border-color: rgba(133, 187, 215, .18);
+  background: rgba(3, 16, 30, .4);
+}
+
+.app-shell:has(.flights-page) .sidebar-account,
+.app-shell:has(.baggage-page) .sidebar-account,
+.app-shell:has(.security-page) .sidebar-account {
+  color: #e6f1f8;
+  border-color: rgba(148, 193, 217, .22);
+  background: rgba(11, 36, 57, .86);
+}
+
+.app-shell:has(.flights-page) .sidebar-account-name,
+.app-shell:has(.baggage-page) .sidebar-account-name,
+.app-shell:has(.security-page) .sidebar-account-name {
+  color: #f0f7fc;
+}
+
+.app-shell:has(.flights-page) .sidebar-account-email,
+.app-shell:has(.baggage-page) .sidebar-account-email,
+.app-shell:has(.security-page) .sidebar-account-email {
+  color: #a9c0cf;
+}
+
+.flights-page .flights-heading h1 {
+  color: #f1f7ff;
+}
+
+.flights-page .flights-heading p {
+  color: #a9bfd0;
+}
+
+.baggage-page,
+.security-page {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+}
+
+.baggage-page .ai-hero h1,
+.security-page .ai-hero h1 {
+  color: #f2f7fc;
+  font-size: 1.42rem;
+}
+
+.baggage-page .ai-hero-sub,
+.security-page .ai-hero-sub {
+  color: #b4c7d7;
+  font-size: .84rem;
+}
+
+.baggage-page .ai-hero-icon,
+.security-page .ai-hero-icon {
+  color: #78e1eb;
+  border: 1px solid rgba(104, 209, 232, .34);
+  background: linear-gradient(145deg, rgba(29, 115, 165, .7), rgba(24, 52, 99, .82));
+  box-shadow: 0 8px 22px rgba(16, 167, 206, .15);
+}
+
+.baggage-page .ai-hero-note,
+.security-page .ai-hero-note {
+  color: #a3bacb;
+}
+
+.baggage-page .ai-stat,
+.security-page .ai-stat,
+.ops-glass-card {
+  color: #e8f3fb;
+  border: 1px solid rgba(133, 190, 222, .28);
+  background: linear-gradient(145deg, rgba(18, 48, 72, .86), rgba(13, 35, 59, .9));
+  box-shadow: 0 14px 36px rgba(0, 8, 20, .24), inset 0 1px rgba(225, 245, 255, .05);
+  backdrop-filter: blur(12px);
+}
+
+.ops-glass-card:hover {
+  transform: none;
+}
+
+.baggage-page .ai-stat-label,
+.security-page .ai-stat-label {
+  color: #a7c0d0;
+}
+
+.baggage-page .ai-stat-value,
+.security-page .ai-stat-value {
+  color: #f4f9ff;
+  font-size: 1.32rem;
+}
+
+.baggage-page .ai-stat-sub,
+.security-page .ai-stat-sub {
+  color: #a9c1d0;
+}
+
+.baggage-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.ops-glass-card h3 {
+  margin-bottom: 16px;
+  color: #f0f6fc;
+  font-size: 1.04rem;
+}
+
+.baggage-search-card,
+.baggage-journey-card,
+.security-camera-card,
+.security-report-card {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 17px;
+}
+
+.ops-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ops-eyebrow {
+  color: #69dbe6;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.ops-card-heading h2 {
+  margin-top: 5px;
+  color: #f0f7fc;
+  font-size: 1.13rem;
+}
+
+.ops-card-heading p {
+  margin-top: 5px;
+  color: #a7bdcc;
+  font-size: .76rem;
+  line-height: 1.45;
+}
+
+.ops-heading-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #6be2e9;
+  border: 1px solid rgba(105, 213, 233, .27);
+  border-radius: 11px;
+  background: rgba(64, 186, 212, .1);
+}
+
+.ops-form {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  gap: 11px;
+}
+
+.ops-form > label,
+.ops-field > span {
+  color: #e1edf5;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.ops-input-wrap {
+  position: relative;
+}
+
+.ops-input-wrap > svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: #82c8d9;
+  transform: translateY(-50%);
+}
+
+.ops-form input {
+  width: 100%;
+  height: 43px;
+  color: #f1f7fc;
+  border: 1px solid rgba(141, 190, 218, .36);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(5, 22, 40, .62);
+  font: inherit;
+  font-size: .78rem;
+}
+
+.ops-form input::placeholder {
+  color: #91aabd;
+}
+
+.ops-form input:focus {
+  border-color: #4bd9d9;
+  box-shadow: 0 0 0 3px rgba(75, 217, 217, .13);
+}
+
+.ops-input-wrap input {
+  padding: 0 12px 0 38px;
+}
+
+button.btn.ops-gradient-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 17px;
+  color: #08243a;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #19dfac, #36d1dc 58%, #647fff);
+  box-shadow: 0 7px 20px rgba(37, 214, 199, .19);
+  font-size: .82rem;
+}
+
+button.btn.ops-gradient-button:hover {
+  background: linear-gradient(100deg, #45ecc0, #58e0e5 58%, #8297ff);
+}
+
+.ops-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  color: #ffc1c1;
+  border: 1px solid rgba(255, 136, 136, .3);
+  border-radius: 9px;
+  background: rgba(112, 28, 44, .35);
+  font-size: .8rem;
+}
+
+.baggage-recent {
+  margin-top: 23px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(160, 199, 218, .2);
+}
+
+.baggage-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.baggage-section-title h3 {
+  margin: 0;
+  color: #eff7fc;
+  font-size: .9rem;
+}
+
+.baggage-section-title > span {
+  color: #8faabd;
+  font-size: .68rem;
+}
+
+.baggage-search-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.baggage-search-chip {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  overflow: hidden;
+  color: #c4e4f0;
+  border: 1px solid rgba(85, 192, 223, .36);
+  border-radius: 999px;
+  background: rgba(25, 104, 143, .31);
+  font: inherit;
+  font-size: .72rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.baggage-search-chip:hover:not(:disabled) {
+  border-color: #48d7df;
+  background: rgba(30, 142, 168, .38);
+}
+
+.baggage-search-chip:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.baggage-search-chip > svg {
+  flex: 0 0 auto;
+  color: #72dce5;
+}
+
+.baggage-chip-status {
+  margin-left: auto;
+  color: #8ff0c8;
+  font-size: .62rem;
+}
+
+.ops-empty-note {
+  color: #9eb6c7;
+  font-size: .77rem;
+  line-height: 1.5;
+}
+
+.baggage-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  color: #b8d4df;
+  border: 1px solid rgba(149, 194, 215, .18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .04);
+  font-size: .61rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.baggage-live-indicator > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #39dfb0;
+  box-shadow: 0 0 10px rgba(57, 223, 176, .6);
+}
+
+.baggage-route-summary {
+  display: flex;
+  min-height: 117px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -3px 0 12px;
+}
+
+.baggage-suitcase-art {
+  position: relative;
+  display: grid;
+  width: 94px;
+  height: 94px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #5ed8e5;
+  border: 1px dashed rgba(118, 198, 225, .32);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 166, 194, .16), transparent 70%);
+  filter: drop-shadow(0 0 18px rgba(43, 195, 220, .18));
+}
+
+.baggage-suitcase-art > span {
+  position: absolute;
+  right: 8px;
+  bottom: 11px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: #9be9d0;
+  border: 1px solid rgba(90, 221, 185, .45);
+  border-radius: 8px;
+  background: #123651;
+}
+
+.baggage-status-box {
+  display: grid;
+  min-width: min(220px, 62%);
+  grid-template-columns: 1fr auto;
+  gap: 8px 14px;
+  padding: 12px;
+  border: 1px solid rgba(157, 194, 214, .22);
+  border-radius: 11px;
+  background: rgba(3, 20, 37, .45);
+}
+
+.baggage-status-box span {
+  color: #a2b9c8;
+  font-size: .69rem;
+}
+
+.baggage-status-box strong {
+  overflow: hidden;
+  color: #7fe3c0;
+  font-size: .72rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.baggage-journey-list {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding: 3px 0 3px 2px;
+}
+
+.baggage-journey-list::before {
+  position: absolute;
+  top: 21px;
+  bottom: 27px;
+  left: 12px;
+  width: 2px;
+  background: linear-gradient(#3bdcb8 0%, rgba(91, 184, 219, .5) 54%, rgba(141, 175, 195, .19) 100%);
+  content: '';
+}
+
+.baggage-journey-step {
+  position: relative;
+  display: grid;
+  min-height: 54px;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+}
+
+.baggage-journey-marker {
+  z-index: 1;
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  color: #94aebe;
+  border: 1px solid rgba(141, 180, 200, .31);
+  border-radius: 50%;
+  background: #102c43;
+}
+
+.baggage-journey-step.is-complete .baggage-journey-marker {
+  color: #112e43;
+  border-color: #44e0b2;
+  background: #44e0b2;
+}
+
+.baggage-journey-step.is-active .baggage-journey-marker {
+  border: 2px solid #43dce4;
+  box-shadow: 0 0 0 5px rgba(67, 220, 228, .12), 0 0 18px rgba(67, 220, 228, .5);
+}
+
+.baggage-journey-step.is-active .baggage-journey-marker > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #67e8eb;
+}
+
+.baggage-journey-step > div {
+  display: grid;
+  gap: 3px;
+  padding: 2px 0 11px;
+}
+
+.baggage-journey-step strong {
+  color: #edf5fa;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.baggage-journey-step > div > span,
+.baggage-journey-step time {
+  color: #9bb3c2;
+  font-size: .68rem;
+}
+
+.baggage-journey-step:not(.is-complete):not(.is-active) strong {
+  color: #9eb0bd;
+}
+
+.baggage-empty-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0 0 32px;
+  color: #8fabbc;
+  font-size: .7rem;
+  line-height: 1.5;
+}
+
+.baggage-empty-help svg {
+  flex: 0 0 auto;
+  color: #68d9e3;
+}
+
+.baggage-pipeline {
+  margin: 13px 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(133, 190, 222, .24);
+  border-radius: 12px;
+  background: rgba(13, 35, 59, .78);
+}
+
+.baggage-pipeline .ai-pipe-step {
+  color: #c2d5e1;
+}
+
+.baggage-pipeline .ai-pipe-step.done .ai-pipe-label {
+  color: #65e2bb;
+}
+
+.baggage-pipeline .ai-pipe-step.active .ai-pipe-label {
+  color: #77e2ea;
+}
+
+.baggage-pipeline .ai-pipe-link {
+  background: rgba(144, 182, 204, .32);
+}
+
+.baggage-history-details {
+  margin-top: 12px;
+}
+
+.baggage-history-details .ai-kv dt,
+.baggage-history-details .ai-muted {
+  color: #abc0cd;
+}
+
+.baggage-history-details .ai-kv dd,
+.baggage-history-details .ai-tl-item strong {
+  color: #edf5fa;
+}
+
+.baggage-history-details .ai-kv-row,
+.baggage-history-details .ai-tl-item {
+  border-color: rgba(151, 190, 210, .18);
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.security-camera-card > h3,
+.security-report-card > h3 {
+  margin-bottom: 15px;
+}
+
+.security-camera-stage {
+  min-height: 260px;
+  border: 1px solid rgba(100, 202, 230, .28);
+  background: linear-gradient(145deg, rgba(6, 29, 53, .96), rgba(12, 45, 72, .94));
+  box-shadow: inset 0 0 35px rgba(35, 156, 190, .08);
+}
+
+.security-camera-stage .cam-grid-bg {
+  opacity: .43;
+}
+
+.security-camera-stage .cam-rec {
+  z-index: 1;
+  color: #ffb0ae;
+  font-size: .67rem;
+}
+
+.security-camera-stage .cam-timestamp {
+  z-index: 1;
+  color: #b2d1df;
+}
+
+.security-camera-corners {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+}
+
+.security-camera-corners i {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: #63dce5;
+  border-style: solid;
+  opacity: .8;
+}
+
+.security-camera-corners i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 5px 0 0; }
+.security-camera-corners i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 5px 0 0; }
+.security-camera-corners i:nth-child(3) { right: 0; bottom: 0; border-width: 0 2px 2px 0; border-radius: 0 0 5px; }
+.security-camera-corners i:nth-child(4) { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 5px; }
+
+.egate-kiosk-page,
+.gate-boarding-page {
+  color: #172a43;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.kiosk-page-header {
+  border-color: rgba(153, 177, 196, .42);
+  background: rgba(250, 252, 255, .9);
+  box-shadow: 0 4px 18px rgba(26, 53, 77, .08);
+}
+
+.egate-page-header > div:first-child,
+.gate-boarding-header > div:first-child {
+  min-height: 72px;
+  padding-right: clamp(16px, 3vw, 40px);
+  padding-left: clamp(16px, 3vw, 40px);
+}
+
+.egate-page-header nav,
+.egate-page-header > div:first-child > div,
+.gate-boarding-header > div:first-child > div:last-child {
+  border: 1px solid rgba(137, 163, 184, .24);
+  background-color: #f1f6fa;
+  box-shadow: 0 3px 10px rgba(27, 54, 78, .06);
+}
+
+.egate-page-header nav {
+  gap: 3px;
+}
+
+.egate-page-header nav button,
+.egate-page-header > div:first-child > div button,
+.gate-boarding-header > div:first-child > div:last-child button {
+  min-width: 54px;
+  transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.egate-page-header nav button[class*="bg-primary-container"],
+.egate-page-header > div:first-child > div button[class*="bg-inverse-surface"],
+.gate-boarding-header > div:first-child > div:last-child button[class*="bg-[#131b2e]"] {
+  color: #fff;
+  background: linear-gradient(110deg, #5549e8, #7054f4);
+  box-shadow: 0 4px 12px rgba(87, 76, 230, .2);
+}
+
+.egate-page-header > div:first-child > div button,
+.gate-boarding-header > div:first-child > div:last-child button {
+  min-width: 62px;
+  text-align: center;
+}
+
+.egate-page-header > div:first-child > button,
+.gate-boarding-header > div:first-child > div:last-child + button {
+  border: 1px solid rgba(137, 163, 184, .3);
+  background: #fff;
+}
+
+.egate-page-header > div:last-child {
+  border-top-color: rgba(153, 177, 196, .3);
+  background: rgba(237, 245, 250, .94);
+}
+
+.egate-page-header > div:last-child > div:first-child > span,
+.egate-page-header > div:last-child > div:last-child > button {
+  border: 1px solid rgba(137, 163, 184, .24);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(27, 54, 78, .05);
+}
+
+.kiosk-page-content {
+  width: 100%;
+  padding: 22px clamp(16px, 3vw, 36px) 32px;
+}
+
+.kiosk-page-title {
+  display: flex;
+  width: min(100%, 1100px);
+  align-items: center;
+  gap: 13px;
+  margin: 0 auto 18px;
+}
+
+.kiosk-title-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #536dff, #7960f5);
+  box-shadow: 0 7px 18px rgba(83, 109, 255, .24);
+  font-size: 23px;
+}
+
+.kiosk-page-title h1 {
+  margin: 0;
+  color: #172a43;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+
+.kiosk-page-title p {
+  margin-top: 4px;
+  color: #708197;
+  font-size: .82rem;
+}
+
+.egate-page-title {
+  align-self: center;
+}
+
+.egate-kiosk-page .kiosk-page-content {
+  padding-top: 18px;
+}
+
+.egate-kiosk-page .kiosk-page-content > .relative.z-10.w-full.max-w-4xl {
+  width: min(100%, 1060px);
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  border: 1px solid rgba(154, 181, 200, .36);
+  border-radius: 17px;
+  background: rgba(250, 252, 255, .9);
+  box-shadow: 0 8px 24px rgba(28, 55, 78, .08);
+  backdrop-filter: blur(12px);
+}
+
+.egate-kiosk-page .egate-stage-view {
+  width: min(100%, 1060px);
+  max-width: 1060px;
+  min-height: 360px;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid rgba(154, 181, 200, .36);
+  border-radius: 22px;
+  background: rgba(250, 252, 255, .9);
+  box-shadow: 0 14px 38px rgba(28, 55, 78, .1);
+  backdrop-filter: blur(12px);
+}
+
+.egate-kiosk-page .egate-stage-view h1,
+.egate-kiosk-page .egate-stage-view h2 {
+  color: #172a43;
+}
+
+.egate-kiosk-page .egate-stage-view [class*="bg-surface-container-lowest"] {
+  border-color: rgba(153, 177, 196, .36);
+  box-shadow: 0 9px 24px rgba(28, 55, 78, .08);
+}
+
+.gate-boarding-page .kiosk-page-content {
+  justify-content: flex-start;
+}
+
+.gate-boarding-page .kiosk-page-content > div {
+  width: min(100%, 1100px);
+  max-width: 1100px;
+}
+
+.gate-boarding-page .kiosk-page-content > div > div:not(.kiosk-page-title) {
+  width: 100%;
+  max-width: none;
+  padding: clamp(18px, 3vw, 32px);
+  border: 1px solid rgba(154, 181, 200, .36);
+  border-radius: 22px;
+  background: rgba(250, 252, 255, .92);
+  box-shadow: 0 14px 38px rgba(28, 55, 78, .1);
+  backdrop-filter: blur(12px);
+}
+
+.gate-boarding-page .kiosk-page-content h1 {
+  color: #172a43;
+}
+
+.gate-boarding-page .kiosk-page-content > div > div:not(.kiosk-page-title) > div > div:first-child {
+  margin-bottom: 18px;
+}
+
+.gate-boarding-page .kiosk-page-content [class*="bg-white"],
+.gate-boarding-page .kiosk-page-content [class*="bg-surface-container-lowest"] {
+  border-color: rgba(153, 177, 196, .36);
+}
+
+.gate-boarding-page .kiosk-page-content .relative.w-full.max-w-md.h-\[400px\] {
+  border: 5px solid #fff;
+  box-shadow: 0 12px 30px rgba(10, 24, 42, .22);
+}
+
+.gate-boarding-page .kiosk-page-footer {
+  width: min(100%, 1100px);
+  align-self: center;
+  border: 1px solid rgba(153, 177, 196, .28);
+  border-radius: 12px 12px 0 0;
+}
+
+@media (max-width: 760px) {
+  .egate-page-header > div:first-child,
+  .gate-boarding-header > div:first-child {
+    min-height: 64px;
+    gap: 10px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .egate-page-header > div:first-child > div,
+  .gate-boarding-header > div:first-child > div:last-child {
+    gap: 6px;
+  }
+
+  .egate-kiosk-page .egate-stage-view,
+  .gate-boarding-page .kiosk-page-content > div > div:not(.kiosk-page-title) {
+    padding: 18px 14px;
+    border-radius: 17px;
+  }
+}
+
+.security-camera-stage .xray-bbox {
+  border-color: #a8d8ff;
+  border-width: 1px;
+}
+
+.security-camera-stage .xray-tag {
+  max-width: min(240px, 70vw);
+  overflow: hidden;
+  color: #172b41;
+  background: #f1cb9f;
+  text-overflow: ellipsis;
+}
+
+.security-camera-state {
+  display: flex;
+  margin-top: 11px;
+  padding: 8px 10px;
+  border: 1px solid rgba(152, 183, 205, .2);
+  border-radius: 9px;
+  background: rgba(5, 22, 40, .5);
+}
+
+.security-form-intro {
+  margin: -5px 0 16px;
+  color: #a8becd;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+.security-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 11px;
+}
+
+.ops-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.ops-field input {
+  padding: 0 11px;
+}
+
+.security-field-wide {
+  grid-column: 1 / -1;
+}
+
+button.btn.security-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.security-page .ai-result {
+  margin-top: 14px;
+  color: #eef6fc;
+  border-color: rgba(139, 191, 217, .25);
+  background: linear-gradient(145deg, rgba(18, 48, 72, .9), rgba(13, 35, 59, .94));
+}
+
+.security-page .ai-kv dt {
+  color: #b2c8d6;
+}
+
+.security-page .ai-kv dd {
+  color: #f0f7fc;
+}
+
+@media (max-width: 850px) {
+  .baggage-layout,
+  .security-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .baggage-status-box {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .baggage-search-card,
+  .baggage-journey-card,
+  .security-camera-card,
+  .security-report-card {
+    padding: 16px;
+  }
+
+  .baggage-search-chips {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .baggage-route-summary {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .baggage-suitcase-art {
+    width: 62px;
+    height: 62px;
+  }
+
+  .baggage-status-box {
+    flex: 1;
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .baggage-status-box span,
+  .baggage-status-box strong {
+    font-size: .64rem;
+  }
+
+  .security-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .security-field-wide {
+    grid-column: auto;
+  }
+
+  .security-camera-stage {
+    min-height: 220px;
+  }
+}
+
+/* Light airport-glass theme shared by Flights, Baggage, and Security. */
+.app-main:has(.flights-page),
+.app-main:has(.baggage-page),
+.app-main:has(.security-page) {
+  color: #17263b;
+  background-color: #eaf2f8;
+  background-image:
+    linear-gradient(110deg, rgba(238, 247, 252, .84), rgba(248, 251, 253, .78)),
+    repeating-linear-gradient(0deg, rgba(36, 112, 158, .08) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(36, 112, 158, .08) 0 1px, transparent 1px 40px),
+    url('/sidebarImage.jpeg');
+}
+
+.app-shell:has(.flights-page) .app-header,
+.app-shell:has(.baggage-page) .app-header,
+.app-shell:has(.security-page) .app-header {
+  color: #14233d;
+  border-color: rgba(139, 169, 190, .25);
+  background: rgba(245, 250, 253, .91);
+  box-shadow: 0 4px 20px rgba(24, 54, 78, .08);
+  backdrop-filter: blur(12px);
+}
+
+.app-shell:has(.flights-page) .brand-name,
+.app-shell:has(.baggage-page) .brand-name,
+.app-shell:has(.security-page) .brand-name,
+.app-shell:has(.flights-page) .user-name,
+.app-shell:has(.baggage-page) .user-name,
+.app-shell:has(.security-page) .user-name {
+  color: #10213a;
+}
+
+.app-shell:has(.flights-page) .brand-sub,
+.app-shell:has(.baggage-page) .brand-sub,
+.app-shell:has(.security-page) .brand-sub,
+.app-shell:has(.flights-page) .user-role,
+.app-shell:has(.baggage-page) .user-role,
+.app-shell:has(.security-page) .user-role {
+  color: #68798c;
+}
+
+.app-shell:has(.flights-page) .system-chip,
+.app-shell:has(.baggage-page) .system-chip,
+.app-shell:has(.security-page) .system-chip {
+  border-color: rgba(132, 166, 188, .3);
+  background: rgba(255, 255, 255, .72);
+}
+
+.app-shell:has(.flights-page) .chip-label,
+.app-shell:has(.baggage-page) .chip-label,
+.app-shell:has(.security-page) .chip-label {
+  color: #34485e;
+}
+
+.app-shell:has(.flights-page) .icon-btn,
+.app-shell:has(.baggage-page) .icon-btn,
+.app-shell:has(.security-page) .icon-btn {
+  color: #263c54;
+  border-color: rgba(132, 166, 188, .35);
+  background: rgba(255, 255, 255, .66);
+}
+
+.app-shell:has(.flights-page) .sidebar,
+.app-shell:has(.baggage-page) .sidebar,
+.app-shell:has(.security-page) .sidebar {
+  color: #263548;
+  border-color: rgba(127, 160, 184, .27);
+  background:
+    linear-gradient(rgba(235, 245, 250, .72), rgba(241, 248, 251, .74)),
+    url('/sidebarImage.jpeg') center / cover no-repeat;
+}
+
+.app-shell:has(.flights-page) .sidebar-nav,
+.app-shell:has(.baggage-page) .sidebar-nav,
+.app-shell:has(.security-page) .sidebar-nav {
+  scrollbar-color: rgba(91, 124, 146, .35) transparent;
+}
+
+.app-shell:has(.flights-page) .nav-group-label,
+.app-shell:has(.baggage-page) .nav-group-label,
+.app-shell:has(.security-page) .nav-group-label {
+  color: #707f8c;
+}
+
+.app-shell:has(.flights-page) .nav-item,
+.app-shell:has(.baggage-page) .nav-item,
+.app-shell:has(.security-page) .nav-item {
+  color: #344454;
+}
+
+.app-shell:has(.flights-page) .nav-item:hover,
+.app-shell:has(.baggage-page) .nav-item:hover,
+.app-shell:has(.security-page) .nav-item:hover {
+  color: #5142d9;
+  background: rgba(255, 255, 255, .63);
+}
+
+.app-shell:has(.flights-page) .nav-item-active,
+.app-shell:has(.baggage-page) .nav-item-active,
+.app-shell:has(.security-page) .nav-item-active {
+  color: #fff;
+  background: linear-gradient(105deg, #5949e8, #644ef2);
+}
+
+.app-shell:has(.flights-page) .sidebar-footer,
+.app-shell:has(.baggage-page) .sidebar-footer,
+.app-shell:has(.security-page) .sidebar-footer {
+  border-color: rgba(139, 169, 190, .28);
+  background: rgba(237, 246, 250, .55);
+}
+
+.app-shell:has(.flights-page) .sidebar-account,
+.app-shell:has(.baggage-page) .sidebar-account,
+.app-shell:has(.security-page) .sidebar-account {
+  color: #263548;
+  border-color: rgba(147, 174, 193, .32);
+  background: rgba(255, 255, 255, .91);
+}
+
+.app-shell:has(.flights-page) .sidebar-account-name,
+.app-shell:has(.baggage-page) .sidebar-account-name,
+.app-shell:has(.security-page) .sidebar-account-name {
+  color: #25364a;
+}
+
+.app-shell:has(.flights-page) .sidebar-account-email,
+.app-shell:has(.baggage-page) .sidebar-account-email,
+.app-shell:has(.security-page) .sidebar-account-email {
+  color: #778391;
+}
+
+.flights-page .flights-heading h1 {
+  color: #14233d;
+}
+
+.flights-page .flights-heading p {
+  color: #62758a;
+}
+
+.flight-create-panel {
+  border-color: rgba(88, 155, 189, .38);
+  background: linear-gradient(135deg, rgba(99, 198, 222, .65), rgba(118, 126, 219, .52) 55%, rgba(71, 205, 186, .43));
+  box-shadow: 0 24px 60px rgba(35, 69, 96, .14), 0 4px 12px rgba(28, 58, 91, .08);
+}
+
+.flight-create-panel::before {
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(70, 206, 220, .19), transparent 38%),
+    radial-gradient(ellipse at 100% 100%, rgba(132, 115, 233, .13), transparent 42%),
+    linear-gradient(130deg, rgba(248, 252, 254, .97), rgba(228, 241, 248, .97) 52%, rgba(241, 243, 253, .97));
+}
+
+.flight-panel-glow {
+  background: rgba(42, 201, 224, .13);
+}
+
+.flight-panel-content {
+  background-image: radial-gradient(rgba(54, 127, 159, .1) .7px, transparent .7px);
+}
+
+.flight-panel-eyebrow {
+  color: #168c9c;
+}
+
+.flight-panel-heading h2 {
+  color: #152b41;
+}
+
+.flight-step-badge {
+  color: #526a7d;
+  border-color: rgba(91, 136, 162, .25);
+  background: rgba(255, 255, 255, .57);
+}
+
+.flight-progress {
+  color: #708397;
+}
+
+.flight-progress > span:nth-child(1),
+.flight-progress > span:nth-child(2) {
+  background: rgba(77, 126, 151, .2);
+}
+
+.flight-progress > span:nth-child(3) {
+  color: #187e84;
+}
+
+.flight-field-label {
+  color: #26394d;
+}
+
+.flight-field-label svg,
+.flight-input-wrap svg {
+  color: #388fa4;
+}
+
+.flight-form input {
+  color: #20364b;
+  border-color: rgba(77, 132, 160, .4);
+  background: rgba(255, 255, 255, .64);
+}
+
+.flight-form input::placeholder {
+  color: #778d9f;
+}
+
+.flight-form input:focus {
+  border-color: #28aeb5;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(40, 174, 181, .14);
+}
+
+.flight-form input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+.flight-route-fields {
+  border-color: rgba(75, 168, 181, .42);
+  background: linear-gradient(110deg, rgba(82, 210, 200, .13), rgba(133, 133, 222, .12));
+}
+
+.flight-route-topline {
+  color: #687d8d;
+}
+
+.flight-route-topline span:first-child {
+  color: #158b8b;
+}
+
+.flight-field-caption {
+  color: #526a7b;
+}
+
+.flight-route-path {
+  color: #259ea7;
+}
+
+.flight-route-path span {
+  border-color: rgba(53, 160, 168, .75);
+}
+
+.flight-route-path svg {
+  background: #e9f3f7;
+  filter: drop-shadow(0 0 5px rgba(78, 178, 190, .35));
+}
+
+.flight-form-note {
+  color: #647c8c;
+}
+
+.flight-form-note svg {
+  color: #1da88b;
+}
+
+.flight-error {
+  color: var(--color-danger);
+}
+
+.baggage-page .ai-hero h1,
+.security-page .ai-hero h1 {
+  color: #182c40;
+}
+
+.baggage-page .ai-hero-sub,
+.security-page .ai-hero-sub {
+  color: #50677b;
+}
+
+.baggage-page .ai-hero-icon,
+.security-page .ai-hero-icon {
+  color: #e8f6ff;
+  border-color: rgba(68, 129, 169, .3);
+  background: linear-gradient(145deg, #16335a, #254978);
+  box-shadow: 0 8px 22px rgba(27, 72, 112, .18);
+}
+
+.baggage-page .ai-hero-note,
+.security-page .ai-hero-note {
+  color: #62778a;
+}
+
+.baggage-page .ai-stat,
+.security-page .ai-stat,
+.ops-glass-card {
+  color: #26394d;
+  border-color: rgba(126, 163, 185, .35);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .91), rgba(239, 247, 251, .91));
+  box-shadow: 0 14px 36px rgba(34, 67, 91, .1), inset 0 1px rgba(255, 255, 255, .8);
+  backdrop-filter: blur(12px);
+}
+
+.baggage-page .ai-stat-label,
+.security-page .ai-stat-label {
+  color: #657b8d;
+}
+
+.baggage-page .ai-stat-value,
+.security-page .ai-stat-value {
+  color: #1b3045;
+}
+
+.baggage-page .ai-stat-sub,
+.security-page .ai-stat-sub {
+  color: #667d8f;
+}
+
+.ops-glass-card h3 {
+  color: #1d3146;
+}
+
+.ops-eyebrow {
+  color: #167f8b;
+}
+
+.ops-card-heading h2 {
+  color: #1c3247;
+}
+
+.ops-card-heading p {
+  color: #61778a;
+}
+
+.ops-heading-icon {
+  color: #258da0;
+  border-color: rgba(66, 150, 171, .25);
+  background: rgba(59, 170, 191, .1);
+}
+
+.ops-form > label,
+.ops-field > span {
+  color: #344b60;
+}
+
+.ops-input-wrap > svg {
+  color: #44899e;
+}
+
+.ops-form input {
+  color: #24394c;
+  border-color: rgba(110, 152, 176, .46);
+  background: rgba(255, 255, 255, .82);
+}
+
+.ops-form input::placeholder {
+  color: #778c9c;
+}
+
+.ops-form input:focus {
+  border-color: #31aeb4;
+  box-shadow: 0 0 0 3px rgba(49, 174, 180, .13);
+}
+
+.ops-error {
+  color: #a72f3a;
+  border-color: rgba(214, 69, 80, .25);
+  background: rgba(255, 241, 242, .94);
+}
+
+.baggage-recent {
+  border-color: rgba(131, 164, 183, .32);
+}
+
+.baggage-section-title h3 {
+  color: #263c50;
+}
+
+.baggage-section-title > span {
+  color: #718596;
+}
+
+.baggage-search-chip {
+  color: #24516b;
+  border-color: rgba(58, 148, 178, .35);
+  background: rgba(219, 241, 248, .82);
+}
+
+.baggage-search-chip:hover:not(:disabled) {
+  border-color: #34aeb5;
+  background: rgba(198, 237, 239, .95);
+}
+
+.baggage-search-chip > svg {
+  color: #318da0;
+}
+
+.baggage-chip-status {
+  color: #168061;
+}
+
+.ops-empty-note {
+  color: #677d8e;
+}
+
+.baggage-live-indicator {
+  color: #536b7d;
+  border-color: rgba(115, 154, 175, .25);
+  background: rgba(234, 245, 250, .8);
+}
+
+.baggage-route-summary {
+  border-bottom: 1px solid rgba(131, 164, 183, .27);
+}
+
+.baggage-suitcase-art {
+  color: #268fa2;
+  border-color: rgba(70, 151, 174, .34);
+  background: radial-gradient(circle, rgba(60, 172, 190, .16), transparent 70%);
+  filter: drop-shadow(0 0 15px rgba(43, 156, 176, .16));
+}
+
+.baggage-suitcase-art > span {
+  color: #138464;
+  border-color: rgba(57, 167, 138, .35);
+  background: #e2f5ee;
+}
+
+.baggage-status-box {
+  border-color: rgba(129, 164, 184, .3);
+  background: rgba(240, 247, 250, .86);
+}
+
+.baggage-status-box span {
+  color: #607789;
+}
+
+.baggage-status-box strong {
+  color: #187956;
+}
+
+.baggage-journey-list::before {
+  background: linear-gradient(#31b990 0%, rgba(76, 161, 189, .5) 54%, rgba(128, 158, 177, .23) 100%);
+}
+
+.baggage-journey-marker {
+  color: #708899;
+  border-color: rgba(113, 154, 177, .4);
+  background: #edf5f8;
+}
+
+.baggage-journey-step.is-complete .baggage-journey-marker {
+  color: #fff;
+  border-color: #24a980;
+  background: #24a980;
+}
+
+.baggage-journey-step.is-active .baggage-journey-marker {
+  border-color: #23aab4;
+  background: #f4fcfd;
+  box-shadow: 0 0 0 5px rgba(35, 170, 180, .12), 0 0 15px rgba(35, 170, 180, .22);
+}
+
+.baggage-journey-step.is-active .baggage-journey-marker > span {
+  background: #24aeb7;
+}
+
+.baggage-journey-step strong,
+.baggage-journey-step:not(.is-complete):not(.is-active) strong {
+  color: #354b5e;
+}
+
+.baggage-journey-step > div > span,
+.baggage-journey-step time {
+  color: #718596;
+}
+
+.baggage-empty-help {
+  color: #657c8d;
+}
+
+.baggage-empty-help svg {
+  color: #318fa1;
+}
+
+.baggage-pipeline {
+  border-color: rgba(126, 163, 185, .32);
+  background: rgba(245, 250, 252, .9);
+}
+
+.baggage-pipeline .ai-pipe-step {
+  color: #516a7d;
+}
+
+.baggage-pipeline .ai-pipe-step.done .ai-pipe-label {
+  color: #17835f;
+}
+
+.baggage-pipeline .ai-pipe-step.active .ai-pipe-label {
+  color: #187e8a;
+}
+
+.baggage-pipeline .ai-pipe-step.active .ai-pipe-dot {
+  background: #258f9b;
+}
+
+.baggage-pipeline .ai-pipe-link {
+  background: rgba(105, 145, 166, .32);
+}
+
+.baggage-history-details .ai-kv dt,
+.baggage-history-details .ai-muted {
+  color: #5e7487;
+}
+
+.baggage-history-details .ai-kv dd,
+.baggage-history-details .ai-tl-item strong {
+  color: #253b50;
+}
+
+.baggage-history-details .ai-kv-row,
+.baggage-history-details .ai-tl-item {
+  border-color: rgba(131, 164, 183, .25);
+}
+
+.security-camera-stage {
+  background: linear-gradient(145deg, rgba(7, 28, 52, .98), rgba(13, 45, 73, .98));
+}
+
+.security-camera-state {
+  border-color: rgba(125, 164, 185, .3);
+  background: rgba(239, 247, 250, .9);
+}
+
+.security-form-intro {
+  color: #647a8c;
+}
+
+.security-page .ai-result {
+  color: #26394d;
+  border-color: rgba(126, 163, 185, .32);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .95), rgba(239, 247, 251, .96));
+}
+
+.security-page .ai-kv dt {
+  color: #5f7587;
+}
+
+.security-page .ai-kv dd {
+  color: #263b50;
+}
+
+@media (max-width: 560px) {
+  .baggage-route-summary {
+    border-bottom: 1px solid rgba(131, 164, 183, .27);
+  }
+}
+
+.app-main .flight-create-panel {
+  border-color: rgba(88, 155, 189, .38);
+  background: linear-gradient(135deg, rgba(99, 198, 222, .65), rgba(118, 126, 219, .52) 55%, rgba(71, 205, 186, .43));
+}
+
+.app-main .flight-create-panel::before {
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(70, 206, 220, .19), transparent 38%),
+    radial-gradient(ellipse at 100% 100%, rgba(132, 115, 233, .13), transparent 42%),
+    linear-gradient(130deg, rgba(248, 252, 254, .97), rgba(228, 241, 248, .97) 52%, rgba(241, 243, 253, .97));
+}
+
+.app-main .flight-panel-heading h2 {
+  color: #152b41;
+}
+
+.app-main .flight-panel-eyebrow {
+  color: #168c9c;
+}
+
+.app-main .flight-step-badge {
+  color: #526a7d;
+  border-color: rgba(91, 136, 162, .25);
+  background: rgba(255, 255, 255, .57);
+}
+
+.app-main .flight-progress {
+  color: #708397;
+}
+
+.app-main .flight-progress > span:nth-child(1),
+.app-main .flight-progress > span:nth-child(2) {
+  background: rgba(77, 126, 151, .2);
+}
+
+.app-main .flight-progress > span:nth-child(3) {
+  color: #187e84;
+}
+
+.app-main .flight-field-label {
+  color: #26394d;
+}
+
+.app-main .flight-field-label svg,
+.app-main .flight-input-wrap svg {
+  color: #388fa4;
+}
+
+.app-main .flight-form input {
+  color: #20364b;
+  border-color: rgba(77, 132, 160, .4);
+  background: rgba(255, 255, 255, .64);
+}
+
+.app-main .flight-form input::placeholder {
+  color: #778d9f;
+}
+
+.app-main .flight-form input:focus {
+  border-color: #28aeb5;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(40, 174, 181, .14);
+}
+
+.app-main .flight-form input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+.app-main .flight-route-fields {
+  border-color: rgba(75, 168, 181, .42);
+  background: linear-gradient(110deg, rgba(82, 210, 200, .13), rgba(133, 133, 222, .12));
+}
+
+.app-main .flight-route-topline {
+  color: #687d8d;
+}
+
+.app-main .flight-route-topline span:first-child {
+  color: #158b8b;
+}
+
+.app-main .flight-field-caption {
+  color: #526a7b;
+}
+
+.app-main .flight-route-path {
+  color: #259ea7;
+}
+
+.app-main .flight-route-path span {
+  border-color: rgba(53, 160, 168, .75);
+}
+
+.app-main .flight-route-path svg {
+  background: #e9f3f7;
+  filter: drop-shadow(0 0 5px rgba(78, 178, 190, .35));
+}
+
+.app-main .flight-form-note {
+  color: #647c8c;
+}
+
+.app-main .flight-form-note svg {
+  color: #1da88b;
+}

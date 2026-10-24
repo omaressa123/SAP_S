@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { BadgeCheck, CreditCard, LockKeyhole, Plane, QrCode, ShieldCheck, Smartphone } from 'lucide-react'
 import { SmartGateApi, AiApi } from '../services/api'
 
 // Initial empty state before document scan
@@ -427,7 +428,7 @@ export default function EGateKiosk() {
   const isAr = lang === 'AR'
 
   return (
-    <div className={`min-h-screen bg-background font-body-md text-on-surface antialiased flex flex-col ${isAr ? 'rtl' : 'ltr'}`}>
+    <div className={`kiosk-page-shell egate-kiosk-page font-body-md text-on-surface antialiased flex flex-col ${isAr ? 'rtl' : 'ltr'}`}>
       {/* Hidden File Inputs for custom imports */}
       <input
         type="file"
@@ -445,21 +446,8 @@ export default function EGateKiosk() {
       />
 
       {/* Top Fixed Header */}
-      <header className="sticky top-0 w-full z-40 bg-surface/90 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+      <header className="kiosk-page-header egate-page-header" dir="ltr">
         <div className="h-20 w-full px-6 md:px-12 flex items-center justify-between gap-4">
-          {/* Logo / Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm">
-              <span className="material-symbols-outlined text-[24px]">flight_takeoff</span>
-            </div>
-            <div>
-              <div className="font-headline-sm text-headline-sm tracking-tight text-primary leading-none font-bold">AeroGate</div>
-              <div className="font-label-sm text-label-sm text-on-surface-variant leading-none mt-1 uppercase font-semibold">
-                {isAr ? 'نظام الحدود الذكي • البوابة B22' : 'SMART BORDER SYSTEM • Gate B22'}
-              </div>
-            </div>
-          </div>
-
           {/* Stepper Navigation */}
           <nav className="hidden lg:flex items-center bg-surface-container-low p-1.5 rounded-full shadow-inner">
             {[
@@ -515,9 +503,6 @@ export default function EGateKiosk() {
               <span className="text-sm font-semibold">{isAr ? 'مساعدة' : 'Assistance'}</span>
             </button>
 
-            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-sm">
-              <span className="material-symbols-outlined text-[18px]">person</span>
-            </div>
           </div>
         </div>
 
@@ -551,7 +536,14 @@ export default function EGateKiosk() {
       </header>
 
       {/* Main Kiosk Screen Container */}
-      <main className="flex-1 w-full flex flex-col items-center justify-start py-4 px-4 md:px-10 relative overflow-hidden select-none">
+      <div className="kiosk-page-content flex-1 w-full flex flex-col items-center justify-start py-4 px-4 md:px-10 relative overflow-hidden select-none">
+        <div className="kiosk-page-title egate-page-title">
+          <span className="kiosk-title-icon" aria-hidden="true"><BadgeCheck size={22} /></span>
+          <div>
+            <h1>{isAr ? 'بوابة إلكترونية' : 'E-Gate Kiosk'}</h1>
+            <p>{isAr ? 'التحقق الآلي من هوية ووثائق المسافرين' : 'Automated passenger identity and document verification'}</p>
+          </div>
+        </div>
         {/* Subtle Ambient Glow */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
           <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-primary/10 via-surface-container-high/30 to-transparent blur-3xl opacity-70"></div>
@@ -562,7 +554,7 @@ export default function EGateKiosk() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-surface-container-lowest/95 backdrop-blur-md px-6 py-3.5 rounded-2xl shadow-sm border border-surface-container-high">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-high text-primary">
-                <span className="material-symbols-outlined text-[20px]">flight</span>
+                <Plane size={19} aria-hidden="true" />
               </span>
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
@@ -619,7 +611,7 @@ export default function EGateKiosk() {
         </div>
 
         {/* Dynamic Stage View */}
-        <div className="relative z-10 w-full max-w-4xl mx-auto flex items-center justify-center py-2">
+        <div className="egate-stage-view relative z-10 w-full max-w-4xl mx-auto flex items-center justify-center py-2">
           {/* STEP 1: METHOD SELECTION */}
           {currentStep === 1 && (
             <div className="w-full flex flex-col items-center justify-center max-w-3xl animate-fadeIn">
@@ -644,7 +636,7 @@ export default function EGateKiosk() {
                   className="group relative flex flex-col text-left p-8 rounded-3xl bg-surface-container-lowest hover:bg-surface-container-low transition-all duration-200 shadow-md hover:shadow-xl transform active:scale-[0.98] border border-surface-container-high"
                 >
                   <div className="w-16 h-16 rounded-2xl bg-primary-container/10 flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors shadow-sm">
-                    <span className="material-symbols-outlined text-[36px]">contactless</span>
+                    <CreditCard size={32} aria-hidden="true" />
                   </div>
                   <div className="flex items-center justify-between w-full mb-1">
                     <span className="text-xl font-bold text-on-surface">Biometric Passport</span>
@@ -654,7 +646,7 @@ export default function EGateKiosk() {
                     e-Passport with embedded microchip or contactless MRZ page.
                   </p>
                   <div className="mt-6 flex items-center gap-3 pt-4 bg-surface-container-low/60 rounded-xl px-4 py-2.5">
-                    <span className="material-symbols-outlined text-[20px] text-primary">credit_card</span>
+                    <CreditCard size={20} aria-hidden="true" />
                     <span className="text-xs text-on-surface-variant font-medium">Place face-down flat on glass scanner</span>
                   </div>
                 </button>
@@ -666,7 +658,7 @@ export default function EGateKiosk() {
                   className="group relative flex flex-col text-left p-8 rounded-3xl bg-surface-container-lowest hover:bg-surface-container-low transition-all duration-200 shadow-md hover:shadow-xl transform active:scale-[0.98] border border-surface-container-high"
                 >
                   <div className="w-16 h-16 rounded-2xl bg-primary-container/10 flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-on-primary transition-colors shadow-sm">
-                    <span className="material-symbols-outlined text-[36px]">qr_code_scanner</span>
+                    <QrCode size={32} aria-hidden="true" />
                   </div>
                   <div className="flex items-center justify-between w-full mb-1">
                     <span className="text-xl font-bold text-on-surface">Boarding Pass QR</span>
@@ -676,7 +668,7 @@ export default function EGateKiosk() {
                     Digital Apple/Google Wallet pass, airline app barcode, or printed slip.
                   </p>
                   <div className="mt-6 flex items-center gap-3 pt-4 bg-surface-container-low/60 rounded-xl px-4 py-2.5">
-                    <span className="material-symbols-outlined text-[20px] text-primary">smartphone</span>
+                    <Smartphone size={20} aria-hidden="true" />
                     <span className="text-xs text-on-surface-variant font-medium">Hold 5–10 cm directly above red optical beam</span>
                   </div>
                 </button>
@@ -685,12 +677,12 @@ export default function EGateKiosk() {
               {/* Security Standards Tag */}
               <div className="mt-8 flex items-center justify-center gap-6 text-on-surface-variant text-xs font-semibold">
                 <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-secondary text-[18px]">verified_user</span>
+                  <ShieldCheck size={18} aria-hidden="true" />
                   ICAO Doc 9303 Compliant
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
                 <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-primary text-[18px]">lock</span>
+                  <LockKeyhole size={18} aria-hidden="true" />
                   Encrypted Biometric Tunnel
                 </span>
               </div>
@@ -1288,7 +1280,7 @@ export default function EGateKiosk() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   )
 }

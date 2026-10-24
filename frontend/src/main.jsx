@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './styles/global.css'
 import './styles/animations.css'
+import './styles/AirportOps.css'
 import './components/ai/scenes.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

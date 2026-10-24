@@ -333,26 +333,17 @@ export default function GateBoarding() {
   const handleToolbarState = handleStateTransition
 
   return (
-    <div className="bg-[#faf8ff] text-[#131b2e] min-h-screen flex flex-col justify-between selection:bg-[#006194] selection:text-white" dir={currentLang === 'AR' ? 'rtl' : 'ltr'}>
+    <div className="kiosk-page-shell gate-boarding-page text-[#131b2e] flex flex-col justify-between selection:bg-[#006194] selection:text-white" dir={currentLang === 'AR' ? 'rtl' : 'ltr'}>
       {/* Top Header */}
-      <header className="w-full bg-[#faf8ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-[#dae2fd]">
+      <header className="kiosk-page-header gate-boarding-header" dir="ltr">
         <div className="h-20 w-full px-6 lg:px-10 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-[#006194] text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                ✈
-              </div>
-              <span className="font-bold text-xl tracking-tight text-[#131b2e]">AeroGate</span>
-            </div>
-            <div className="h-6 w-[1px] bg-[#dae2fd] hidden sm:block"></div>
-            <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
               <span className="inline-flex items-center px-3 py-1 rounded bg-[#006194] text-white font-bold text-sm tracking-wide">
                 {t.gateTitle}
               </span>
               <div className="flex items-center gap-2 text-sm text-[#4a5a75]">
                 <span className="font-semibold text-[#131b2e]">{t.flightLabel}</span>
               </div>
-            </div>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
@@ -389,9 +380,15 @@ export default function GateBoarding() {
 
 
       {/* Main Viewport Container */}
-      <main className="w-full flex-1 flex flex-col justify-center items-center px-6 py-6">
+      <div className="kiosk-page-content w-full flex-1 flex flex-col justify-center items-center px-6 py-6">
         <div className="w-full max-w-5xl mx-auto flex flex-col justify-center items-center">
-          
+          <div className="kiosk-page-title gate-boarding-title">
+            <span className="kiosk-title-icon material-symbols-outlined" aria-hidden="true">flight_takeoff</span>
+            <div>
+              <h1>{currentLang === 'AR' ? 'الصعود عند البوابة' : 'Gate Boarding'}</h1>
+              <p>{currentLang === 'AR' ? 'التحقق الآمن من هوية المسافرين والصعود للطائرة' : 'Secure passenger verification and boarding clearance'}</p>
+            </div>
+          </div>
           {/* ========================================================================= */}
           {/* STATE 1: LIVE BIOMETRIC CAMERA SCAN */}
           {/* ========================================================================= */}
@@ -852,7 +849,7 @@ export default function GateBoarding() {
           )}
 
         </div>
-      </main>
+      </div>
 
       {/* Assistance Modal */}
       {isAssistModalOpen && (
@@ -882,7 +879,7 @@ export default function GateBoarding() {
       )}
 
       {/* Footer */}
-      <footer className="w-full bg-white border-t border-[#dae2fd] py-3 px-6 lg:px-10">
+      <footer className="kiosk-page-footer w-full py-3 px-6 lg:px-10">
         <div className="w-full flex items-center justify-between text-xs text-[#4a5a75]">
           <span>AeroGate Automated Terminal OS v4.2 • SafeZone Clearance Protocol Active</span>
           <span className="hidden sm:inline">Terminal Biometrics Secured • Operational 24/7</span>

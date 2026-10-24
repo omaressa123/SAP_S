@@ -47,13 +47,12 @@ export default function AppRoutes() {
           <Route path="/events" element={<EventCenter />} />
           <Route path="/workflows" element={<WorkflowMonitor />} />
           <Route path="/disruption" element={<DisruptionPlanner />} />
+          <Route path="/egate" element={<EGateKiosk />} />
+          <Route path="/kiosk" element={<EGateKiosk />} />
+          <Route path="/gate-boarding" element={<GateBoarding />} />
+          <Route path="/boarding-gate" element={<GateBoarding />} />
+          <Route path="/entry-gate" element={<GateBoarding />} />
         </Route>
-        {/* Full-screen Terminal Kiosk Views */}
-        <Route path="/egate" element={<EGateKiosk />} />
-        <Route path="/kiosk" element={<EGateKiosk />} />
-        <Route path="/gate-boarding" element={<GateBoarding />} />
-        <Route path="/boarding-gate" element={<GateBoarding />} />
-        <Route path="/entry-gate" element={<GateBoarding />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
