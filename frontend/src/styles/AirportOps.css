@@ -943,6 +943,10 @@ button.btn.ops-gradient-button:hover {
   box-shadow: 0 12px 30px rgba(10, 24, 42, .22);
 }
 
+.theme-toggle-btn {
+  flex: 0 0 auto;
+}
+
 .gate-boarding-page .kiosk-page-footer {
   width: min(100%, 1100px);
   align-self: center;
@@ -969,6 +973,429 @@ button.btn.ops-gradient-button:hover {
     padding: 18px 14px;
     border-radius: 17px;
   }
+}
+
+.app-shell[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e5eef5;
+  background: #081521;
+}
+
+.app-shell[data-theme="dark"] .app-header {
+  color: #e5eef5;
+  border-color: rgba(142, 177, 198, .18);
+  background: linear-gradient(105deg, #0b1d2d, #10283a);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .26);
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .app-header,
+.app-shell[data-theme="dark"]:has(.baggage-page) .app-header,
+.app-shell[data-theme="dark"]:has(.security-page) .app-header {
+  color: #e5eef5;
+  border-color: rgba(142, 177, 198, .18);
+  background: linear-gradient(105deg, #0b1d2d, #10283a);
+}
+
+.app-shell[data-theme="dark"] .brand-name,
+.app-shell[data-theme="dark"] .user-name {
+  color: #f0f6fb;
+}
+
+.app-shell[data-theme="dark"] .brand-sub,
+.app-shell[data-theme="dark"] .user-role {
+  color: #a3b8c8;
+}
+
+.app-shell[data-theme="dark"] .system-chip,
+.app-shell[data-theme="dark"] .icon-btn {
+  color: #d6e5ef;
+  border-color: rgba(147, 183, 203, .23);
+  background: rgba(255, 255, 255, .06);
+}
+
+.app-shell[data-theme="dark"] .chip-label {
+  color: #d6e5ef;
+}
+
+.app-shell[data-theme="dark"] .icon-btn:hover {
+  color: #fff;
+  border-color: rgba(115, 205, 224, .55);
+  background: rgba(100, 179, 208, .16);
+}
+
+.app-shell[data-theme="dark"] .notif-badge {
+  border-color: #10283a;
+}
+
+.app-shell[data-theme="dark"] .sidebar {
+  color: #dbe7ef;
+  border-color: rgba(142, 177, 198, .16);
+  background:
+    linear-gradient(rgba(6, 20, 33, .94), rgba(8, 25, 40, .96)),
+    url('/sidebarImage.jpeg') center / cover no-repeat;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .sidebar,
+.app-shell[data-theme="dark"]:has(.baggage-page) .sidebar,
+.app-shell[data-theme="dark"]:has(.security-page) .sidebar {
+  color: #dbe7ef;
+  border-color: rgba(142, 177, 198, .16);
+  background:
+    linear-gradient(rgba(6, 20, 33, .94), rgba(8, 25, 40, .96)),
+    url('/sidebarImage.jpeg') center / cover no-repeat;
+}
+
+.app-shell[data-theme="dark"] .sidebar-header {
+  border-color: rgba(142, 177, 198, .16);
+  background: rgba(7, 20, 33, .94);
+}
+
+.app-shell[data-theme="dark"] .nav-group-label {
+  color: #91a9ba;
+}
+
+.app-shell[data-theme="dark"] .nav-item {
+  color: #c5d4df;
+}
+
+.app-shell[data-theme="dark"] .nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .09);
+}
+
+.app-shell[data-theme="dark"] .nav-item-active {
+  color: #fff;
+  background: linear-gradient(105deg, #5949e8, #644ef2);
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .nav-item,
+.app-shell[data-theme="dark"]:has(.baggage-page) .nav-item,
+.app-shell[data-theme="dark"]:has(.security-page) .nav-item {
+  color: #c5d4df;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .nav-item-active,
+.app-shell[data-theme="dark"]:has(.baggage-page) .nav-item-active,
+.app-shell[data-theme="dark"]:has(.security-page) .nav-item-active {
+  color: #fff;
+  background: linear-gradient(105deg, #5949e8, #644ef2);
+}
+
+.app-shell[data-theme="dark"] .sidebar-footer {
+  border-color: rgba(142, 177, 198, .18);
+  background: rgba(4, 15, 26, .48);
+}
+
+.app-shell[data-theme="dark"] .sidebar-account {
+  color: #e2edf4;
+  border-color: rgba(148, 183, 203, .22);
+  background: rgba(19, 43, 61, .88);
+}
+
+.app-shell[data-theme="dark"] .sidebar-account-name {
+  color: #edf5fa;
+}
+
+.app-shell[data-theme="dark"] .sidebar-account-email {
+  color: #a8bdcb;
+}
+
+.app-shell[data-theme="dark"] .app-main {
+  color: #e4edf4;
+  background-color: #0a1b2a;
+  background-image:
+    linear-gradient(110deg, rgba(4, 15, 27, .94), rgba(7, 23, 38, .91)),
+    repeating-linear-gradient(0deg, rgba(94, 177, 224, .055) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(94, 177, 224, .055) 0 1px, transparent 1px 40px),
+    url('/sidebarImage.jpeg');
+}
+
+.app-shell[data-theme="dark"] .app-main:has(.flights-page),
+.app-shell[data-theme="dark"] .app-main:has(.baggage-page),
+.app-shell[data-theme="dark"] .app-main:has(.security-page) {
+  color: #e4edf4;
+  background-color: #081a2b;
+  background-image:
+    linear-gradient(110deg, rgba(2, 12, 25, .91), rgba(3, 16, 32, .88)),
+    repeating-linear-gradient(0deg, rgba(94, 177, 224, .07) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(94, 177, 224, .07) 0 1px, transparent 1px 40px),
+    url('/sidebarImage.jpeg');
+}
+
+.app-shell[data-theme="dark"] .app-main .card,
+.app-shell[data-theme="dark"] .app-main .ai-stat,
+.app-shell[data-theme="dark"] .app-main .ai-processing,
+.app-shell[data-theme="dark"] .app-main .flow-stat,
+.app-shell[data-theme="dark"] .app-main .zone-cell-card,
+.app-shell[data-theme="dark"] .app-main [class*="bg-white"],
+.app-shell[data-theme="dark"] .app-main [class*="bg-surface-container-lowest"],
+.app-shell[data-theme="dark"] .app-main [class*="bg-surface-container-low"],
+.app-shell[data-theme="dark"] .app-main [class*="bg-[#f2f3ff]"] {
+  color: #e6eff6;
+  border-color: rgba(143, 179, 200, .24);
+  background-color: #12283a;
+}
+
+.app-shell[data-theme="dark"] .app-main :is(
+  h1, h2, h3, h4, h5, h6, p, label, small, strong, li, th, td, dt, dd,
+  .ai-muted, .ai-stat-label, .ai-stat-sub, .ai-hero-sub, .ai-hero-note,
+  .report-meta, .chart-meta, .chart-hbar-label, .chart-hbar-value,
+  .hist-label, .hist-count, .flow-stat span:last-child, .kpi-value,
+  .ai-conf-label, .ai-kv dt, .ai-kv dd, .ai-tl-time
+) {
+  color: #d7e4ed !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge,
+.app-shell[data-theme="dark"] .app-main .ai-badge * {
+  color: #e4edf4 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-good,
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-good * {
+  color: #9be4b6 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-good {
+  background-color: rgba(14, 124, 74, .25);
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-warn,
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-warn * {
+  color: #f3ce8a !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-warn {
+  background-color: rgba(199, 123, 26, .2);
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-bad,
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-bad * {
+  color: #ffafb4 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-bad {
+  background-color: rgba(214, 69, 80, .2);
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-live,
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-live * {
+  color: #e3c39d !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-live {
+  background-color: #0b2148;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-pipe-step.done .ai-pipe-label {
+  color: #7ee0ad !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-pipe-step.fail .ai-pipe-label {
+  color: #ff9098 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main .chart-hbar-track,
+.app-shell[data-theme="dark"] .app-main .donut-bg,
+.app-shell[data-theme="dark"] .app-main .ai-conf-track {
+  background: #263d50;
+  stroke: #263d50;
+}
+
+.app-shell[data-theme="dark"] .app-main .chart-line {
+  stroke: #9fc5da;
+}
+
+.app-shell[data-theme="dark"] .app-main .chart-area {
+  fill: rgba(159, 197, 218, .14);
+}
+
+.app-shell[data-theme="dark"] .app-main .donut-total {
+  fill: #e6eff6;
+}
+
+.app-shell[data-theme="dark"] .app-main .donut-caption {
+  fill: #a9bfce;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="text-on-surface"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#131b2e]"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#172a43]"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#14233d]"],
+.app-shell[data-theme="dark"] .app-main [class*="text-gray-900"],
+.app-shell[data-theme="dark"] .app-main [class*="text-slate-900"] {
+  color: #e6eff6 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="text-on-surface-variant"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#4a5a75]"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#68798c]"],
+.app-shell[data-theme="dark"] .app-main [class*="text-[#708197]"] {
+  color: #a9bfce !important;
+}
+
+.app-shell[data-theme="dark"] .app-main input,
+.app-shell[data-theme="dark"] .app-main select,
+.app-shell[data-theme="dark"] .app-main textarea {
+  color: #e8f1f8;
+  border-color: rgba(145, 181, 203, .34);
+  background-color: #0d2233;
+}
+
+.app-shell[data-theme="dark"] .app-main input::placeholder,
+.app-shell[data-theme="dark"] .app-main textarea::placeholder {
+  color: #91a9b9;
+}
+
+.app-shell[data-theme="dark"] .app-main th,
+.app-shell[data-theme="dark"] .app-main td {
+  color: #d7e4ed;
+  border-color: rgba(143, 179, 200, .2);
+}
+
+.app-shell[data-theme="dark"] .app-main tbody tr:hover {
+  background: rgba(148, 188, 211, .08);
+}
+
+.app-shell[data-theme="dark"] .dashboard-page .card,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-card,
+.app-shell[data-theme="dark"] .dashboard-page .dash-health-card {
+  color: #e6eff6;
+  border-color: rgba(143, 179, 200, .24);
+  background: #12283a;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .2);
+}
+
+.app-shell[data-theme="dark"] .dashboard-welcome h1,
+.app-shell[data-theme="dark"] .dashboard-page .card h3,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-label,
+.app-shell[data-theme="dark"] .dashboard-page .panel-title,
+.app-shell[data-theme="dark"] .dashboard-page .health-title,
+.app-shell[data-theme="dark"] .dashboard-page .health-time div,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-value,
+.app-shell[data-theme="dark"] .dashboard-page .panel-link {
+  color: #e9f2f8 !important;
+}
+
+.app-shell[data-theme="dark"] .dashboard-page [style*="#4a5a75"] {
+  color: #a9bfce !important;
+}
+
+.app-shell[data-theme="dark"] .dashboard-welcome p,
+.app-shell[data-theme="dark"] .dashboard-page .health-sub,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-label,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-sub,
+.app-shell[data-theme="dark"] .dashboard-page .panel-sub {
+  color: #a9bfce;
+}
+
+.app-shell[data-theme="dark"] .dashboard-page .panel-head {
+  border-color: rgba(143, 179, 200, .2);
+}
+
+.app-shell[data-theme="dark"] .dashboard-page .kpi-agent .kpi-icon-wrap,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-tasks .kpi-icon-wrap,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-events .kpi-icon-wrap,
+.app-shell[data-theme="dark"] .dashboard-page .kpi-carbon .kpi-icon-wrap {
+  background: rgba(95, 169, 201, .2);
+}
+
+.app-shell[data-theme="dark"] .kiosk-page-header,
+.app-shell[data-theme="dark"] .egate-page-header > div:last-child,
+.app-shell[data-theme="dark"] .kiosk-page-footer {
+  color: #e5eef5;
+  border-color: rgba(143, 179, 200, .24);
+  background: rgba(12, 32, 48, .94);
+}
+
+.app-shell[data-theme="dark"] .egate-page-header nav,
+.app-shell[data-theme="dark"] .egate-page-header > div:first-child > div,
+.app-shell[data-theme="dark"] .gate-boarding-header > div:first-child > div:last-child {
+  color: #dbe7ef;
+  border-color: rgba(143, 179, 200, .24);
+  background-color: #142d40;
+}
+
+.app-shell[data-theme="dark"] .kiosk-page-title h1 {
+  color: #f0f6fb;
+}
+
+.app-shell[data-theme="dark"] .kiosk-page-title p {
+  color: #aec2d0;
+}
+
+.app-shell[data-theme="dark"] .egate-kiosk-page .kiosk-page-content > .relative.z-10.w-full.max-w-4xl,
+.app-shell[data-theme="dark"] .egate-kiosk-page .egate-stage-view,
+.app-shell[data-theme="dark"] .gate-boarding-page .kiosk-page-content > div > div:not(.kiosk-page-title) {
+  border-color: rgba(143, 179, 200, .26);
+  background: rgba(12, 32, 48, .92);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .25);
+}
+
+.app-shell[data-theme="dark"] .flights-page .flights-heading h1,
+.app-shell[data-theme="dark"] .flights-page .flight-panel-heading h2 {
+  color: #f0f6fb;
+}
+
+.app-shell[data-theme="dark"] .flights-page .flights-heading p {
+  color: #a9bfce;
+}
+
+.app-shell[data-theme="dark"] .flight-create-panel::before {
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(27, 191, 225, .16), transparent 38%),
+    radial-gradient(ellipse at 100% 100%, rgba(115, 76, 244, .18), transparent 42%),
+    linear-gradient(130deg, #071c2e 0%, #0d2438 52%, #10213a 100%);
+}
+
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(7, 23, 57)"],
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(16, 28, 52)"],
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(74, 90, 117)"],
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(80, 90, 110)"],
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(112, 112, 112)"],
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(139, 147, 167)"] {
+  color: #d1dfE8 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(14, 124, 74)"] {
+  color: #8be0b1 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main [style*="color: rgb(214, 69, 80)"] {
+  color: #ff9ca4 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main [style*="background: rgb(255, 255, 255)"],
+.app-shell[data-theme="dark"] .app-main [style*="background-color: rgb(255, 255, 255)"] {
+  color: #e3edf4;
+  border-color: rgba(143, 179, 200, .28) !important;
+  background: #12283a !important;
+}
+
+.app-shell[data-theme="dark"] .app-main [style*="background: rgb(238, 240, 250)"],
+.app-shell[data-theme="dark"] .app-main [style*="background-color: rgb(238, 240, 250)"] {
+  background: #1a3448 !important;
+}
+
+.app-shell[data-theme="dark"] .app-main button.btn {
+  color: #e8f1f7;
+  border: 1px solid rgba(150, 187, 208, .24);
+  background: #253f53;
+}
+
+.app-shell[data-theme="dark"] .app-main button.btn:hover:not(:disabled) {
+  background: #31546b;
+}
+
+.app-shell[data-theme="dark"] .app-main .report-head [role="tab"][aria-selected="true"] {
+  color: #fff;
+  border-color: rgba(151, 136, 255, .5);
+  background: linear-gradient(110deg, #5549e8, #7054f4);
+}
+
+.app-shell[data-theme="dark"] .app-main button.btn:disabled {
+  color: #a9bfce;
+  background: #1c3447;
 }
 
 .security-camera-stage .xray-bbox {
@@ -1747,4 +2174,211 @@ button.btn.security-submit {
 
 .app-main .flight-form-note svg {
   color: #1da88b;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .system-chip,
+.app-shell[data-theme="dark"]:has(.baggage-page) .system-chip,
+.app-shell[data-theme="dark"]:has(.security-page) .system-chip,
+.app-shell[data-theme="dark"]:has(.flights-page) .icon-btn,
+.app-shell[data-theme="dark"]:has(.baggage-page) .icon-btn,
+.app-shell[data-theme="dark"]:has(.security-page) .icon-btn {
+  color: #d6e5ef;
+  border-color: rgba(147, 183, 203, .23);
+  background: rgba(255, 255, 255, .06);
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .sidebar-footer,
+.app-shell[data-theme="dark"]:has(.baggage-page) .sidebar-footer,
+.app-shell[data-theme="dark"]:has(.security-page) .sidebar-footer {
+  border-color: rgba(142, 177, 198, .18);
+  background: rgba(4, 15, 26, .48);
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .sidebar-account,
+.app-shell[data-theme="dark"]:has(.baggage-page) .sidebar-account,
+.app-shell[data-theme="dark"]:has(.security-page) .sidebar-account {
+  color: #e2edf4;
+  border-color: rgba(148, 183, 203, .22);
+  background: rgba(19, 43, 61, .88);
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .sidebar-account-name,
+.app-shell[data-theme="dark"]:has(.baggage-page) .sidebar-account-name,
+.app-shell[data-theme="dark"]:has(.security-page) .sidebar-account-name {
+  color: #edf5fa;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .sidebar-account-email,
+.app-shell[data-theme="dark"]:has(.baggage-page) .sidebar-account-email,
+.app-shell[data-theme="dark"]:has(.security-page) .sidebar-account-email {
+  color: #a8bdcb;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-stat,
+.app-shell[data-theme="dark"] .app-main .ops-glass-card,
+.app-shell[data-theme="dark"] .app-main .baggage-pipeline {
+  color: #e6eff6;
+  border-color: rgba(143, 179, 200, .24);
+  background: #12283a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-stat-label,
+.app-shell[data-theme="dark"] .app-main .ai-stat-sub,
+.app-shell[data-theme="dark"] .app-main .ops-card-heading p,
+.app-shell[data-theme="dark"] .app-main .ops-empty-note,
+.app-shell[data-theme="dark"] .app-main .baggage-section-title > span,
+.app-shell[data-theme="dark"] .app-main .baggage-status-box span,
+.app-shell[data-theme="dark"] .app-main .baggage-journey-step > div > span,
+.app-shell[data-theme="dark"] .app-main .baggage-journey-step time,
+.app-shell[data-theme="dark"] .app-main .baggage-empty-help,
+.app-shell[data-theme="dark"] .app-main .security-form-intro {
+  color: #a9bfce;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-stat-value,
+.app-shell[data-theme="dark"] .app-main .ops-card-heading h2,
+.app-shell[data-theme="dark"] .app-main .ops-glass-card h3,
+.app-shell[data-theme="dark"] .app-main .baggage-section-title h3,
+.app-shell[data-theme="dark"] .app-main .baggage-journey-step strong,
+.app-shell[data-theme="dark"] .app-main .baggage-status-box strong,
+.app-shell[data-theme="dark"] .app-main .ops-field > span {
+  color: #e6eff6;
+}
+
+.app-shell[data-theme="dark"] .app-main .ops-eyebrow {
+  color: #74d6dd;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-search-chip {
+  color: #cbe0eb;
+  border-color: rgba(109, 174, 198, .3);
+  background: #19384d;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-search-chip:hover:not(:disabled) {
+  background: #23485c;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-chip-status,
+.app-shell[data-theme="dark"] .app-main .baggage-status-box strong {
+  color: #8be0b1;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-live-indicator,
+.app-shell[data-theme="dark"] .app-main .baggage-status-box,
+.app-shell[data-theme="dark"] .app-main .security-camera-state {
+  color: #cbdce7;
+  border-color: rgba(143, 179, 200, .24);
+  background: #1a3448;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-journey-marker {
+  color: #a9bfce;
+  border-color: rgba(143, 179, 200, .32);
+  background: #1a3448;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-journey-step.is-active .baggage-journey-marker {
+  background: #173b50;
+}
+
+.app-shell[data-theme="dark"] .app-main .baggage-pipeline .ai-pipe-step {
+  color: #cbdce7;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge {
+  color: #e6eff6;
+  border: 1px solid rgba(143, 179, 200, .24);
+  background: #263d50;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-good {
+  color: #9be4b6;
+  background: #173b32;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-warn {
+  color: #f3ce8a;
+  background: #49371f;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-bad {
+  color: #ffafb4;
+  background: #48262c;
+}
+
+.app-shell[data-theme="dark"] .app-main .ai-badge.tone-live {
+  color: #e3c39d;
+  background: #0b2148;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="bg-surface-container"] {
+  color: #d7e4ed;
+  background-color: #1a3448;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="text-primary"] {
+  color: #75d5f2;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="text-secondary"] {
+  color: #8be0b1;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="bg-[#f2f3ff]"] {
+  border-color: rgba(143, 179, 200, .25);
+  background-color: #1a3448;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="bg-[#eaedff]"],
+.app-shell[data-theme="dark"] .app-main [class*="bg-[#dae2fd]"] {
+  border-color: rgba(143, 179, 200, .25);
+  background-color: #1a3448;
+}
+
+.app-shell[data-theme="dark"] .app-main [class*="text-[#006194]"] {
+  color: #75d5f2;
+}
+
+.app-shell[data-theme="dark"] .dashboard-page .side-column > .card [style*="background: rgb(246, 248, 252)"] {
+  border-color: rgba(143, 179, 200, .24) !important;
+  background: #1a3448 !important;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .brand-name,
+.app-shell[data-theme="dark"]:has(.baggage-page) .brand-name,
+.app-shell[data-theme="dark"]:has(.security-page) .brand-name,
+.app-shell[data-theme="dark"]:has(.flights-page) .user-name,
+.app-shell[data-theme="dark"]:has(.baggage-page) .user-name,
+.app-shell[data-theme="dark"]:has(.security-page) .user-name {
+  color: #f0f6fb;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .brand-sub,
+.app-shell[data-theme="dark"]:has(.baggage-page) .brand-sub,
+.app-shell[data-theme="dark"]:has(.security-page) .brand-sub,
+.app-shell[data-theme="dark"]:has(.flights-page) .user-role,
+.app-shell[data-theme="dark"]:has(.baggage-page) .user-role,
+.app-shell[data-theme="dark"]:has(.security-page) .user-role,
+.app-shell[data-theme="dark"]:has(.flights-page) .chip-label,
+.app-shell[data-theme="dark"]:has(.baggage-page) .chip-label,
+.app-shell[data-theme="dark"]:has(.security-page) .chip-label,
+.app-shell[data-theme="dark"]:has(.flights-page) .nav-group-label,
+.app-shell[data-theme="dark"]:has(.baggage-page) .nav-group-label,
+.app-shell[data-theme="dark"]:has(.security-page) .nav-group-label {
+  color: #a9bfce;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .nav-item,
+.app-shell[data-theme="dark"]:has(.baggage-page) .nav-item,
+.app-shell[data-theme="dark"]:has(.security-page) .nav-item {
+  color: #c5d4df;
+}
+
+.app-shell[data-theme="dark"]:has(.flights-page) .nav-item-active,
+.app-shell[data-theme="dark"]:has(.baggage-page) .nav-item-active,
+.app-shell[data-theme="dark"]:has(.security-page) .nav-item-active {
+  color: #fff;
+  background: linear-gradient(105deg, #5949e8, #644ef2);
 }

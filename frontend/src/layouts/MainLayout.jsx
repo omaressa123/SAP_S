@@ -5,9 +5,14 @@ import Header from '../components/Header'
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 900px)').matches)
+  const [theme, setTheme] = useState(() => localStorage.getItem('airport-theme') || 'light')
   const [workspaceView, setWorkspaceView] = useState('overview')
   const location = useLocation()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    localStorage.setItem('airport-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     const requestedView = location.state?.workspaceView
@@ -24,8 +29,8 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="app-shell">
-      <Header />
+    <div className="app-shell" data-theme={theme}>
+      <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
       <div className={`app-body ${collapsed ? 'sidebar-collapsed' : ''}`}>
         <Sidebar
           collapsed={collapsed}

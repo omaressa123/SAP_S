@@ -1,6 +1,8 @@
-import { Bell } from 'lucide-react'
+import { Bell, Moon, Sun } from 'lucide-react'
 
-export default function Header() {
+export default function Header({ theme, onToggleTheme }) {
+  const isDark = theme === 'dark'
+
   return (
     <header className="app-header">
       <div className="header-left">
@@ -27,6 +29,17 @@ export default function Header() {
             <span className="notif-badge">3</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          className="icon-btn theme-toggle-btn"
+          onClick={onToggleTheme}
+          aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          aria-pressed={isDark}
+          title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+        >
+          {isDark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
+        </button>
 
         <div className="user-profile">
           <div className="user-avatar">OJ</div>
