@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, Loading } from '../components/States'
 import { AiModuleLayout, StatusBadge } from '../components/ai/AiVisuals'
 
 const ICONS = { face_recognition: ScanFace, baggage_threat_detection: Luggage, baggage_person_detection: Users, smoke_fire_detection: Flame, full_scene_detection: ScanEye }
-const ROUTES = { face_recognition: '/ai/face', baggage_threat_detection: '/ai/baggage', baggage_person_detection: '/ai/baggage', smoke_fire_detection: '/ai/smoke-fire', full_scene_detection: '/ai/full-detection' }
+const ROUTES = { face_recognition: '/ai/face', baggage_threat_detection: '/ai/baggage', baggage_person_detection: '/ai/baggage-person', smoke_fire_detection: '/ai/smoke-fire', full_scene_detection: '/ai/full-detection' }
 
 function MiniPreview({ id }) {
   if (id === 'face_recognition') return (
