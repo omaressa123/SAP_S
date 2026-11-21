@@ -15,15 +15,22 @@ export default function GateBoarding() {
   const [personaMode, setPersonaMode] = useState('real') // 'real', 'wrong_flight', 'unknown'
 
   const [passengerData, setPassengerData] = useState({
-    name: 'JOHNATHAN DOE',
+    name: '',
+    passengerId: null,
+    passportNumber: '',
     flightNumber: 'QR-082',
-    seat: '24A',
-    zone: 'ZONE 2',
+    seat: '',
+    zone: '',
     gate: 'GATE B22',
     destination: 'Doha Intl (DOH)',
-    matchConfidence: 99.4,
-    baggage: '2 / 2 Loaded (Holds A-04)',
-    pathway: 'Jetbridge Open (Door 2L Direct)'
+    matchConfidence: 95.0,
+    cabinClass: 'Economy',
+    priorityBoarding: false,
+    manifestId: '',
+    baggage: '',
+    baggageDetail: '',
+    pathway: 'Jetbridge Open',
+    pathwayDetail: 'Door 2L Direct'
   })
 
   // DOM Refs
@@ -218,11 +225,11 @@ export default function GateBoarding() {
     try {
       const res = await SmartGateApi.enrollGateFace({
         capturedFrameBase64: frame,
-        passengerId: 4,
-        flightNumber: 'QR-082'
+        passengerId: passengerData.passengerId || 36,
+        flightNumber: passengerData.flightNumber || 'QR-082'
       })
       if (res.success) {
-        setEnrollSuccess(res.message || 'Face photo successfully linked to Yehia (QR-082) in database!')
+        setEnrollSuccess(res.message || `Face photo successfully linked to ${passengerData.name} in database!`)
         setTimeout(() => setEnrollSuccess(null), 5000)
       } else {
         setScanError(res.message || 'Enrollment failed.')
@@ -260,11 +267,21 @@ export default function GateBoarding() {
         // PASS -> State 2 (Cleared)
         setPassengerData(prev => ({
           ...prev,
-          name: res.passengerName || 'JOHNATHAN DOE',
-          flightNumber: res.flightNumber || 'QR-082',
-          seat: res.seatNumber || '24A',
-          zone: res.group || 'ZONE 2',
-          matchConfidence: res.biometricMatchScore || 99.4,
+          name: res.passengerName || prev.name,
+          passengerId: res.passengerId || prev.passengerId,
+          passportNumber: res.passportNumber || prev.passportNumber,
+          manifestId: res.manifestId || prev.manifestId,
+          flightNumber: res.flightNumber || prev.flightNumber,
+          destination: res.destination || prev.destination,
+          seat: res.seatNumber || prev.seat,
+          zone: res.group || prev.zone,
+          cabinClass: res.cabinClass || prev.cabinClass,
+          priorityBoarding: res.priorityBoarding !== undefined ? res.priorityBoarding : true,
+          matchConfidence: res.biometricMatchScore || 95.0,
+          baggage: res.checkedBaggage || prev.baggage,
+          baggageDetail: res.baggageDetail || prev.baggageDetail,
+          pathway: res.gatePathway || prev.pathway,
+          pathwayDetail: res.pathwayDetail || prev.pathwayDetail
         }))
         setCurrentState(2)
 
@@ -305,7 +322,7 @@ export default function GateBoarding() {
     setCurrentState(1)
   }
 
-  const handleStateTransition = (stateNum) => {
+  const handleStateTransition = async (stateNum) => {
     if (timerRef.current) clearInterval(timerRef.current)
     setScanError(null)
     setEnrollSuccess(null)
@@ -313,6 +330,42 @@ export default function GateBoarding() {
       handleNextPassenger()
       return
     }
+
+    if (stateNum === 2) {
+      setLoading(true)
+      try {
+        const res = await SmartGateApi.verifyAndBoard({
+          testPassengerMode: 'valid',
+          passengerId: passengerData.passengerId,
+          flightNumber: passengerData.flightNumber || 'QR-082'
+        })
+        if (res.cleared) {
+          setPassengerData(prev => ({
+            ...prev,
+            name: res.passengerName || prev.name,
+            passengerId: res.passengerId || prev.passengerId,
+            passportNumber: res.passportNumber || prev.passportNumber,
+            manifestId: res.manifestId || prev.manifestId,
+            flightNumber: res.flightNumber || prev.flightNumber,
+            destination: res.destination || prev.destination,
+            seat: res.seatNumber || prev.seat,
+            zone: res.group || prev.zone,
+            cabinClass: res.cabinClass || prev.cabinClass,
+            priorityBoarding: res.priorityBoarding !== undefined ? res.priorityBoarding : true,
+            matchConfidence: res.biometricMatchScore || 95.0,
+            baggage: res.checkedBaggage || prev.baggage,
+            baggageDetail: res.baggageDetail || prev.baggageDetail,
+            pathway: res.gatePathway || prev.pathway,
+            pathwayDetail: res.pathwayDetail || prev.pathwayDetail
+          }))
+        }
+      } catch (err) {
+        console.warn('Failed approving test passenger:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     setCurrentState(stateNum)
 
     if (stateNum === 2) {
@@ -342,7 +395,7 @@ export default function GateBoarding() {
                 {t.gateTitle}
               </span>
               <div className="flex items-center gap-2 text-sm text-[#4a5a75]">
-                <span className="font-semibold text-[#131b2e]">{t.flightLabel}</span>
+                <span className="font-semibold text-[#131b2e]">{passengerData.flightNumber} • {passengerData.destination}</span>
               </div>
           </div>
 
@@ -389,6 +442,7 @@ export default function GateBoarding() {
               <p>{currentLang === 'AR' ? 'التحقق الآمن من هوية المسافرين والصعود للطائرة' : 'Secure passenger verification and boarding clearance'}</p>
             </div>
           </div>
+
           {/* ========================================================================= */}
           {/* STATE 1: LIVE BIOMETRIC CAMERA SCAN */}
           {/* ========================================================================= */}
@@ -621,7 +675,7 @@ export default function GateBoarding() {
                     <div className="text-xs uppercase font-bold tracking-wider text-[#4a5a75]">Confirmed Passenger</div>
                     <div className="text-2xl font-bold text-[#131b2e]">{passengerData.name}</div>
                     <div className="text-xs text-[#707881] flex items-center gap-2 mt-0.5">
-                      <span>MANIF-ID: #QR82-004928</span>
+                      <span>MANIF-ID: {passengerData.manifestId || `#QR82-${passengerData.passengerId || '0036'}`}</span>
                       <span>•</span>
                       <span className="text-[#006c49] font-bold">Biometric Match: {passengerData.matchConfidence}%</span>
                     </div>
@@ -648,18 +702,18 @@ export default function GateBoarding() {
                   </div>
                   <div className="bg-[#f2f3ff] p-3.5 rounded-xl border border-[#dae2fd]/60">
                     <div className="text-[11px] font-bold text-[#4a5a75] uppercase">Cabin Class</div>
-                    <div className="text-lg font-bold text-[#131b2e]">Economy</div>
-                    <div className="text-xs text-[#006c49] font-semibold">Priority Boarding</div>
+                    <div className="text-lg font-bold text-[#131b2e]">{passengerData.cabinClass || 'Economy'}</div>
+                    <div className="text-xs text-[#006c49] font-semibold">{passengerData.priorityBoarding ? 'Priority Boarding' : 'Standard Boarding'}</div>
                   </div>
                   <div className="bg-[#f2f3ff] p-3.5 rounded-xl border border-[#dae2fd]/60">
                     <div className="text-[11px] font-bold text-[#4a5a75] uppercase">Checked Baggage</div>
-                    <div className="text-lg font-bold text-[#131b2e]">2 / 2 Loaded</div>
-                    <div className="text-xs text-[#006c49] font-semibold">Holds A-04 Checked</div>
+                    <div className="text-lg font-bold text-[#131b2e]">{passengerData.baggage || '1 / 1 Carry-On Loaded'}</div>
+                    <div className="text-xs text-[#006c49] font-semibold">{passengerData.baggageDetail || 'Holds A-04 Checked'}</div>
                   </div>
                   <div className="bg-[#f2f3ff] p-3.5 rounded-xl border border-[#dae2fd]/60">
                     <div className="text-[11px] font-bold text-[#4a5a75] uppercase">Gate Pathway</div>
-                    <div className="text-lg font-bold text-[#006c49]">Jetbridge Open</div>
-                    <div className="text-xs text-[#4a5a75]">Door 2L Direct</div>
+                    <div className="text-lg font-bold text-[#006c49]">{passengerData.pathway || 'Jetbridge Open'}</div>
+                    <div className="text-xs text-[#4a5a75]">{passengerData.pathwayDetail || 'Door 2L Direct'}</div>
                   </div>
                 </div>
 
@@ -810,14 +864,29 @@ export default function GateBoarding() {
                   <button
                     type="button"
                     onClick={async () => {
-                      const res = await SmartGateApi.verifyAndBoard({ barcode: 'QR82-VALID-PASS', flightNumber: 'QR-082' })
+                      const res = await SmartGateApi.verifyAndBoard({
+                        barcode: 'QR82-VALID-PASS',
+                        flightNumber: passengerData.flightNumber || 'QR-082',
+                        passengerId: passengerData.passengerId
+                      })
                       if (res.cleared) {
                         setPassengerData(prev => ({
                           ...prev,
-                          name: res.passengerName || 'JOHNATHAN DOE',
-                          flightNumber: res.flightNumber || 'QR-082',
-                          seat: res.seatNumber || '24A',
-                          zone: res.group || 'ZONE 2'
+                          name: res.passengerName || prev.name,
+                          passengerId: res.passengerId || prev.passengerId,
+                          passportNumber: res.passportNumber || prev.passportNumber,
+                          manifestId: res.manifestId || prev.manifestId,
+                          flightNumber: res.flightNumber || prev.flightNumber,
+                          destination: res.destination || prev.destination,
+                          seat: res.seatNumber || prev.seat,
+                          zone: res.group || prev.zone,
+                          cabinClass: res.cabinClass || prev.cabinClass,
+                          priorityBoarding: res.priorityBoarding !== undefined ? res.priorityBoarding : true,
+                          matchConfidence: res.biometricMatchScore || 95.0,
+                          baggage: res.checkedBaggage || prev.baggage,
+                          baggageDetail: res.baggageDetail || prev.baggageDetail,
+                          pathway: res.gatePathway || prev.pathway,
+                          pathwayDetail: res.pathwayDetail || prev.pathwayDetail
                         }))
                         handleToolbarState(2)
                       }

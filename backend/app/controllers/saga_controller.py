@@ -110,11 +110,11 @@ def approve_step(
     saga_id: str = Path(...),
     step_name: str = Path(...),
     reason: Optional[str] = Body(None, embed=True),
+    user: dict = Depends(get_current_user),
 ):
     engine = _engine()
     if step_name not in STEP_BY_NAME:
         return error_response(code="INVALID_STEP", message=f"Unknown step {step_name}", status_code=400)
-    user = get_current_user()
     staff_id = int(user.get("staff_id", 0)) if user.get("staff_id") else None
     saga = engine.approve_step(saga_id, step_name, staff_id=staff_id or 0, reason=reason)
     if not saga:
@@ -129,11 +129,11 @@ def reject_step(
     saga_id: str = Path(...),
     step_name: str = Path(...),
     reason: Optional[str] = Body(None, embed=True),
+    user: dict = Depends(get_current_user),
 ):
     engine = _engine()
     if step_name not in STEP_BY_NAME:
         return error_response(code="INVALID_STEP", message=f"Unknown step {step_name}", status_code=400)
-    user = get_current_user()
     staff_id = int(user.get("staff_id", 0)) if user.get("staff_id") else None
     saga = engine.reject_step(saga_id, step_name, staff_id=staff_id or 0, reason=reason)
     if not saga:

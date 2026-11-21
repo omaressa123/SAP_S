@@ -116,6 +116,19 @@ class BiometricService:
                         raw = resp.read()
                 elif os.path.exists(data_str):
                     return cv2.imread(data_str)
+                elif data_str.startswith("/data/") or data_str.startswith("data/") or "faces" in data_str or "documents" in data_str:
+                    base_backend = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                    clean_rel = data_str.lstrip("/\\")
+                    cand1 = os.path.join(base_backend, clean_rel)
+                    cand2 = os.path.join(base_backend, "data", os.path.basename(data_str))
+                    cand3 = os.path.join(base_backend, "data", "faces", os.path.basename(data_str))
+                    cand4 = os.path.join(base_backend, "data", "documents", os.path.basename(data_str))
+                    for c in [cand1, cand2, cand3, cand4]:
+                        if os.path.exists(c):
+                            return cv2.imread(c)
+                    if "," in data_str:
+                        data_str = data_str.split(",", 1)[1]
+                    raw = base64.b64decode(data_str)
                 else:
                     if "," in data_str:
                         data_str = data_str.split(",", 1)[1]

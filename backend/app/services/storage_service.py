@@ -24,10 +24,35 @@ except Exception as e:
     logger.warning(f"Could not initialize Cloudinary: {e}. Falling back to local storage.")
 
 
+def ensure_cloudinary() -> bool:
+    global _cloudinary_configured
+    if not _cloudinary_configured:
+        c_name = settings.CLOUDINARY_CLOUD_NAME or os.getenv("CLOUDINARY_CLOUD_NAME")
+        c_key = settings.CLOUDINARY_API_KEY or os.getenv("CLOUDINARY_API_KEY")
+        c_sec = settings.CLOUDINARY_API_SECRET or os.getenv("CLOUDINARY_API_SECRET")
+        if c_name and c_key and c_sec:
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                cloudinary.config(
+                    cloud_name=c_name,
+                    api_key=c_key,
+                    api_secret=c_sec,
+                    secure=True
+                )
+                _cloudinary_configured = True
+                logger.info(f"Cloudinary storage initialized for cloud: {c_name}")
+            except Exception as e:
+                logger.warning(f"Could not initialize Cloudinary: {e}. Falling back to local storage.")
+    return _cloudinary_configured
+
+ensure_cloudinary()
+
+
 class StorageService:
     @staticmethod
     def is_cloud_enabled() -> bool:
-        return _cloudinary_configured
+        return ensure_cloudinary()
 
     @staticmethod
     def _normalize_base64(raw_b64: str) -> str:
@@ -56,7 +81,7 @@ class StorageService:
 
         formatted_b64 = cls._normalize_base64(image_data)
 
-        if _cloudinary_configured:
+        if ensure_cloudinary():
             try:
                 import cloudinary.uploader
                 res = cloudinary.uploader.upload(
@@ -101,7 +126,7 @@ class StorageService:
 
         formatted_b64 = cls._normalize_base64(image_data)
 
-        if _cloudinary_configured:
+        if ensure_cloudinary():
             try:
                 import cloudinary.uploader
                 res = cloudinary.uploader.upload(

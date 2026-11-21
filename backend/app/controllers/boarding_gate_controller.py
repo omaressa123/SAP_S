@@ -11,7 +11,8 @@ from ..utils.response_envelope import success_response
 from ..utils.auth import verify_api_key
 from ..database import get_db
 from ..models.identity import Passenger, TravelDocument, FaceEnrollment, FaceVerificationLog
-from ..models.flights import Flight, Booking
+from ..models.flights import Flight, Booking, Airport
+from ..models.check_in import Bag
 from ..models.security import BoardingGate, BoardingLog
 from ..services.storage_service import storage_service
 
@@ -175,83 +176,37 @@ def execute_boarding_verification(payload: BoardingGateVerifyRequest, db: Sessio
             "timestamp": now.isoformat() + "Z"
         })
 
-    # 4. Real biometric identification against Flight manifest
-    p_id = None
-    match_score = 95.0
+    # 4. Real 1-to-N Biometric Identification against Cloudinary & Database Face Registry
+    best_p_id = None
+    best_sim = 0.0
+    best_score = 95.0
 
-    # If a specific passengerId was provided, verify live frame against their enrolled face
-    if payload.passengerId:
-        target_fe = db.query(FaceEnrollment).filter(
-            FaceEnrollment.passenger_id == payload.passengerId,
-            FaceEnrollment.status == "active"
-        ).first()
-        if target_fe and target_fe.face_embedding_ref:
+    # Retrieve all active face enrollments stored in database (with Cloudinary or local image refs)
+    all_enrollments = db.query(FaceEnrollment).filter(FaceEnrollment.status == "active").all()
+
+    for fe in all_enrollments:
+        targets = []
+        if fe.face_embedding_ref:
+            targets.append(fe.face_embedding_ref)
+        doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == fe.passenger_id).first()
+        if doc and doc.document_image_url and doc.document_image_url not in targets:
+            targets.append(doc.document_image_url)
+
+        for target in targets:
             try:
-                res = biometric_service.verify_face_pair(target_fe.face_embedding_ref, frame)
+                res = biometric_service.verify_face_pair(target, frame, is_kiosk_doc_check=False)
                 if res.get("verified"):
-                    p_id = target_fe.passenger_id
                     sim = res.get("similarity", 0.95)
-                    match_score = round(sim * 100, 1)
-                else:
-                    return success_response(data={
-                        "cleared": False,
-                        "verificationResult": "face_mismatch",
-                        "state": 1,
-                        "title": "Biometric Identity Mismatch",
-                        "message": f"Biometric verification failed: Live face does not match passenger #{payload.passengerId}. Turnstile remains locked.",
-                        "barrierStatus": "LOCKED & SEALED",
-                        "timestamp": now.isoformat() + "Z"
-                    })
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_score = round(sim * 100, 1)
+                        best_p_id = fe.passenger_id
+                        break
             except Exception as e:
-                print(f"[BoardingGate] Face match error for passenger {payload.passengerId}: {e}")
+                print(f"[BoardingGate] Face match error for passenger {fe.passenger_id}: {e}")
 
-    # If no passengerId or 1-to-N search on active flight manifest
-    if not p_id and not payload.passengerId:
-        fl = db.query(Flight).filter(Flight.flight_number == gate_flight).first()
-        if fl:
-            bookings = db.query(Booking).filter(Booking.flight_id == fl.flight_id).all()
-            p_ids = [b.passenger_id for b in bookings]
-            enrollments = db.query(FaceEnrollment).filter(
-                FaceEnrollment.passenger_id.in_(p_ids),
-                FaceEnrollment.status == "active"
-            ).all()
-
-            for fe in enrollments:
-                match_targets = []
-                if fe.face_embedding_ref:
-                    match_targets.append(fe.face_embedding_ref)
-                doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == fe.passenger_id).first()
-                if doc and doc.document_image_url and doc.document_image_url not in match_targets:
-                    match_targets.append(doc.document_image_url)
-
-                for target in match_targets:
-                    try:
-                        res = biometric_service.verify_face_pair(target, frame, is_kiosk_doc_check=False)
-                        if res.get("verified"):
-                            p_id = fe.passenger_id
-                            sim = res.get("similarity", 0.95)
-                            match_score = round(sim * 100, 1)
-                            break
-                    except Exception as e:
-                        print(f"[BoardingGate] Face match error for passenger {fe.passenger_id}: {e}")
-                if p_id:
-                    break
-
-        # If not on this flight, check if passenger is Alex Smith on EK-204 (Wrong Flight scenario)
-        if not p_id:
-            p_alex = db.query(Passenger).filter(Passenger.full_name.ilike("%alex smith%")).first()
-            if p_alex:
-                fe_alex = db.query(FaceEnrollment).filter(FaceEnrollment.passenger_id == p_alex.passenger_id).first()
-                if fe_alex and fe_alex.face_embedding_ref:
-                    try:
-                        res_alex = biometric_service.verify_face_pair(fe_alex.face_embedding_ref, frame)
-                        if res_alex.get("verified"):
-                            return reject_wrong_flight(gate_flight, now)
-                    except Exception:
-                        pass
-
-    # If still not verified, STRICTLY REJECT: turnstile remains locked!
-    if not p_id:
+    # If no face matched in the entire database, STRICTLY REJECT: turnstile remains locked!
+    if not best_p_id:
         return success_response(data={
             "cleared": False,
             "verificationResult": "unrecognized_face",
@@ -262,7 +217,42 @@ def execute_boarding_verification(payload: BoardingGateVerifyRequest, db: Sessio
             "timestamp": now.isoformat() + "Z"
         })
 
-    return approve_passenger(db, passenger_id=p_id, gate_flight=gate_flight, gate_id=payload.boardingGateId, now=now, method="biometric", match_score=match_score)
+    # The passenger is POSITIVELY IDENTIFIED by face recognition!
+    identified_passenger = db.query(Passenger).filter(Passenger.passenger_id == best_p_id).first()
+    p_name = identified_passenger.full_name if identified_passenger else "PASSENGER"
+
+    # Check which flight this passenger is booked on
+    booking = db.query(Booking).filter(Booking.passenger_id == best_p_id).order_by(Booking.booking_id.desc()).first()
+    p_flight = None
+    if booking:
+        p_flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first()
+
+    p_flight_num = p_flight.flight_number if p_flight else "QR-082"
+
+    # If passenger is booked on a DIFFERENT flight -> Rejection (Wrong Gate / Flight Mismatch)
+    if p_flight and p_flight.flight_number and p_flight.flight_number.upper() != gate_flight.upper():
+        dest_apt = db.query(Airport).filter(Airport.airport_id == p_flight.destination_airport_id).first() if p_flight.destination_airport_id else None
+        dest_city = dest_apt.city if dest_apt else "Destination"
+        dest_iata = dest_apt.iata_code if dest_apt else "DXB"
+        return success_response(data={
+            "cleared": False,
+            "verificationResult": "flight_mismatch",
+            "state": 3,
+            "title": "Access Denied: Wrong Departure Gate",
+            "subtitle": f"Identified as {p_name}, but your ticket is for Flight {p_flight_num}.",
+            "identifiedTraveler": p_name,
+            "passengerId": best_p_id,
+            "discrepancyReason": f"Booked on {p_flight_num}, not {gate_flight}",
+            "correctFlight": f"{p_flight_num} • {dest_city} ({dest_iata})",
+            "assignedGate": "Concourse C • Gate C14",
+            "wayfindingAdvice": "Gate C14 is an estimated 7-minute walk. Head south toward Concourse C transit hub, take the express moving walkway to Level 2.",
+            "barrierStatus": "LOCKED & SEALED",
+            "auditLogId": f"DENY-{now.strftime('%M%S')}",
+            "timestamp": now.isoformat() + "Z"
+        })
+
+    # Passenger matches this flight -> APPROVE & CLEAR FOR BOARDING!
+    return approve_passenger(db, passenger_id=best_p_id, gate_flight=gate_flight, gate_id=payload.boardingGateId, now=now, method="biometric", match_score=best_score)
 
 
 def reject_wrong_flight(gate_flight: str, now: datetime):
@@ -284,11 +274,46 @@ def reject_wrong_flight(gate_flight: str, now: datetime):
     })
 
 
+@router.get("/manifest", dependencies=[Depends(verify_api_key)])
+def get_gate_manifest(flightNumber: Optional[str] = "QR-082", db: Session = Depends(get_db)):
+    """
+    Returns passengers available for the gate manifest so the operator or kiosk
+    can test and board any passenger dynamically from the database.
+    """
+    passengers = db.query(Passenger).order_by(Passenger.passenger_id.desc()).limit(20).all()
+    results = []
+    for p in passengers:
+        doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == p.passenger_id).first()
+        b = db.query(Booking).filter(Booking.passenger_id == p.passenger_id).order_by(Booking.booking_id.desc()).first()
+        fl = db.query(Flight).filter(Flight.flight_id == b.flight_id).first() if b else None
+        fe = db.query(FaceEnrollment).filter(FaceEnrollment.passenger_id == p.passenger_id, FaceEnrollment.status == "active").first()
+        bags = db.query(Bag).filter(Bag.passenger_id == p.passenger_id).all()
+        results.append({
+            "passengerId": p.passenger_id,
+            "fullName": p.full_name,
+            "passportNumber": doc.document_number if doc else "N/A",
+            "flightNumber": fl.flight_number if fl else "QR-082",
+            "seatNumber": b.seat_number if b else "18B",
+            "cabinClass": b.booking_class if b else "Economy",
+            "bookingReference": b.booking_reference if b else f"QR82-P{p.passenger_id}",
+            "hasBiometrics": bool(fe and fe.face_embedding_ref),
+            "bagCount": len(bags)
+        })
+    return success_response(data=results)
+
+
 def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str, gate_id: Optional[int], now: datetime, method: str = "biometric", match_score: float = 95.0):
     """Approves passenger boarding for Gate B22 with real database-backed details."""
-    passenger = db.query(Passenger).filter(Passenger.passenger_id == passenger_id).first()
+    passenger = None
+    if passenger_id:
+        passenger = db.query(Passenger).filter(Passenger.passenger_id == passenger_id).first()
     if not passenger:
-        passenger = db.query(Passenger).order_by(Passenger.passenger_id.desc()).first()
+        # Fall back to latest enrolled face or registered passenger
+        latest_fe = db.query(FaceEnrollment).filter(FaceEnrollment.status == "active").order_by(FaceEnrollment.enrollment_id.desc()).first()
+        if latest_fe:
+            passenger = db.query(Passenger).filter(Passenger.passenger_id == latest_fe.passenger_id).first()
+        if not passenger:
+            passenger = db.query(Passenger).order_by(Passenger.passenger_id.desc()).first()
 
     p_id = passenger.passenger_id if passenger else (passenger_id or 1)
     p_name = passenger.full_name if passenger else "PASSENGER"
@@ -296,25 +321,77 @@ def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str
     seat_num = "18B"
     group_num = "ZONE 2"
     cabin = "Economy"
+    dest_name = "Doha Intl (DOH)"
 
     doc = db.query(TravelDocument).filter(TravelDocument.passenger_id == p_id).first()
     if doc:
-        passport_num = doc.document_number
+        passport_num = doc.document_number or "—"
 
-    booking = db.query(Booking).filter(Booking.passenger_id == p_id).first()
+    booking = db.query(Booking).filter(Booking.passenger_id == p_id).order_by(Booking.booking_id.desc()).first()
+    if not booking and passenger:
+        # Auto-link booking for demonstration continuity
+        fl_qr = db.query(Flight).filter(Flight.flight_number == gate_flight).first() or db.query(Flight).first()
+        booking = Booking(
+            passenger_id=p_id,
+            flight_id=fl_qr.flight_id if fl_qr else 1,
+            booking_reference=f"QR82-P{p_id:04d}",
+            seat_number="18B",
+            booking_class="Economy",
+            booking_status="confirmed",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        try:
+            db.add(booking)
+            db.commit()
+            db.refresh(booking)
+        except Exception:
+            db.rollback()
+
     if booking:
         seat_num = booking.seat_number or seat_num
         cabin = booking.booking_class or cabin
         flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first()
-        if flight and flight.flight_number:
-            gate_flight = flight.flight_number
+        if flight:
+            if flight.flight_number:
+                gate_flight = flight.flight_number
+            if flight.destination_airport_id:
+                dest_apt = db.query(Airport).filter(Airport.airport_id == flight.destination_airport_id).first()
+                if dest_apt:
+                    dest_name = f"{dest_apt.city or 'Doha'} ({dest_apt.iata_code or 'DOH'})"
+
+    # Dynamic cabin priority & zone
+    cabin_lower = cabin.lower()
+    is_priority = "first" in cabin_lower or "bus" in cabin_lower or "exec" in cabin_lower
+    if is_priority:
+        group_num = "ZONE 1 (Priority)"
+    else:
+        group_num = f"ZONE {(p_id % 3) + 2}"
+
+    # Real Bags count & summary
+    bags = db.query(Bag).filter(Bag.passenger_id == p_id).all()
+    bag_count = len(bags)
+    if bag_count > 0:
+        checked_baggage = f"{bag_count} / {bag_count} Loaded"
+        baggage_detail = f"Holds A-04 Checked"
+    else:
+        checked_baggage = "1 / 1 Carry-On"
+        baggage_detail = "Overhead Hold Approved"
+
+    # Real Manifest ID
+    booking_ref = booking.booking_reference if booking else f"P{p_id:04d}"
+    manifest_id = f"#{gate_flight.replace('-', '')}-{booking_ref}"
+
+    gate_name = "Gate B22"
+    pathway = "Jetbridge Open"
+    pathway_detail = "Door 2L Direct"
 
     # Audit logging to PostgreSQL
     try:
         log_entry = BoardingLog(
             passenger_id=p_id,
             flight_id=1,
-            boarding_gate_id=gate_id or 11,
+            boarding_gate_id=gate_id or 22,
             boarding_status="boarded",
             timestamp=now,
             created_at=now,
@@ -337,16 +414,19 @@ def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str
         "passengerId": p_id,
         "passengerName": p_name,
         "passportNumber": passport_num,
+        "manifestId": manifest_id,
         "seatNumber": seat_num,
         "group": group_num,
         "gate": "B22",
         "flightNumber": gate_flight,
-        "destination": "Doha Intl (DOH)",
+        "destination": dest_name,
         "cabinClass": cabin,
-        "priorityBoarding": True,
+        "priorityBoarding": is_priority,
         "biometricMatchScore": match_score,
-        "checkedBaggage": "2 / 2 Loaded (Holds A-04 Checked)",
-        "gatePathway": "Jetbridge Open (Door 2L Direct)",
+        "checkedBaggage": checked_baggage,
+        "baggageDetail": baggage_detail,
+        "gatePathway": pathway,
+        "pathwayDetail": pathway_detail,
         "barrierStatus": "RETRACTED & UNLOCKED",
         "gateTurnstileOpened": True,
         "autoCloseSeconds": 10,

@@ -106,7 +106,8 @@ async def health() -> Dict[str, Any]:
             models_ok = False
             details.append("shared_detector model not loaded")
         # Verify fall model file exists
-        if not pipe.fall_model_path.exists():
+        from pathlib import Path as _P
+        if not _P(pipe.fall_model_path).exists():
             models_ok = False
             details.append(f"fall model not found: {pipe.fall_model_path}")
     except Exception as exc:  # noqa: BLE001

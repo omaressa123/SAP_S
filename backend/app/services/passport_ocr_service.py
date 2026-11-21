@@ -21,6 +21,11 @@ try:
 except ImportError:
     pytesseract = None
 
+try:
+    import easyocr
+except ImportError:
+    easyocr = None
+
 from .storage_service import storage_service
 
 
@@ -373,10 +378,39 @@ def scan_and_extract_passport(
         if parsed:
             return _build_success_payload(parsed, pil_image)
 
-    # 2. Extract OCR lines using PyTesseract
+    # 2. Extract OCR lines using EasyOCR (primary) and PyTesseract (fallback)
     raw_ocr_lines = []
     full_text = ""
-    if pytesseract:
+
+    if easyocr:
+        try:
+            reader = getattr(scan_and_extract_passport, "_reader", None)
+            if reader is None:
+                reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+                scan_and_extract_passport._reader = reader
+
+            # Pass A: Dedicated bottom MRZ crop (bottom 35% of passport)
+            w_img, h_img = pil_image.size
+            mrz_crop = pil_image.crop((0, int(h_img * 0.65), w_img, h_img))
+            mrz_np = np.array(mrz_crop)
+            mrz_results = reader.readtext(mrz_np, detail=0, paragraph=False)
+            for ln in mrz_results:
+                clean_ln = str(ln).strip()
+                if len(clean_ln) >= 15:
+                    raw_ocr_lines.append(clean_ln)
+
+            # Pass B: Full-page OCR
+            full_np = np.array(pil_image)
+            full_results = reader.readtext(full_np, detail=0, paragraph=False)
+            for ln in full_results:
+                clean_ln = str(ln).strip()
+                if len(clean_ln) >= 15:
+                    raw_ocr_lines.append(clean_ln)
+                full_text += "\n" + clean_ln
+        except Exception as e:
+            print(f"EasyOCR error: {e}")
+
+    if not raw_ocr_lines and pytesseract:
         try:
             # Pass A: Dedicated bottom MRZ crop (bottom 32% of passport)
             # MRZ is strictly located at the bottom of the data page without Arabic headers/stamps.

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from ..utils.response_envelope import success_response
+from ..utils.auth import verify_api_key
 from ..database import get_db
 from ..models.flights import Flight, Airline, Airport
 
@@ -46,7 +47,7 @@ class CreateFlightRequest(BaseModel):
     scheduledDeparture: str
     boardingGateCode: Optional[str] = None
 
-@router.post("/create")
+@router.post("/create", dependencies=[Depends(verify_api_key)])
 def create_flight(payload: CreateFlightRequest, db: Session = Depends(get_db)):
     # Auto-create airline if missing
     airline = db.query(Airline).filter(Airline.iata_code == payload.airlineCode).first()

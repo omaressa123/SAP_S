@@ -195,9 +195,13 @@ class UnifiedPipeline:
 
         # Fall detector: MediaPipe Pose + Random Forest.
         fall_cfg = self.config.get("fall_detection", {})
-        self.fall_model_path = str(
-            Path(fall_cfg.get("model_path", "AI/fulldetection/models/rf_fall_model.joblib"))
-        )
+        fall_model = fall_cfg.get("model_path", "AI/fulldetection/models/rf_fall_model.joblib")
+        p = Path(fall_model)
+        if not p.exists():
+            root_candidate = Path(__file__).resolve().parent.parent / "fulldetection" / "models" / "rf_fall_model.joblib"
+            if root_candidate.exists():
+                p = root_candidate
+        self.fall_model_path = str(p)
         self.fall_cfg = self.config
 
         # Per-camera state.

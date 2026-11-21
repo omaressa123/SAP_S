@@ -63,17 +63,11 @@ export default function EGateKiosk() {
   useEffect(() => {
     async function initKioskSession() {
       try {
-        const res = await fetch('http://127.0.0.1:8001/kiosk/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kiosk_id: 'KIOSK-B22', flight_id: 'QR-082' }),
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const data = await SmartGateApi.createKioskSession({ kiosk_id: 'KIOSK-B22', flight_id: 'QR-082' })
+        if (data?.session_id) {
           setSessionId(data.session_id)
         }
       } catch {
-        // AI microservice offline; fallback session ID
         setSessionId(Date.now() % 10000)
       }
     }
@@ -316,6 +310,29 @@ export default function EGateKiosk() {
         action: 'created',
         message: 'Saved to PostgreSQL / SQLite Database ✓',
       })
+
+      try {
+        const activePax = {
+          passengerId: scanRes.passengerId || 1,
+          name: ocrInfo.fullName,
+          passportNumber: ocrInfo.passportNumber,
+          nationality: ocrInfo.nationality,
+          flightNumber: booking.flightNumber || 'QR-082',
+          destination: booking.destination || 'Doha Intl (DOH)',
+          seat: booking.seatNumber || '18B',
+          zone: booking.group || 'ZONE 2',
+          cabinClass: booking.class || 'Economy',
+          manifestId: booking.bookingReference ? `#QR82-${booking.bookingReference}` : `#QR82-P${scanRes.passengerId || 1}`,
+          baggage: '1 / 1 Carry-On Loaded',
+          baggageDetail: 'Overhead Hold Approved',
+          pathway: 'Jetbridge Open',
+          pathwayDetail: 'Door 2L Direct',
+          faceUrl: scanRes.faceCropBase64 || null
+        }
+        localStorage.setItem('active_airport_passenger', JSON.stringify(activePax))
+      } catch (storageErr) {
+        console.warn('Could not cache active airport passenger:', storageErr)
+      }
 
       setDocScanned(true)
       setTimeout(() => {

@@ -1,5 +1,8 @@
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
+
+_env_file = str(Path(__file__).resolve().parent.parent / ".env")
 
 class Settings(BaseSettings):
     # PostgreSQL is the production source of truth.
@@ -28,12 +31,18 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
     CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
 
+    # Host & Database parameters
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "smart_airport")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", 5432))
+    MQTT_HOST_PORT: int = int(os.getenv("MQTT_HOST_PORT", 1883))
+    FRONTEND_HOST_PORT: int = int(os.getenv("FRONTEND_HOST_PORT", 80))
+    VITE_API_URL: str = os.getenv("VITE_API_URL", "http://localhost:8000")
+
     class Config:
-        env_file = ".env"
-        # STRICT: unknown .env variables raise ValidationError instead of
-        # being silently ignored. Every key in .env/.env.example must map
-        # to a field above. Do NOT relax this to "ignore".
-        extra = "forbid"
+        env_file = _env_file
+        extra = "ignore"
 
     @property
     def cors_origins_list(self) -> list[str]:

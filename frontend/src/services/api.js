@@ -20,6 +20,20 @@ export async function api(path, options = {}) {
 
 // Dedicated API service methods for Smart Gate & Airport Operations
 export const SmartGateApi = {
+  createKioskSession: async (payload = {}) => {
+    try {
+      const res = await fetch('http://localhost:8001/kiosk/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kiosk_id: 'KIOSK-B22', flight_id: 'QR-082', ...payload })
+      })
+      if (res.ok) return await res.json()
+    } catch {
+      // microservice fallback
+    }
+    return { session_id: Date.now() % 10000 }
+  },
+
   scanPassport: (payload = {}) => api('/api/v1/kiosk/passport/scan', {
     method: 'POST',
     body: JSON.stringify({
@@ -81,6 +95,8 @@ export const SmartGateApi = {
       ...payload
     })
   }),
+
+  getGateManifest: (flightNumber = 'QR-082') => api(`/api/v1/boarding-gate/manifest?flightNumber=${encodeURIComponent(flightNumber)}`),
 
   issueBoardingPass: (payload = {}) => api('/api/v1/kiosk/boarding-pass/issue', {
     method: 'POST',
@@ -159,3 +175,26 @@ export const DisruptionApi = {
     body: JSON.stringify({ reason })
   }),
 }
+
+export const BaggageDropApi = {
+  identifyPassenger: (payload = {}) => api('/api/v1/baggage-drop/identify-passenger', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  getManifestPassengers: (flightNumber = 'QR-082') => api(`/api/v1/baggage-drop/manifest-passengers?flightNumber=${flightNumber}`, {
+    method: 'GET'
+  }),
+  weighBag: (payload = {}) => api('/api/v1/baggage-drop/weigh', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  issueTag: (payload = {}) => api('/api/v1/baggage-drop/issue-tag', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  dispatchBag: (payload = {}) => api('/api/v1/baggage-drop/dispatch', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+}
+
