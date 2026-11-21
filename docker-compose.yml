@@ -1,13 +1,13 @@
 # Smart Green Airport — full development environment.
-#   docker compose up --build     # start everything (Postgres, Mosquitto,
-#                                 # backend, mqtt-consumer, frontend, twin)
+#   docker compose up --build     # start everything (Postgres, backend,
+#                                 # frontend, twin)
 #   docker compose down           # stop (Postgres data kept in postgres_data volume)
 #   docker compose down -v        # DESTRUCTIVE: deletes the Postgres volume
 #
 # URL map (host):
 #   Frontend: http://localhost            Backend: http://localhost:8000
 #   Health:   http://localhost:8000/health Twin:    http://localhost:8100
-#   Postgres: localhost:5432              MQTT (ESP32/host tools): <host-LAN-IP>:1883
+#   Postgres: localhost:5432
 name: smart-airport
 
 networks:
@@ -18,10 +18,6 @@ networks:
 volumes:
   postgres_data:
     name: smart-airport-postgres-data
-  mosquitto_data:
-    name: smart-airport-mosquitto-data
-  mosquitto_log:
-    name: smart-airport-mosquitto-log
 
 # PostgreSQL now runs as a compose service (postgres:5432) with data persisted
 # in the postgres_data volume. Docker-to-Docker services reach it via the
@@ -32,11 +28,6 @@ x-backend-env: &backend-env
   SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-secret}
   API_KEY: ${API_KEY:-MOCK_API_KEY_123}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
-  MQTT_BROKER: mosquitto
-  MQTT_PORT: 1883
-  MQTT_USERNAME: ${MQTT_USERNAME:-}
-  MQTT_PASSWORD: ${MQTT_PASSWORD:-}
-  MQTT_TOPIC_FILTER: ${MQTT_TOPIC_FILTER:-airport/#}
   CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
   CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
   CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
@@ -63,26 +54,6 @@ services:
       retries: 10
       start_period: 10s
 
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: smart-airport-mosquitto
-    restart: unless-stopped
-    networks: [airport-network]
-    ports:
-      # Host port is configurable: if something already occupies 1883 on the
-      # host, start with MQTT_HOST_PORT=1884 (container port stays 1883, so
-      # Docker-to-Docker `mosquitto:1883` never changes).
-      - "${MQTT_HOST_PORT:-1883}:1883"
-    volumes:
-      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
-    healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -t '$$SYS/broker/uptime' -C 1 -W 5"]
-      interval: 10s
-      timeout: 6s
-      retries: 5
-
   backend:
     build:
       context: ./backend
@@ -100,63 +71,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mosquitto:
-        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s
       timeout: 5s
       start_period: 40s
       retries: 5
-
-  mqtt-consumer:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: smart-airport-mqtt-consumer
-    restart: unless-stopped
-    networks: [airport-network]
-    environment: *backend-env
-    volumes:
-      - ./backend/app:/app/backend/app
-      - ./backend/models:/app/backend/models
-    # Same image, consumer entrypoint (no DB init, no uvicorn).
-    entrypoint: ["python", "-m", "app.services.mqtt_consumer"]
-    # Inherits the backend image's HTTP healthcheck, which can never pass
-    # here (no uvicorn on :8000) -- disable it; liveness is visible in logs
-    # ("MQTT connected ... subscribing airport/#").
-    healthcheck:
-      test: ["NONE"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mosquitto:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-
-  mqtt-bridge:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: smart-airport-mqtt-bridge
-    restart: unless-stopped
-    networks: [airport-network]
-    environment: *backend-env
-    volumes:
-      - ./backend/app:/app/backend/app
-      - ./backend/models:/app/backend/models
-    # Publishes commands to field devices and ingests telemetry/acks.
-    entrypoint: ["python", "-m", "app.services.mqtt_bridge"]
-    healthcheck:
-      test: ["NONE"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mosquitto:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
 
   unified-detection:
     build:

@@ -70,9 +70,9 @@ All Phase 1 and Phase 2 agents, orchestrator mappings, and test suites are fully
 │ │ EventSystem          │ │ HITL Escalation      │ │ NegotiationCoordinator           │ │
 │ │ (Redis/In-Process Bus│ │ (WebSocket Dashboard)│ │ (Contract Net Protocol / Auction)│ │
 │ └──────────────────────┘ └──────────────────────┘ └──────────────────────────────────┘ │
-│ ┌──────────────────────────────────────────────┐ ┌───────────────────────────────────┐ │
-│ │ TwinPublisher (Asset State / Telemetry)      │ │ IoTMqttBridge (Bidirectional Act) │ │
-│ └──────────────────────────────────────────────┘ └───────────────────────────────────┘ │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ TwinPublisher (Asset State / Telemetry)      │ │
+│ └──────────────────────────────────────────────┘ │
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             │
 ┌───────────────────────────────────────────▼────────────────────────────────────────────┐
@@ -80,7 +80,7 @@ All Phase 1 and Phase 2 agents, orchestrator mappings, and test suites are fully
 │ ┌─────────────────────────────────┐   ┌──────────────────────────────────────────────┐ │
 │ │       Phase 1 Core Agents       │   │           Phase 2 Domain Agents              │ │
 │ │ • IdentityAgent                 │   │ • FlightOpsAgent (Status/Gate/Delays)        │ │
-│ │ • BaggageAgent                  │   │ • MaintenanceAgent (IoT Telemetry/Tickets)   │ │
+│ │ • BaggageAgent                  │ │ • MaintenanceAgent (Telemetry/Tickets)   │ │
 │ │ • SafetyAgent                   │   │ • NotificationAgent (Push/SMS/PA Broadcast)  │ │
 │ │                                 │   │ • SustainabilityAgent (Microgrid/HVAC/Carbon)│ │
 │ └─────────────────────────────────┘   └──────────────────────────────────────────────┘ │
@@ -92,13 +92,12 @@ All Phase 1 and Phase 2 agents, orchestrator mappings, and test suites are fully
 └───────────────────────────┬───────────────────────────────────┬────────────────────────┘
                             │                                   │
 ┌───────────────────────────▼───────────────┐   ┌───────────────▼────────────────────────┐
-│              AI Microservices             │   │       IoT & Field Infrastructure       │
-│ • FaceVerification (:8001 / YuNet+SFace)  │   │ • Mosquitto MQTT Broker (:1883)        │
-│ • BaggageThreatAdapter (:8002 / YOLO11)   │   │ • 11 ESP32 Modules (Wokwi / Hardware)  │
-│ • SmokeFireDetector (:8003 / YOLOv8)      │   │ • Smart Gates (GATE-001..004)          │
-│ • FullSceneDetector (:8004 / Falls/Bags)  │   │ • Baggage Sorter & Reclaim Carousels   │
-└───────────────────────────────────────────┘   │ • Smart Charging & Solar Arrays        │
-                                                └────────────────────────────────────────┘
+│              AI Microservices             │
+│ • FaceVerification (:8001 / YuNet+SFace)  │
+│ • BaggageThreatAdapter (:8002 / YOLO11)   │
+│ • SmokeFireDetector (:8003 / YOLOv8)      │
+│ • FullSceneDetector (:8004 / Falls/Bags)  │
+└───────────────────────────────────────────┘
 ```
 
 ### 2.2 Core Component Taxonomy
@@ -112,7 +111,6 @@ All Phase 1 and Phase 2 agents, orchestrator mappings, and test suites are fully
 | `SagaWorkflowEngine` | `saga.py` | Workflow | Multi-step transaction orchestrator with state persistence and compensating rollbacks |
 | `DisruptionPlanner` | `planner.py` | Cognitive | LLM-assisted schedule recovery and constraint satisfaction during disruptions |
 | `HITLManager` | `hitl.py` | Human-Loop | WebSocket bridge routing uncertain decisions to human officer review queues |
-| `IoTMqttBridge` | `iot_bridge.py` | Hardware | Bidirectional MQTT actuator for field hardware command & telemetry loops |
 | `TwinPublisher` | `twin_publisher.py`| Sync | Real-time digital twin state mirror via REST/WebSocket (:8100) |
 | `NegotiationCoordinator`| `negotiation.py`| Protocol | Contract Net Protocol for multi-agent competitive resource allocation |
 | `FederatedCoordinator` | `federated.py`| Learning | Secure federated model weight aggregation without raw biometric exposure |
@@ -147,12 +145,11 @@ All Phase 1 and Phase 2 agents, orchestrator mappings, and test suites are fully
 
 #### 3.1.3 Safety Monitoring Agent (`safety_agent.py`)
 - **Primary Capability:** `assess_safety`
-- **Supported Events:** `smoke_detected`, `fire_detected`, `fall_detected`, `restricted_area`, `unattended_bag`, `overcrowding`, `iot_telemetry`
+- **Supported Events:** `smoke_detected`, `fire_detected`, `fall_detected`, `restricted_area`, `unattended_bag`, `overcrowding`
 - **Processing Logic:**
   1. Ingests video analytics bounding boxes and confidence levels (:8003, :8004).
-  2. Correlates visual detections with physical IoT sensor telemetry (MQ-2 smoke, thermal sensors).
-  3. Evaluates zone vulnerability (e.g. Fuel Hydrant Stand A12 vs Departure Concourse).
-  4. Assigns severity: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`.
+  2. Evaluates zone vulnerability (e.g. Fuel Hydrant Stand A12 vs Departure Concourse).
+  3. Assigns severity: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`.
 - **Outputs:** `ASSESSED_SAFE`, `INCIDENT_DISPATCHED`, `EVACUATION_TRIGGERED`
 - **Persistence Target:** `emergencyevent`, `monitoringalert`, `decisionaudit`
 
@@ -496,52 +493,6 @@ During major irregular airport operations (IRROPS)—such as runway icing, sever
   "confidence_score": 0.94
 }
 ```
-
----
-
-## 7. Cross-System IoT Action Triggering (Bidirectional MQTT)
-
-**Implementation status (M2.6): Finished & Tested.** Implemented in
-`backend/app/agents/iot_bridge.py` (IoTMqttBridge), run as the dedicated
-`mqtt-bridge` compose service (`backend/app/services/mqtt_bridge.py`), exposed
-via `backend/app/controllers/iot_controller.py`, persisted in
-`backend/app/models/iot.py` (iotcommandlog, iottelemetrylog), registered in
-`backend/app/agents/service.py`. Verified by `backend/app/tests/test_iot_bridge.py`
-(13 tests, all passing). Mosquitto (:1883) was already present in
-`docker-compose.yml`; a `mqtt-bridge` service was added. No Redis/Kafka was
-introduced.
-
-Phase 2 connects agents directly to physical edge hardware and Wokwi simulation modules over Mosquitto MQTT (:1883).
-
-### 7.1 Actuation Channel Architecture
-
-```
-Agent Layer (e.g. IdentityAgent)
-       │
-       ▼ (Publishes command)
-IoTMqttBridge.dispatch_command("airport/gate/GATE-001/cmd", {"action": "UNLOCK", "duration_ms": 7000})
-       │
-       ▼ (MQTT QoS 1)
-Mosquitto Broker (:1883)
-       │
-       ▼ (Subscribed topic)
-ESP32 Smart Airport Gate (`IOT/modules/smart-airport-gate`)
-       │ (Executes stepper motor turnstile unlock & green LED pulse)
-       ▼ (Publishes status telemetry)
-Topic: "airport/gate/GATE-001/telemetry" -> {"status": "OPENED", "turnstile_cycles": 14210}
-       │
-       ▼
-IoTMqttBridge.on_telemetry_received() -> Ingested by MaintenanceAgent & TwinPublisher
-```
-
-### 7.2 Hardware Command Protocol
-
-| Module | Command Topic | Command Payload | Expected Physical Response |
-|---|---|---|---|
-| `smart-airport-gate` | `airport/gate/{id}/cmd` | `{"cmd": "OPEN", "timeout_sec": 10}` | Unlocks magnetic solenoid, turns LED bar green |
-| `smart-baggage` | `airport/baggage/{id}/cmd` | `{"cmd": "DIVERT_THREAT", "chute": 4}` | Actuates pneumatic diverter flap to quarantine spur |
-| `security-area` | `airport/security/{id}/cmd`| `{"cmd": "LOCKDOWN", "zone": 2}` | Closes security shutters, sounds local buzzer |
-| `environment` | `airport/env/{id}/cmd` | `{"cmd": "SET_HVAC", "target_c": 22.0}` | Updates variable frequency drive fan speed |
 
 ---
 

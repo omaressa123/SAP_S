@@ -101,7 +101,6 @@ export const ReportsApi = {
   baggage: (params = {}) => api(`/api/v1/reports/baggage${toQuery(params)}`),
   security: () => api('/api/v1/reports/security'),
   ai: () => api('/api/v1/reports/ai'),
-  iot: () => api('/api/v1/reports/iot'),
   operations: () => api('/api/v1/reports/operations'),
 }
 

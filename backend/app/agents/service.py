@@ -9,7 +9,6 @@ from .registry import AgentRegistry
 from .events import EventSystem
 from .orchestrator import AgentOrchestrator
 from .saga import SagaWorkflowEngine
-from .iot_bridge import IoTMqttBridge
 from .hitl import HitlManager
 from .disruption_planner import DisruptionPlanner
 from .identity_agent import IdentityAgent
@@ -41,7 +40,6 @@ class AgentService:
         self.sustainability_agent: Optional[SustainabilityAgent] = None
         self.twin_publisher: Optional[TwinPublisher] = None
         self.saga_engine: Optional[SagaWorkflowEngine] = None
-        self.mqtt_bridge: Optional[IoTMqttBridge] = None
         self.hitl_manager: Optional[HitlManager] = None
         self.disruption_planner: Optional[DisruptionPlanner] = None
         self.initialized = False
@@ -145,11 +143,6 @@ class AgentService:
         if not self.initialized or not self.twin_publisher:
             raise RuntimeError("AgentService not initialized")
         return self.twin_publisher
-
-    def get_mqtt_bridge(self) -> IoTMqttBridge:
-        if not self.initialized or self.mqtt_bridge is None:
-            raise RuntimeError("MQTT bridge not initialized")
-        return self.mqtt_bridge
 
     def get_hitl_manager(self) -> HitlManager:
         if not self.initialized or self.hitl_manager is None:

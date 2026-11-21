@@ -22,12 +22,6 @@ class Settings(BaseSettings):
     BTD_INFERENCE_URL: str = os.getenv("BTD_INFERENCE_URL", "http://localhost:8002")
     SMOKE_FIRE_URL: str = os.getenv("SMOKE_FIRE_URL", "http://localhost:8003")
     FULL_DETECTION_URL: str = os.getenv("FULL_DETECTION_URL", "http://localhost:8004")
-    MQTT_BROKER: str = os.getenv("MQTT_BROKER", "localhost")
-    MQTT_PORT: int = int(os.getenv("MQTT_PORT", "1883"))
-    MQTT_USERNAME: str = os.getenv("MQTT_USERNAME", "")
-    MQTT_PASSWORD: str = os.getenv("MQTT_PASSWORD", "")
-    # MQTT topic filter, e.g. "airport/#" (convention: airport/{module}/{device_id}/{event}).
-    MQTT_TOPIC_FILTER: str = os.getenv("MQTT_TOPIC_FILTER", "airport/#")
     # Digital Twin API base URL. In Docker this resolves to the `twin` compose
     # service; locally it defaults to localhost:8100.
     TWIN_BASE_URL: str = os.getenv("TWIN_BASE_URL", "http://localhost:8100")

@@ -122,9 +122,6 @@ export function summarizeReport(tab, d) {
     push(`Gate decisions: ${n(d.gate_authorized)} authorized vs ${n(d.gate_denied)} denied.`)
   } else if (tab === 'ai') {
     push(`Models logged ${n(d.face_attempts)} face attempts (avg similarity ${Number(d.avg_similarity || 0).toFixed(3)}), ${n(d.inspections)} baggage inspections and ${n(d.monitoring_alerts)} monitoring alerts.`)
-  } else if (tab === 'iot') {
-    const bad = (d.by_status || []).filter((r) => !/ok|online|active/i.test(r.status)).reduce((a, r) => a + r.count, 0)
-    push(`${n(d.devices_total)} devices registered${bad ? `; ${n(bad)} report a non-nominal status.` : ' — all nominal.'}`)
   } else if (tab === 'operations') {
     const open = (d.alerts || []).filter((a) => a.status === 'open').length
     push(`${n(d.emergencies_total)} emergencies and ${n(d.alerts_total)} monitoring alerts on record.`)

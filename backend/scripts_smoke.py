@@ -42,8 +42,6 @@ CHECKS = [
      lambda b: "verification_rate" in (b.get("data") or {})),
     ("GET", "/api/v1/reports/ai", None,
      lambda b: "face_attempts" in (b.get("data") or {})),
-    ("GET", "/api/v1/reports/iot", None,
-     lambda b: "devices_total" in (b.get("data") or {})),
     ("GET", "/api/v1/reports/operations", None,
      lambda b: "emergencies" in (b.get("data") or {})),
     ("GET", "/api/v1/ai/registry", None,

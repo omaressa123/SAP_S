@@ -9,7 +9,7 @@
   <a href="#license"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
 </p>
 
-The passenger journey (Mobile App → Check-in → Security → Boarding → Flight Ops → Baggage) is the single central business process; AI, IoT, Software, Database, and Network are technical layers of one system.
+The passenger journey (Mobile App → Check-in → Security → Boarding → Flight Ops → Baggage) is the single central business process; AI, Software, Database, and Network are technical layers of one system.
 
 ## Repository Layout
 
@@ -36,8 +36,6 @@ air_ai/
 | **Digital Twin** | Babylon.js + FastAPI + WebSocket | 3D airport visualization |
 | **AI Models** | YOLO11, DeepFace, MediaPipe RF | Baggage threat, face recognition, fall detection |
 | **Database** | PostgreSQL + pgcrypto | Relational data storage |
-| **Messaging** | MQTT (Mosquitto) | IoT device telemetry |
-| **IoT** | ESP32 + PlatformIO | 11 sensor modules |
 | **CI/CD** | Docker Compose | Container orchestration |
 
 ## Problem Solved
@@ -49,7 +47,7 @@ Smart airports face fragmented operations across check-in, security, baggage, an
 | **Fragmented passenger journey** | Unified passenger-centric workflow from booking to baggage claim |
 | **Manual baggage screening** | AI-powered X-ray threat detection (YOLO11) with MANUAL_REVIEW/SAFE decisions |
 | **Security bottlenecks** | Biometric face verification at security and boarding gates |
-| **Silos between systems** | Autonomous multi-agent orchestrator coordinating AI, IoT, backend, and twin |
+| **Silos between systems** | Autonomous multi-agent orchestrator coordinating AI, backend, and twin |
 | **No real-time visibility** | Digital Twin with live asset tracking and WebSocket updates |
 | **No observability** | Agent registry, event system, workflow tracking, and decision audit trails |
 | **No passenger mobile experience** | React Native app with boarding pass, baggage tracking, wayfinding, alerts |
@@ -67,11 +65,11 @@ Smart airports face fragmented operations across check-in, security, baggage, an
  │                    backend/ (FastAPI v2.0)              │
  │  controllers/ → services/ → repositories/ → models/     │
  └──────┬───────────────────────────────┬──────────────────┘
-        │ SQL                           │ MQTT / HTTP
+        │ SQL                           │ HTTP
         ▼                               ▼
  ┌──────────────┐               ┌──────────────────────────┐
- │  Database    │               │  IOT/ ESP32 modules      │
- │  schema.sql  │               │  (11 modules, MQTT pub/  │
+ │  Database    │               │  Edge hardware           │
+ │  schema.sql  │               │  (standalone, external)  │
  └──────────────┘               │   sub over Mosquitto)    │
                                  └──────────┬───────────────┘
                                             │ camera streams
@@ -86,8 +84,8 @@ Smart airports face fragmented operations across check-in, security, baggage, an
 ## Run with Docker (recommended)
 
 The entire development environment starts with a single command — PostgreSQL,
-Mosquitto, FastAPI backend, MQTT consumer, React dashboard, and the Digital
-Twin backend. No manual terminals needed.
+FastAPI backend, React dashboard, and the Digital Twin backend. No manual
+terminals needed.
 
 ```bash
 cp .env.example .env   # change ALL secrets before any deployment; .env is gitignored
@@ -101,8 +99,6 @@ docker compose up --build
 | API health | — | http://localhost:8000/health |
 | Digital Twin API | `smart-airport-twin` | http://localhost:8100 |
 | PostgreSQL 18 | `smart-airport-postgres` | `postgres:5432` (Docker) / `localhost:5432` (host tools) |
-| Mosquitto MQTT | `smart-airport-mosquitto` | `mosquitto:1883` (Docker) / host LAN IP `:1883` (ESP32) |
-| MQTT consumer | `smart-airport-mqtt-consumer` | `airport/#` → PostgreSQL |
 
 ```bash
 docker compose up -d        # detached
@@ -115,20 +111,15 @@ docker compose down -v      # DESTRUCTIVE: deletes the database
 Notes:
 
 - Startup order is health-gated: PostgreSQL (healthy) → schema init (`init_db.py`)
-  → Mosquitto → backend → MQTT consumer → frontend. The database survives
+  → backend → frontend. The database survives
   `down`/`up` via the `postgres_data` volume.
 - The frontend image bakes in `VITE_API_URL` (default `http://localhost:8000`,
   browser-accessible — never the Docker-internal `http://backend:8000`).
   `CORS_ORIGINS` defaults to `http://localhost` to match.
 - If host ports are occupied, remap without touching container ports:
-  `MQTT_HOST_PORT=1884 FRONTEND_HOST_PORT=3000 docker compose up -d`.
-- ESP32 devices on the LAN must target this machine's **LAN IP** on port 1883
-  (not `localhost`, not the `mosquitto` hostname).
-- Verify the pipeline: publish `airport/fire-smoke/FIRE-001/event`, then check
-  `equipment` + `emergency_event` + `monitoring_alert` rows and
-  `/api/v1/reports/operations`.
+  `FRONTEND_HOST_PORT=3000 docker compose up -d`.
 - Not containerized (run locally, see sections below): AI services (heavy
-  TF/YOLO stacks — `AI/<module>`), ESP32 firmware (`IOT/`, PlatformIO), and the
+  TF/YOLO stacks — `AI/<module>`), and the
   Expo passenger app (`EXPO_PUBLIC_API_URL=http://<host-LAN-IP>:8000`).
 
 ## 1. Backend — `backend/`
@@ -150,7 +141,7 @@ Routers (`backend/app/controllers/`):
 | `/api/v1/boarding-gate` | Biometric boarding gate |
 | `/api/v1/monitoring` | CCTV monitoring |
 | `/api/v1/k9-patrols` | K9 units |
-| `/api/v1/maintenance` | IoT maintenance |
+| `/api/v1/maintenance` | Maintenance |
 | `/api/v1/digital-twin` | Digital twin |
 | `/api/v1/reports` | Reports & analytics |
 | `/api/v1/ai` | AI Center |
@@ -205,12 +196,6 @@ Twin REST API (port 8100): `GET /api/twin/assets`, `POST /api/twin/ingest`, `POS
 | `Baggage_And_Person_Detector/` | Combined baggage + person detector (`Detector.py`) | YOLO/ONNX |
 | `BTD/` | Baggage threat detection (best.pt/best.onnx, classes.json) | YOLO, ONNX |
 
-## 6. IoT Firmware — `IOT/`
-
-ESP32 firmware built with PlatformIO, simulated in Wokwi, telemetried over MQTT (Mosquitto, topic root `airport/{module}/{device_id}/{event}`). 11 modules under `IOT/modules/`:
-
-`smart-airport-gate` (GATE-001), `passenger-counter` (COUNTER-001), `aircraft-parking` (AIRCRAFT-PARK-001), `smart-charging` (CHARGER-001), `equipment-monitoring` (EQUIPMENT-001), `security-area` (SECURITY-001), `smart-baggage` (BAGGAGE-001), `emergency-detection` (EMERG-001), `fire-smoke` (FIRE-001), `environment` (ENV-001), `smart-elevator` (ELEV-001). Shared headers in `IOT/common/`; docs in `IOT/docs/` (architecture, MQTT topic dictionary, device spec, integration guide). Build: `cd IOT/modules/<module> && pio run`.
-
 ## 7. Database — `schema.sql`
 
 Relational schema covering the whole journey: passenger, travel_document, face_enrollment, face_verification_log, booking, checkin_record, bag, bag_checkpoint_log, baggage_inspection, detected_item, security_gate(_log), boarding_gate, boarding_log, flight, zone, equipment, camera, emergency_event, monitoring_alert, notification, user_account, staff, digital_twin_position.
@@ -221,7 +206,7 @@ Relational schema covering the whole journey: passenger, travel_document, face_e
 
 ## Database Design — `schema.sql`
 
-PostgreSQL relational schema (498 SQL lines, ~29 tables) modeling the single central business process — the passenger journey — plus staff, IoT devices, security, and sustainability layers. Initialized automatically on container startup via `init_db.py` (health-gated after PostgreSQL becomes healthy).
+PostgreSQL relational schema (498 SQL lines, ~29 tables) modeling the single central business process — the passenger journey — plus staff, security, and sustainability layers. Initialized automatically on container startup via `init_db.py` (health-gated after PostgreSQL becomes healthy).
 
 Design principles:
 
@@ -349,7 +334,7 @@ The YOLO11 checkpoint (`classes.json`) defines 12 threat/contraband classes:
 
 ## Business Workflow
 
-The passenger journey is the ONE central business process. AI, IoT, Software, Database, and Network are technical layers of that single system.
+The passenger journey is the ONE central business process. AI, Software, Database, and Network are technical layers of that single system.
 
 Canonical business chain (per `docs/SMART_AIRPORT_Foundation.md`):
 
@@ -358,9 +343,9 @@ BUSINESS MODEL → BUSINESS DIAGRAM → BUSINESS WORKFLOW → SYSTEM REQUIREMENT
 → SOFTWARE ARCHITECTURE → SOFTWARE DIAGRAMS → NETWORK ARCHITECTURE
 ```
 
-Actors: `Passenger, CheckInStaff, SecurityOfficer, GateStaff, BaggageStaff, GroundStaff, AirportAdmin, ITAdmin, MaintenanceTeam, EmergencyTeam, Airline, BorderControl, AISystem, IoTSystem`
+Actors: `Passenger, CheckInStaff, SecurityOfficer, GateStaff, BaggageStaff, GroundStaff, AirportAdmin, ITAdmin, MaintenanceTeam, EmergencyTeam, Airline, BorderControl, AISystem`
 
-Systems: `MobileApp, SmartKiosk, SmartGate, BaggageSystem, SecuritySystem, Backend, AIPlatform, IoTPlatform, Database, DigitalTwinService, NotificationService, AdminDashboard, CiscoNetwork`
+Systems: `MobileApp, SmartKiosk, SmartGate, BaggageSystem, SecuritySystem, Backend, AIPlatform, Database, DigitalTwinService, NotificationService, AdminDashboard, CiscoNetwork`
 
 End-to-end business workflow (passenger journey):
 
@@ -410,7 +395,6 @@ cd frontend && npm install && npm run dev
 cd Passenger_App && npm install && npx expo start
 
 # Digital twin (see airport-twin/README.md)
-# IoT firmware (see IOT/README.md)
 # AI services: cd AI/<module> && pip install -r requirements.txt
 ```
 

@@ -1,5 +1,5 @@
 # Unified person + fall detection inference service.
-FROM python:3.14-slim
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -14,7 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Install CPU-only torch first to avoid downloading 3.5GB+ of heavy CUDA/NVIDIA wheels,
+# then install remaining dependencies with increased retries and timeouts for reliable fast builds.
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir --retries 10 --default-timeout 120 -r requirements.txt
 
 COPY pipeline.py .
 COPY inference_server.py .
