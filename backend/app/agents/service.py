@@ -18,7 +18,6 @@ from .flight_ops_agent import FlightOpsAgent
 from .maintenance_agent import MaintenanceAgent
 from .notification_agent import NotificationAgent
 from .sustainability_agent import SustainabilityAgent
-from .twin_publisher import TwinPublisher
 from .adapters.face import FaceVerificationAdapter
 from .adapters.baggage import BaggageThreatAdapter
 from .adapters.safety import SafetyAdapter
@@ -38,7 +37,6 @@ class AgentService:
         self.maintenance_agent: Optional[MaintenanceAgent] = None
         self.notification_agent: Optional[NotificationAgent] = None
         self.sustainability_agent: Optional[SustainabilityAgent] = None
-        self.twin_publisher: Optional[TwinPublisher] = None
         self.saga_engine: Optional[SagaWorkflowEngine] = None
         self.hitl_manager: Optional[HitlManager] = None
         self.disruption_planner: Optional[DisruptionPlanner] = None
@@ -51,8 +49,6 @@ class AgentService:
         btd_inference_url: Optional[str] = None,
         smoke_fire_url: Optional[str] = None,
         fall_detection_url: Optional[str] = None,
-        twin_base_url: str = "http://localhost:8100",
-        twin_auth_token: Optional[str] = None,
     ) -> None:
         if self.initialized:
             return
@@ -63,14 +59,9 @@ class AgentService:
 
         # Disruption recovery planner (M2.8)
         self.disruption_planner = DisruptionPlanner(registry=self.registry)
-        self.twin_publisher = TwinPublisher(
-            twin_base_url=twin_base_url,
-            auth_token=twin_auth_token,
-        )
         self.orchestrator = AgentOrchestrator(
             registry=self.registry,
             event_system=self.event_system,
-            twin_publisher=self.twin_publisher,
         )
 
         # Persistent Saga workflow engine (M2.5)
@@ -78,7 +69,6 @@ class AgentService:
         self.saga_engine = SagaWorkflowEngine(
             registry=self.registry,
             event_system=self.event_system,
-            twin_publisher=self.twin_publisher,
             hitl_manager=self.hitl_manager,
         )
         # Wire the saga engine back into the HITL manager so decisions can

@@ -126,37 +126,10 @@ def recent_events(
 
 @router.get("/health", dependencies=[Depends(verify_api_key)])
 def agent_health():
-    """Agent service + Digital Twin connectivity health."""
+    """Agent service connectivity and registry health."""
     try:
         reg = agent_service.get_registry()
         snapshot = reg.snapshot()
-
-        # Twin connectivity check: attempt a lightweight publish to /api/twin/ingest
-        twin = agent_service.get_twin_publisher()
-        twin_result = None
-        try:
-            import asyncio
-            result = asyncio.get_event_loop().run_until_complete(
-                twin.publish_state_change(
-                    entity_code="dashboard-health",
-                    entity_type="dashboard",
-                    status="online",
-                    payload={"check": "connectivity", "source": "backend-agent-service"},
-                )
-            )
-            if isinstance(result, dict):
-                twin_delivered = result.get("delivered", False)
-                twin_error = result.get("error")
-                twin_auth_error = result.get("auth_error", False)
-            else:
-                # Backward-compatible bool return
-                twin_delivered = bool(result)
-                twin_error = None if twin_delivered else "unknown"
-                twin_auth_error = False
-        except Exception as exc:  # noqa: BLE001
-            twin_delivered = False
-            twin_error = str(exc)
-            twin_auth_error = False
 
         # Agent health summary
         agents = snapshot.get("agents", [])
@@ -169,8 +142,6 @@ def agent_health():
             }
 
         overall = "healthy"
-        if not twin_delivered:
-            overall = "degraded"
         for a in agents:
             if a["status"] != "active":
                 overall = "degraded"
@@ -180,12 +151,6 @@ def agent_health():
             "agents": agent_statuses,
             "agent_count": len(agents),
             "active_agents": snapshot.get("active", 0),
-            "twin": {
-                "url": agent_service.twin_publisher.twin_base_url,
-                "delivered": twin_delivered,
-                "error": twin_error,
-                "auth_error": twin_auth_error,
-            },
         })
     except RuntimeError as exc:
         return error_response(code="AGENT_SERVICE_NOT_READY", message=str(exc), status_code=503)

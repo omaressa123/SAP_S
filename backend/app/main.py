@@ -9,7 +9,7 @@ from .controllers import (
     auth_controller, passenger_controller, kiosk_controller, baggage_drop_controller,
     inspection_controller, baggage_tracking_controller, security_gate_controller,
     boarding_gate_controller, monitoring_controller, k9_patrols_controller,
-    maintenance_controller, digital_twin_controller, flight_controller,
+    maintenance_controller, flight_controller,
     reports_controller, ai_controller, agent_controller, saga_controller, hitl_controller, disruption_controller,
 )
 
@@ -48,8 +48,6 @@ def init_agent_service():
         btd_inference_url=settings.BTD_INFERENCE_URL,
         smoke_fire_url=settings.SMOKE_FIRE_URL,
         fall_detection_url=settings.FULL_DETECTION_URL,
-        twin_base_url=settings.TWIN_BASE_URL,
-        twin_auth_token=settings.TWIN_AUTH_TOKEN,
     )
 
 # Register all routers
@@ -65,7 +63,6 @@ app.include_router(boarding_gate_controller.router, prefix="/api/v1/boarding-gat
 app.include_router(monitoring_controller.router, prefix="/api/v1/monitoring", tags=["9. CCTV Monitoring"])
 app.include_router(k9_patrols_controller.router, prefix="/api/v1/k9-patrols", tags=["10. K9 Units"])
 app.include_router(maintenance_controller.router, prefix="/api/v1/maintenance", tags=["11. IoT Maintenance"])
-app.include_router(digital_twin_controller.router, prefix="/api/v1/digital-twin", tags=["12. Digital Twin"])
 app.include_router(reports_controller.router, prefix="/api/v1/reports", tags=["13. Reports & Analytics"])
 app.include_router(ai_controller.router, prefix="/api/v1/ai", tags=["14. AI Center"])
 app.include_router(agent_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
@@ -81,4 +78,4 @@ app.mount("/data", StaticFiles(directory=_data_dir), name="data")
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok"}

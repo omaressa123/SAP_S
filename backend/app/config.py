@@ -22,12 +22,6 @@ class Settings(BaseSettings):
     BTD_INFERENCE_URL: str = os.getenv("BTD_INFERENCE_URL", "http://localhost:8002")
     SMOKE_FIRE_URL: str = os.getenv("SMOKE_FIRE_URL", "http://localhost:8003")
     FULL_DETECTION_URL: str = os.getenv("FULL_DETECTION_URL", "http://localhost:8004")
-    # Digital Twin API base URL. In Docker this resolves to the `twin` compose
-    # service; locally it defaults to localhost:8100.
-    TWIN_BASE_URL: str = os.getenv("TWIN_BASE_URL", "http://localhost:8100")
-    # Digital Twin API bearer token (operator role) for authenticated ingest.
-    # Obtain via POST /api/twin/auth/token (operator:op123 by default).
-    TWIN_AUTH_TOKEN: str = os.getenv("TWIN_AUTH_TOKEN", "")
 
     # Cloudinary Cloud Storage configuration for documents and face photos
     CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")

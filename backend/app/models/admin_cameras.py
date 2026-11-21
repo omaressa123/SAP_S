@@ -62,20 +62,6 @@ class EmergencyEvent(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class DigitalTwinPosition(Base):
-    __tablename__ = 'digitaltwinposition'
-
-    position_id = Column(Integer, primary_key=True, index=True)
-    entity_type = Column(String)
-    entity_id = Column(Integer)
-    x_coord = Column(DECIMAL(8,2))
-    y_coord = Column(DECIMAL(8,2))
-    z_coord = Column(DECIMAL(8,2))
-    timestamp = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 class AuditLog(Base):
     __tablename__ = 'auditlog'
 

@@ -621,20 +621,6 @@ def reset_demo(db):
     if True:  # leaf / log tables first
         wipe(db.query(admin_cameras.AuditLog).filter(
             admin_cameras.AuditLog.ip_address.like("10.0.0.%")))
-        if d["demo_pax"] or d["demo_bags"]:
-            conds = []
-            if d["demo_pax"]:
-                conds.append(admin_cameras.DigitalTwinPosition.entity_type
-                             == "passenger")
-            twin_q = db.query(admin_cameras.DigitalTwinPosition)
-            if d["demo_pax"]:
-                wipe(twin_q.filter(
-                    admin_cameras.DigitalTwinPosition.entity_type == "passenger",
-                    admin_cameras.DigitalTwinPosition.entity_id.in_(d["demo_pax"])))
-            if d["demo_bags"]:
-                wipe(db.query(admin_cameras.DigitalTwinPosition).filter(
-                    admin_cameras.DigitalTwinPosition.entity_type == "bag",
-                    admin_cameras.DigitalTwinPosition.entity_id.in_(d["demo_bags"])))
         if d["demo_zones"]:
             wipe(db.query(sustainability.EnergyConsumptionLog).filter(
                 sustainability.EnergyConsumptionLog.zone_id.in_(d["demo_zones"])))
