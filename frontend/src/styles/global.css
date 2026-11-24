@@ -324,9 +324,7 @@ pre { background: var(--color-light); border-radius: 12px; padding: 14px; margin
   top: 66px;
   bottom: 0;
   width: 260px;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)),
-    url('/sidebarImage.jpeg') center / cover no-repeat;
+  background: #ffffff;
   color: #20212a;
   display: flex;
   flex-direction: column;
