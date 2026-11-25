@@ -40,6 +40,7 @@ class AgentService:
         self.saga_engine: Optional[SagaWorkflowEngine] = None
         self.hitl_manager: Optional[HitlManager] = None
         self.disruption_planner: Optional[DisruptionPlanner] = None
+        self.twin_publisher = None
         self.initialized = False
 
     def init(
@@ -62,6 +63,7 @@ class AgentService:
         self.orchestrator = AgentOrchestrator(
             registry=self.registry,
             event_system=self.event_system,
+            twin_publisher=self.twin_publisher,
         )
 
         # Persistent Saga workflow engine (M2.5)
@@ -69,6 +71,7 @@ class AgentService:
         self.saga_engine = SagaWorkflowEngine(
             registry=self.registry,
             event_system=self.event_system,
+            twin_publisher=self.twin_publisher,
             hitl_manager=self.hitl_manager,
         )
         # Wire the saga engine back into the HITL manager so decisions can

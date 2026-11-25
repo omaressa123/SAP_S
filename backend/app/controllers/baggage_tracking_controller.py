@@ -1,32 +1,54 @@
+from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Optional
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..models.check_in import Bag, BagCheckpointLog
+from ..models.identity import Passenger
 from ..utils.response_envelope import success_response
-from ..utils.auth import verify_api_key, get_current_user
+from ..utils.auth import verify_api_key
 
 router = APIRouter()
 
 class BagCheckpointRequest(BaseModel):
     bagId: int
     checkpointType: str
-    conveyorId: int
+    conveyorId: int = 1
     handlerRobotId: Optional[int] = None
     location: str
-    elapsedTimeSec: int
+    elapsedTimeSec: Optional[int] = 0
 
 @router.post("/checkpoint", dependencies=[Depends(verify_api_key)])
-def record_bag_checkpoint(payload: BagCheckpointRequest):
-    return success_response(data={
-        "checkpointLogId": 75001,
-        "bagId": payload.bagId,
-        "currentStatus": "moving",
-        "timestamp": "2026-08-24T08:27:00Z"
-    }, status_code=201)
+def record_bag_checkpoint(payload: BagCheckpointRequest, db: Session = Depends(get_db)):
+    """Persist baggage checkpoint location scan to database."""
+    now = datetime.utcnow()
+    bag = db.query(Bag).filter(Bag.bag_id == payload.bagId).first()
+    if bag:
+        bag.current_location = payload.location
+        bag.current_status = payload.checkpointType
+        bag.updated_at = now
 
-from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models.check_in import Bag, BagCheckpointLog
-from ..models.identity import Passenger
+    log = BagCheckpointLog(
+        bag_id=payload.bagId,
+        checkpoint_type=payload.checkpointType,
+        equipment_id=payload.conveyorId,
+        location=payload.location,
+        timestamp=now,
+        created_at=now,
+        updated_at=now
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+
+    return success_response(data={
+        "checkpointLogId": log.checkpoint_log_id,
+        "bagId": payload.bagId,
+        "currentStatus": bag.current_status if bag else payload.checkpointType,
+        "timestamp": now.isoformat() + "Z"
+    }, status_code=201)
 
 @router.get("/all")
 def get_all_bags(db: Session = Depends(get_db)):
@@ -36,41 +58,33 @@ def get_all_bags(db: Session = Depends(get_db)):
         p = db.query(Passenger).filter(Passenger.passenger_id == b.passenger_id).first()
         results.append({
             "bagId": b.bag_id,
-            "passengerName": p.full_name if p else "Alex Mercer",
+            "passengerName": p.full_name if p else f"Passenger #{b.passenger_id}",
             "rfidTag": b.rfid_tag or f"RF-BAG-{b.bag_id}",
             "qrCode": b.qr_code or f"QR-BAG-{b.bag_id}",
-            "weightKg": float(b.weight_kg) if b.weight_kg else 22.0,
+            "weightKg": float(b.weight_kg) if b.weight_kg else 20.0,
             "currentStatus": b.current_status or "loaded",
-            "currentLocation": b.current_location or "Conveyor Line B"
+            "currentLocation": b.current_location or "Conveyor Line"
         })
     return success_response(data=results)
 
 @router.get("/history/{bagId}")
 def get_luggage_history(bagId: int, db: Session = Depends(get_db)):
     bag = db.query(Bag).filter(Bag.bag_id == bagId).first()
-    logs = db.query(BagCheckpointLog).filter(BagCheckpointLog.bag_id == bagId).all()
+    logs = db.query(BagCheckpointLog).filter(BagCheckpointLog.bag_id == bagId).order_by(BagCheckpointLog.timestamp.asc()).all()
     
     timeline = []
-    if logs:
-        for l in logs:
-            timeline.append({
-                "type": l.checkpoint_type,
-                "location": l.location,
-                "time": l.timestamp.isoformat() + "Z" if l.timestamp else "2026-10-05T10:30:00Z"
-            })
-    else:
-        timeline = [
-            { "type": "checkin", "location": "Kiosk #04 - Hall B", "time": "2026-10-05T09:45:00Z" },
-            { "type": "security_scanner", "location": "AI Threat Detection Scanner #02", "time": "2026-10-05T09:58:30Z" },
-            { "type": "sorting_conveyor", "location": "Main Sorter Conveyor Line B", "time": "2026-10-05T10:15:00Z" },
-            { "type": "loaded_aircraft", "location": "Flight QR-082 Cargo Hold (Bay 12)", "time": "2026-10-05T10:35:00Z" }
-        ]
+    for l in logs:
+        timeline.append({
+            "type": l.checkpoint_type,
+            "location": l.location,
+            "time": l.timestamp.isoformat() + "Z" if l.timestamp else None
+        })
 
     return success_response(data={
         "bagId": bagId,
         "rfidTag": bag.rfid_tag if bag else f"RF-BAG-{bagId}",
-        "currentStatus": bag.current_status if bag else "loaded",
-        "currentLocation": bag.current_location if bag else "Flight QR-082 Cargo Hold (Bay 12)",
-        "weightKg": float(bag.weight_kg) if (bag and bag.weight_kg) else 22.4,
+        "currentStatus": bag.current_status if bag else "unknown",
+        "currentLocation": bag.current_location if bag else "Awaiting Check-in",
+        "weightKg": float(bag.weight_kg) if (bag and bag.weight_kg) else 0.0,
         "timeline": timeline
     })

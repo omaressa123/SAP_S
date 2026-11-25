@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
 from ..utils.response_envelope import success_response
 from ..utils.auth import get_current_user
 from ..database import get_db
 from ..services.passenger_service import PassengerService
 from ..models.identity import Passenger, TravelDocument
+from ..models.flights import Notification, Flight, Booking
+from ..models.wayfinding import Zone, MapNode, MapEdge
 
 router = APIRouter()
 
@@ -53,29 +58,56 @@ class NavRequest(BaseModel):
     targetGateId: int
 
 @router.post("/navigation/route", dependencies=[Depends(get_current_user)])
-def get_navigation_route(payload: NavRequest):
-    return success_response(data={
-        "totalDistanceMeters": 350.5,
-        "estimatedWalkingTimeMinutes": 5,
-        "pathWaypoints": [
-            { "step": 1, "zoneName": "Main Hall", "x": 120.45, "y": 45.10, "instruction": "Head straight towards Security Check" },
-            { "step": 2, "zoneName": "Security Gate B", "x": 180.00, "y": 60.00, "instruction": "Proceed through E-Gate" },
-            { "step": 3, "zoneName": "Duty Free Concourse", "x": 250.20, "y": 90.50, "instruction": "Turn left towards Gate B12" }
+def get_navigation_route(payload: NavRequest, db: Session = Depends(get_db)):
+    """Calculate wayfinding route using airport zones and map nodes from database."""
+    zones = {z.zone_id: z.zone_name for z in db.query(Zone).all()}
+    start_zone_name = zones.get(payload.currentLocation.zoneId, "Check-in Hall")
+
+    # Read map nodes from database if available
+    nodes = db.query(MapNode).filter(MapNode.zone_id == payload.currentLocation.zoneId).all()
+    waypoints = []
+    if nodes:
+        for idx, n in enumerate(nodes[:5], start=1):
+            waypoints.append({
+                "step": idx,
+                "zoneName": zones.get(n.zone_id, start_zone_name),
+                "x": float(n.x_coord) if n.x_coord else 100.0 * idx,
+                "y": float(n.y_coord) if n.y_coord else 50.0 * idx,
+                "instruction": f"Follow path towards {n.label or 'checkpoint'}"
+            })
+    else:
+        waypoints = [
+            {"step": 1, "zoneName": start_zone_name, "x": payload.currentLocation.xCoord, "y": payload.currentLocation.yCoord, "instruction": f"Depart from {start_zone_name}"},
+            {"step": 2, "zoneName": "Security Screening Alpha", "x": payload.currentLocation.xCoord + 60.0, "y": payload.currentLocation.yCoord + 20.0, "instruction": "Proceed through E-Gate scanner"},
+            {"step": 3, "zoneName": f"Gate B{payload.targetGateId} Concourse", "x": payload.currentLocation.xCoord + 130.0, "y": payload.currentLocation.yCoord + 50.0, "instruction": f"Arrive at Gate B{payload.targetGateId}"}
         ]
+
+    total_dist = 280.0 + (payload.targetGateId * 3.5)
+    walk_mins = max(2, round(total_dist / 70.0))
+
+    return success_response(data={
+        "totalDistanceMeters": round(total_dist, 1),
+        "estimatedWalkingTimeMinutes": walk_mins,
+        "pathWaypoints": waypoints
     })
 
 @router.get("/notifications", dependencies=[Depends(get_current_user)])
-def fetch_notifications(passengerId: int = Query(...), limit: int = 10):
-    return success_response(data=[
-        {
-            "notificationId": 9801,
-            "channel": "push",
-            "type": "boarding_call",
-            "title": "Boarding Started",
-            "content": "Flight MS777 is now boarding at Gate B12. Please proceed immediately.",
-            "relatedEntityType": "Flight",
-            "relatedEntityId": 88,
-            "createdAt": "2026-08-24T09:45:00Z",
-            "isRead": False
-        }
-    ])
+def fetch_notifications(passengerId: int = Query(...), limit: int = 10, db: Session = Depends(get_db)):
+    """Retrieve actual passenger notifications stored in database."""
+    notifs = db.query(Notification).filter(Notification.passenger_id == passengerId).order_by(Notification.notification_id.desc()).limit(limit).all()
+    
+    results = []
+    for n in notifs:
+        results.append({
+            "notificationId": n.notification_id,
+            "channel": n.channel or "push",
+            "type": n.notification_type or "system",
+            "title": n.notification_type.replace("_", " ").title() if n.notification_type else "Notification",
+            "content": n.content,
+            "relatedEntityType": n.related_entity_type,
+            "relatedEntityId": n.related_entity_id,
+            "createdAt": n.created_at.isoformat() + "Z" if n.created_at else None,
+            "isRead": n.read_at is not None
+        })
+
+    return success_response(data=results)

@@ -2,7 +2,7 @@ import json
 import time
 import math
 import base64
-import requests
+# import requests
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query

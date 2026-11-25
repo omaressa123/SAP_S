@@ -50,15 +50,16 @@ agent_service.init(
     btd_inference_url="http://localhost:8002",
     smoke_fire_url="http://localhost:8003",
     fall_detection_url="http://localhost:8004",
-    twin_base_url="http://localhost:8100",
 )
-
-# Mock the twin publisher so tests do not make real HTTP calls to a service
-# that is not running in the test environment. The twin publish path is
-# non-fatal anyway; this just keeps the test suite fast and deterministic.
-from unittest.mock import AsyncMock
-agent_service.twin_publisher.publish_agent_event = AsyncMock(return_value=True)
-agent_service.twin_publisher.publish_state_change = AsyncMock(return_value=True)
+from unittest.mock import MagicMock, AsyncMock
+mock_tp = MagicMock()
+mock_tp.publish_agent_event = AsyncMock(return_value=True)
+mock_tp.publish_state_change = AsyncMock(return_value=True)
+agent_service.twin_publisher = mock_tp
+if agent_service.orchestrator:
+    agent_service.orchestrator.twin_publisher = mock_tp
+if agent_service.saga_engine:
+    agent_service.saga_engine.twin_publisher = mock_tp
 
 client = TestClient(app)
 HEADERS = {"X-API-KEY": "MOCK_API_KEY_123"}
