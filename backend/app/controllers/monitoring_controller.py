@@ -20,9 +20,7 @@ from ..utils.auth import verify_api_key
 
 router = APIRouter()
 
-# ----------------------------------------------------------------------------
 # NATIVE YOLO INFERENCE PIPELINE
-# ----------------------------------------------------------------------------
 _YOLO_MODEL = None
 
 def get_yolo_model():
