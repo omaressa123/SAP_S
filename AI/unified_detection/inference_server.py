@@ -34,12 +34,17 @@ from pipeline import (
     PipelineEvent,
     UnifiedPipeline,
 )
+from TrackerEngine import AirportTrackerEngine
 
 app = FastAPI(title="Unified Person + Fall Detection", version="1.0.0")
 
 # Single pipeline instance — models loaded exactly once per process.
 _PIPELINE: Optional[UnifiedPipeline] = None
 _PIPELINE_LOCK = asyncio.Lock()
+
+# Airport Tracker Engine instances (per camera)
+_TRACKER_ENGINES: Dict[int, AirportTrackerEngine] = {}
+_TRACKER_LOCK = asyncio.Lock()
 
 # Active continuous streams: stream_id -> {task, camera_id, source, running}
 _ACTIVE_STREAMS: Dict[str, Dict[str, Any]] = {}
@@ -101,7 +106,15 @@ async def health() -> Dict[str, Any]:
     models_ok = True
     details: List[str] = []
     try:
-        # Verify SharedDetector model is loaded
+        # Initialize SharedDetector on check if not yet loaded
+        if pipe.shared_detector is None:
+            from Detector import SharedDetector
+            pipe.shared_detector = SharedDetector(
+                model_path=pipe._shared_detector_model_path,
+                conf=pipe._shared_detector_conf,
+            )
+            pipe._shared_detector_loaded = True
+
         if pipe.shared_detector is None or pipe.shared_detector.model is None:
             models_ok = False
             details.append("shared_detector model not loaded")
@@ -158,6 +171,15 @@ async def process_frame(
         raise HTTPException(status_code=400, detail=f"Invalid image: {exc}")
 
     frame = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    fh, fw = frame.shape[:2]
+
+    # Process through AirportTrackerEngine (ByteTrack + Person-to-Baggage Spatial-Temporal Association)
+    async with _TRACKER_LOCK:
+        if req.camera_id not in _TRACKER_ENGINES:
+            _TRACKER_ENGINES[req.camera_id] = AirportTrackerEngine()
+        tracker = _TRACKER_ENGINES[req.camera_id]
+
+    tracker_result = await asyncio.to_thread(tracker.process_frame, frame)
 
     events = await pipe.process_frame(
         frame=frame,
@@ -172,6 +194,8 @@ async def process_frame(
     return JSONResponse(
         {
             "camera_id": req.camera_id,
+            "frame_width": fw,
+            "frame_height": fh,
             "event_count": len(events),
             "events": [
                 {
@@ -184,6 +208,7 @@ async def process_frame(
                 }
                 for ev in events
             ],
+            "tracker": tracker_result,
         }
     )
 

@@ -48,6 +48,15 @@ export default function Monitoring() {
   const [autoScan, setAutoScan] = useState(true) // Auto-detect video stream
   const [isNativeVision, setIsNativeVision] = useState(false)
   const [visionStats, setVisionStats] = useState({ peopleCount: 0, bagCount: 0, unattendedBagCount: 0, lastScanned: null })
+  const [airportStats, setAirportStats] = useState({
+    peopleCurrentlyInside: 0,
+    totalPeopleDetected: 0,
+    totalPeopleExited: 0,
+    totalBaggageDetected: 0,
+    associatedBaggage: 0,
+    unassociatedBaggage: 0
+  })
+  const [liveTrackingTable, setLiveTrackingTable] = useState([])
 
   // --- View Mode & Matrix State ---
   const [viewMode, setViewMode] = useState('single') // 'single' | 'matrix'
@@ -421,6 +430,12 @@ export default function Monitoring() {
             unattendedBagCount: res.unattendedBagCount ?? 0,
             lastScanned: new Date().toLocaleTimeString()
           })
+          if (res.statistics) {
+            setAirportStats(res.statistics)
+          }
+          if (Array.isArray(res.trackingTable)) {
+            setLiveTrackingTable(res.trackingTable)
+          }
         }
 
         // --- AUTOMATED ALERT DISPATCH ENGINE ---
@@ -1033,21 +1048,24 @@ export default function Monitoring() {
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                         {/* Mini BBox indicators */}
-                        {showBoxes && detections.slice(0, 4).map((det, dIdx) => (
-                          <div
-                            key={dIdx}
-                            style={{
-                              position: 'absolute',
-                              left: `${det.bbox.x}%`,
-                              top: `${det.bbox.y}%`,
-                              width: `${det.bbox.w}%`,
-                              height: `${det.bbox.h}%`,
-                              border: `2px solid ${det.isAnomaly ? '#ef4444' : det.color || '#10b981'}`,
-                              background: det.isAnomaly ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
-                              pointerEvents: 'none'
-                            }}
-                          />
-                        ))}
+                        {showBoxes && detections.slice(0, 4).map((det, dIdx) => {
+                          const box = det.bbox || det.box || { x: 0, y: 0, w: 0, h: 0 }
+                          return (
+                            <div
+                              key={dIdx}
+                              style={{
+                                position: 'absolute',
+                                left: `${box.x}%`,
+                                top: `${box.y}%`,
+                                width: `${box.w}%`,
+                                height: `${box.h}%`,
+                                border: `2px solid ${det.isAnomaly ? '#ef4444' : det.color || '#10b981'}`,
+                                background: det.isAnomaly ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          )
+                        })}
                       </div>
                     ) : (
                       /* Synthetic Terminal Perspective Scene for Matrix Channel */
@@ -1293,18 +1311,53 @@ export default function Monitoring() {
                 </div>
               </div>
 
+              {/* REAL-TIME PERSON-TO-BAGGAGE ASSOCIATION CONNECTING LINES */}
+              {showBoxes && (
+                <svg
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    zIndex: 7
+                  }}
+                >
+                  {detections.filter((d) => d.type === 'baggage' && d.ownerCenter && d.center).map((d, i) => (
+                    <g key={i}>
+                      {/* Connecting Line from Baggage to Owner */}
+                      <line
+                        x1={`${d.center.x}%`}
+                        y1={`${d.center.y}%`}
+                        x2={`${d.ownerCenter.x}%`}
+                        y2={`${d.ownerCenter.y}%`}
+                        stroke="#007bb9"
+                        strokeWidth="2.5"
+                        strokeDasharray="4 3"
+                        strokeOpacity="0.85"
+                      />
+                      {/* Pulse Circle at bag origin */}
+                      <circle cx={`${d.center.x}%`} cy={`${d.center.y}%`} r="4" fill="#007bb9" />
+                      {/* Circle at owner target */}
+                      <circle cx={`${d.ownerCenter.x}%`} cy={`${d.ownerCenter.y}%`} r="4" fill="#10b981" />
+                    </g>
+                  ))}
+                </svg>
+              )}
+
               {/* REAL-TIME BOUNDING BOX OVERLAYS (Normalized 0-100% directly from YOLO) */}
               {showBoxes && detections.map((det, idx) => {
+                const box = det.bbox || det.box || { x: 0, y: 0, w: 0, h: 0 }
                 const isThreat = det.isAnomaly || det.severity === 'High' || det.severity === 'Critical'
                 return (
                   <div
                     key={idx}
                     style={{
                       position: 'absolute',
-                      left: `${det.bbox.x}%`,
-                      top: `${det.bbox.y}%`,
-                      width: `${det.bbox.w}%`,
-                      height: `${det.bbox.h}%`,
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.w}%`,
+                      height: `${box.h}%`,
                       border: `2px solid ${isThreat ? '#ef4444' : det.color || '#10b981'}`,
                       borderRadius: 4,
                       background: isThreat ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.08)',
@@ -1703,6 +1756,139 @@ export default function Monitoring() {
             </ResultCard>
           </div>
         )}
+
+        {/* ==================================================== */}
+        {/* LIVE PEOPLE & BAGGAGE TRACKING TABLE (Requirement 8) */}
+        {/* ==================================================== */}
+        <div style={{ marginTop: 24 }}>
+          <Card title="Live Airport People & Baggage Tracking Registry">
+            {/* Top 6 KPI Live Counters */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 12,
+              marginBottom: 16
+            }}>
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '0.7rem', color: '#166534', fontWeight: 700 }}>PEOPLE CURRENTLY INSIDE</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#15803d' }}>
+                  {airportStats.peopleCurrentlyInside || visionStats.peopleCount}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 700 }}>TOTAL PEOPLE DETECTED</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>
+                  {airportStats.totalPeopleDetected || visionStats.peopleCount}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a' }}>
+                <div style={{ fontSize: '0.7rem', color: '#92400e', fontWeight: 700 }}>TOTAL PEOPLE EXITED</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#b45309' }}>
+                  {airportStats.totalPeopleExited || 0}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 700 }}>TOTAL BAGGAGE DETECTED</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0284c7' }}>
+                  {airportStats.totalBaggageDetected || visionStats.bagCount}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '0.7rem', color: '#1e40af', fontWeight: 700 }}>ASSOCIATED BAGGAGE</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#2563eb' }}>
+                  {airportStats.associatedBaggage || 0}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.7rem', color: '#991b1b', fontWeight: 700 }}>UNASSOCIATED BAGGAGE</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#dc2626' }}>
+                  {airportStats.unassociatedBaggage || visionStats.unattendedBagCount || 0}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Tracking Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#475569' }}>Person ID</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#475569' }}>Status</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#475569' }}>Associated Baggage</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#475569' }}>Tracking Status</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#475569' }}>Active Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liveTrackingTable.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '24px 12px', textAlign: 'center', color: '#94a3b8' }}>
+                        No travelers currently tracked in this camera zone. Camera stream is clear.
+                      </td>
+                    </tr>
+                  ) : (
+                    liveTrackingTable.map((row, idx) => (
+                      <tr
+                        key={idx}
+                        style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#071739' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: row.status === 'Inside' ? '#10b981' : '#94a3b8' }} />
+                            {row.personId}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: row.status === 'Inside' ? '#ecfdf5' : '#f1f5f9',
+                            color: row.status === 'Inside' ? '#065f46' : '#64748b'
+                          }}>
+                            {row.status?.toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#1e293b', fontWeight: 600 }}>
+                          {row.associatedBaggage !== 'None' ? (
+                            <span style={{ color: '#0369a1', background: '#f0f9ff', padding: '3px 8px', borderRadius: 6, border: '1px solid #bae6fd' }}>
+                              💼 {row.associatedBaggage}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>No luggage detected</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: row.trackingStatus === 'Tracking' ? '#eff6ff' : '#f8fafc',
+                            color: row.trackingStatus === 'Tracking' ? '#1d4ed8' : '#64748b'
+                          }}>
+                            {row.trackingStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace' }}>
+                          {row.durationSeconds}s
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
 
         {/* ========================================== */}
         {/* RECENT CCTV ALERTS & AUDIT TRAIL TABLE     */}

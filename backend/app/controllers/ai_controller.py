@@ -130,11 +130,12 @@ class FaceVerifyRequest(BaseModel):
 
 
 class BaggageAnalyzeRequest(BaseModel):
-    bag_id: int
+    bag_id: Optional[int] = None
     equipment_id: Optional[int] = None
     ai_model_version: str = "btd-yolo11"
     image_base64: Optional[str] = None
     detections: Optional[List[Dict[str, Any]]] = None
+    conf: float = 0.35
 
 
 class VisionAnalyzeRequest(BaseModel):
@@ -214,42 +215,115 @@ def face_verify(payload: FaceVerifyRequest, db: Session = Depends(get_db)):
 
 @router.post("/baggage/analyze", dependencies=[Depends(verify_api_key)])
 def baggage_analyze(payload: BaggageAnalyzeRequest, db: Session = Depends(get_db)):
-    """Run real BTD YOLO11 model inference on baggage scan image and record in database."""
-    now = datetime.utcnow()
-    dets = payload.detections or []
+    """Run real AI/BTD YOLO11 model inference on uploaded X-ray image and log if DB is available."""
+    from ..config import settings
 
-    # If image frame passed, run BTD model
+    now = datetime.utcnow()
+    dets = list(payload.detections or [])
+    fw, fh = 640.0, 480.0
+    model_source = "AI/BTD"
+
+    # If image frame passed, forward to AI/BTD inference server (port 8002)
     if not dets and payload.image_base64 and len(payload.image_base64.strip()) > 50:
         img_bgr = _decode_b64(payload.image_base64)
         if img_bgr is not None:
-            dets = detect_threats_from_image(img_bgr)
+            fh, fw = float(img_bgr.shape[0]), float(img_bgr.shape[1])
+            ok, encoded = cv2.imencode(".jpg", img_bgr)
+            btd_url = (settings.BTD_INFERENCE_URL or "http://localhost:8002").rstrip("/")
+            called_service = False
+            if ok:
+                try:
+                    with httpx.Client(timeout=30.0) as client:
+                        resp = client.post(
+                            f"{btd_url}/analyze",
+                            params={"conf": payload.conf},
+                            files={"image": ("xray.jpg", encoded.tobytes(), "image/jpeg")},
+                        )
+                        if resp.status_code == 200:
+                            btd_data = resp.json()
+                            dets = btd_data.get("detections", [])
+                            model_source = f"AI/BTD ({btd_data.get('model', 'best.pt')})"
+                            called_service = True
+                except Exception as exc:
+                    print(f"[AICenter] BTD service unreachable ({exc}), falling back to local ONNX.")
+            if not called_service:
+                dets = detect_threats_from_image(img_bgr, conf_threshold=payload.conf)
+                model_source = "AI/BTD (best.onnx fallback)"
 
-    result = "MANUAL_REVIEW" if dets else "SAFE"
-    row = m_bagsec.BaggageInspection(
-        bag_id=payload.bag_id,
-        equipment_id=payload.equipment_id,
-        scan_time=now,
-        ai_model_version=payload.ai_model_version,
-        result=result,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-
+    # Normalize detections with percentage bounding boxes for UI overlay
+    normalized_dets: List[Dict[str, Any]] = []
     for d in dets:
-        conf = float(d.get("confidence", 0.0))
-        db.add(m_bagsec.DetectedItem(
-            inspection_id=row.inspection_id,
-            item_type=str(d.get("item_type", "unknown"))[:30],
-            confidence_score=min(100.0, max(0.0, conf * 100.0 if conf <= 1.0 else conf)),
-        ))
-    db.commit()
+        raw_conf = float(d.get("confidence", 0.0))
+        conf_pct = round(raw_conf * 100.0 if raw_conf <= 1.0 else raw_conf, 1)
+        box = d.get("box")
+        bbox_pct = None
+        if isinstance(box, (list, tuple)) and len(box) == 4 and fw > 0 and fh > 0:
+            x1, y1, x2, y2 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
+            # AI/BTD returns [x1, y1, x2, y2]; ONNX fallback returns [x, y, w, h]
+            if model_source.endswith("fallback)"):
+                bx, by, bw, bh = x1, y1, x2, y2
+            else:
+                bx, by, bw, bh = x1, y1, max(0.0, x2 - x1), max(0.0, y2 - y1)
+            bbox_pct = {
+                "x": round((bx / fw) * 100.0, 2),
+                "y": round((by / fh) * 100.0, 2),
+                "w": round((bw / fw) * 100.0, 2),
+                "h": round((bh / fh) * 100.0, 2),
+            }
+        normalized_dets.append({
+            "item_type": str(d.get("item_type", "unknown")),
+            "confidence": conf_pct,
+            "box": box,
+            "bbox": bbox_pct,
+        })
+
+    result = "MANUAL_REVIEW" if normalized_dets else "SAFE"
+    inspection_id = None
+    logged_to_db = False
+
+    def _save_inspection(save_bag_id: Optional[int]) -> int:
+        row = m_bagsec.BaggageInspection(
+            bag_id=save_bag_id,
+            equipment_id=payload.equipment_id,
+            scan_time=now,
+            ai_model_version=payload.ai_model_version,
+            result=result,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+
+        for d in normalized_dets:
+            db.add(m_bagsec.DetectedItem(
+                inspection_id=row.inspection_id,
+                item_type=d["item_type"][:30],
+                confidence_score=min(100.0, max(0.0, float(d["confidence"]))),
+            ))
+        db.commit()
+        return row.inspection_id
+
+    try:
+        inspection_id = _save_inspection(payload.bag_id)
+        logged_to_db = True
+    except Exception:
+        db.rollback()
+        if payload.bag_id is not None:
+            try:
+                inspection_id = _save_inspection(None)
+                logged_to_db = True
+            except Exception:
+                db.rollback()
 
     return success_response(data={
-        "inspection_id": row.inspection_id,
+        "inspection_id": inspection_id,
+        "bag_id": payload.bag_id,
         "result": result,
-        "detections_logged": len(dets),
-        "detections": dets
+        "model": model_source,
+        "frame_width": fw,
+        "frame_height": fh,
+        "detections_logged": len(normalized_dets),
+        "detections": normalized_dets,
+        "logged_to_db": logged_to_db,
     })
 
 

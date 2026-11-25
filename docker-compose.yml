@@ -1,13 +1,16 @@
-# Smart Green Airport — full development environment.
+# Smart Green Airport — full development & production environment.
 #   docker compose up --build     # start everything (Postgres, backend,
-#                                 # frontend, twin)
+#                                 # frontend, and all AI model services)
 #   docker compose down           # stop (Postgres data kept in postgres_data volume)
 #   docker compose down -v        # DESTRUCTIVE: deletes the Postgres volume
 #
 # URL map (host):
-#   Frontend: http://localhost            Backend: http://localhost:8000
-#   Health:   http://localhost:8000/health Twin:    http://localhost:8100
-#   Postgres: localhost:5432
+#   Frontend:          http://localhost        (port 80)
+#   Backend API:       http://localhost:8000   (Health: /health, Docs: /docs)
+#   AI Face Reco:      http://localhost:8001/health
+#   AI BTD (X-Ray):    http://localhost:8002/health
+#   AI Unified Detect: http://localhost:8004/health
+#   Postgres:          localhost:5432
 name: smart-airport
 
 networks:
@@ -19,19 +22,18 @@ volumes:
   postgres_data:
     name: smart-airport-postgres-data
 
-# PostgreSQL now runs as a compose service (postgres:5432) with data persisted
-# in the postgres_data volume. Docker-to-Docker services reach it via the
-# `postgres` service name. Local (non-Docker) runs use localhost:5432 instead
-# (see backend/.env).
 x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}}
   SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-secret}
   API_KEY: ${API_KEY:-MOCK_API_KEY_123}
-  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000,http://localhost:5173}
   CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
   CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
   CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-  TWIN_BASE_URL: http://twin:8100
+  FACE_RECO_URL: http://face-reco:8001
+  BTD_URL: http://btd:8002
+  BTD_INFERENCE_URL: http://btd:8002
+  FULL_DETECTION_URL: http://unified-detection:8004
 
 services:
   postgres:
@@ -78,10 +80,42 @@ services:
       start_period: 40s
       retries: 5
 
+  face-reco:
+    build:
+      context: ./AI/face_reco
+      dockerfile: Dockerfile
+    container_name: smart-airport-face-reco
+    restart: unless-stopped
+    networks: [airport-network]
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 5
+
+  btd:
+    build:
+      context: ./AI/BTD
+      dockerfile: Dockerfile
+    container_name: smart-airport-btd
+    restart: unless-stopped
+    networks: [airport-network]
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health')\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
   unified-detection:
     build:
-      context: ./AI/unified_detection
-      dockerfile: Dockerfile
+      context: ./AI
+      dockerfile: unified_detection/Dockerfile
     container_name: smart-airport-unified-detection
     restart: unless-stopped
     networks: [airport-network]
@@ -90,8 +124,6 @@ services:
       - STARTUP_BACKEND_URL=http://backend:8000
     ports:
       - "8004:8004"
-    volumes:
-      - ./AI/unified_detection:/app/unified_detection
     depends_on:
       backend:
         condition: service_healthy
@@ -112,27 +144,7 @@ services:
     restart: unless-stopped
     networks: [airport-network]
     ports:
-      # Same pattern as MQTT: default 80, override if the host uses it.
       - "${FRONTEND_HOST_PORT:-80}:80"
     depends_on:
       backend:
-        condition: service_healthy
-
-  twin:
-    build:
-      context: ./airport-twin
-      dockerfile: backend/Dockerfile
-    container_name: smart-airport-twin
-    restart: unless-stopped
-    networks: [airport-network]
-    environment:
-      DATABASE_URL: ${TWIN_DATABASE_URL:-${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-smart_airport}:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/${POSTGRES_DB:-smart_airport}}}
-      TWIN_SIMULATION: ${TWIN_SIMULATION:-true}
-    # Twin is reachable only via the internal Docker network (twin:8100) and
-    # through the frontend nginx proxy on host port 80 (/api/twin, /ws/twin).
-    # Its host port is deliberately NOT published: the twin is an internal
-    # admin system and, with JWT authentication removed, must not be exposed
-    # directly to the host/network.
-    depends_on:
-      postgres:
         condition: service_healthy

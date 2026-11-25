@@ -10,7 +10,7 @@ capture:
   target_fps: 15          # continuous processing rate — falls are fast (~1s), no polling
 
 detection:
-  confidence_threshold: 0.35
+  confidence_threshold: 0.25
   person_model: yolov8n.pt
 
 fall_detection:

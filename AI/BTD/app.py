@@ -13,10 +13,10 @@ except ImportError:
     _has_yolo = False
 
 _cur_dir = Path(__file__).resolve().parent
-_model_path = _cur_dir / "best.pt"
+_model_path = _cur_dir / "best.onnx"
 if not _model_path.exists():
-    if (_cur_dir / "best").exists():
-        _model_path = _cur_dir / "best"
+    if (_cur_dir / "best.pt").exists():
+        _model_path = _cur_dir / "best.pt"
     else:
         _model_path = "yolov8n.pt"
 
