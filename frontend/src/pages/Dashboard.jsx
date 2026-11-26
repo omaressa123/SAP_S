@@ -180,7 +180,6 @@ export default function Dashboard() {
                   <div className="panel-title">Zone Occupancy</div>
                   <div className="panel-sub">Passenger density by terminal zone (live feed).</div>
                 </div>
-                <Link to="/iot" className="panel-link">IoT Center <ArrowRight size={14} /></Link>
               </div>
               <div style={{ marginTop: 8 }}>
                 {zones.length ? (

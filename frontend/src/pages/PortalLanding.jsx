@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  IdCard, ShieldCheck, Plane, Users, Monitor, BrainCircuit,
+  IdCard, ShieldCheck, Plane, Users, Monitor,
   Activity, FileText, ArrowRight, Smartphone, Lock, Eye, Sparkles, Luggage
 } from 'lucide-react'
 
@@ -76,7 +76,6 @@ export default function PortalLanding() {
       ],
       screens: [
         { label: 'Executive Dashboard', path: '/admin/dashboard', icon: Activity, tag: 'KPIs' },
-        { label: 'AI Center & Models', path: '/admin/ai', icon: BrainCircuit, tag: '5 Models' },
         { label: 'Live AI Monitoring', path: '/admin/ai-monitor', icon: Activity, tag: 'Realtime' },
         { label: 'Analytics & Reports', path: '/admin/reports', icon: FileText, tag: 'Audit' },
       ],

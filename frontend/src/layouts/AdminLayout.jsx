@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, FileText, BrainCircuit, Activity, GitBranch, Bell,
-  AlertTriangle, Wifi, Moon, Sun, ChevronLeft, ChevronRight, LayoutGrid,
+  LayoutDashboard, FileText, Activity, GitBranch, Bell,
+  AlertTriangle, Moon, Sun, ChevronLeft, ChevronRight, LayoutGrid,
   ExternalLink, ShieldCheck
 } from 'lucide-react'
 
@@ -29,12 +29,10 @@ export default function AdminLayout() {
     {
       group: 'AI Systems & Observability',
       items: [
-        { path: '/admin/ai', label: 'AI Center', icon: BrainCircuit, badge: '5 Models' },
         { path: '/admin/ai-monitor', label: 'AI Live Monitoring', icon: Activity, badge: 'Realtime' },
         { path: '/admin/workflows', label: 'Multi-Agent Workflows', icon: GitBranch },
         { path: '/admin/events', label: 'Airport Event Stream', icon: Bell },
         { path: '/admin/disruption', label: 'Disruption Planner', icon: AlertTriangle },
-        { path: '/admin/iot', label: 'IoT & Telemetry', icon: Wifi },
       ],
     },
   ]

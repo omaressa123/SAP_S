@@ -40,7 +40,6 @@ from ..models.agents import DecisionAudit as MDecisionAudit
 from .base import AgentInterface, AgentResult
 from .registry import AgentRegistry
 from .events import EventSystem, AirportEvent, EventSource, EventSeverity
-from .twin_publisher import TwinPublisher
 
 
 class SagaStatus(str):
@@ -176,13 +175,11 @@ class SagaWorkflowEngine:
         self,
         registry: AgentRegistry,
         event_system: EventSystem,
-        twin_publisher: Optional[TwinPublisher] = None,
         session_factory: Callable[[], Session] = SessionLocal,
         hitl_manager: Optional[Any] = None,
     ):
         self.registry = registry
         self.event_system = event_system
-        self.twin_publisher = twin_publisher
         self._session_factory = session_factory or _SagaSessionLocal
         self.hitl_manager = hitl_manager
         self._instances: Dict[str, SagaInstance] = {}
@@ -318,7 +315,6 @@ class SagaWorkflowEngine:
             if step is None:
                 # All steps processed
                 self._transition(saga, SagaStatus.COMPLETED)
-                self._publish_twin(saga, {"status": SagaStatus.COMPLETED})
                 return
 
             if step.requires_human_review and step.status == StepStatus.NEEDS_REVIEW:
@@ -501,7 +497,6 @@ class SagaWorkflowEngine:
         # A failed/cancelled saga with no completed steps stays terminal.
         if completed and saga.status != SagaStatus.CANCELLED:
             self._transition(saga, SagaStatus.COMPENSATED)
-        self._publish_twin(saga, {"status": saga.status})
 
     def _execute_compensation(
         self, saga: SagaInstance, step: SagaStep, action: str
@@ -669,21 +664,6 @@ class SagaWorkflowEngine:
         )
         try:
             self.event_system.publish(event)
-        except Exception:  # noqa: BLE001
-            pass
-
-    def _publish_twin(self, saga: SagaInstance, payload: Dict[str, Any]) -> None:
-        if self.twin_publisher is None:
-            return
-        try:
-            _run_async(asyncio.wait_for(
-                self.twin_publisher.publish_agent_event(
-                    asset_code=f"passenger-{saga.passenger_id}" if saga.passenger_id else "passenger-unknown",
-                    event_type="saga.state_changed",
-                    payload=payload,
-                ),
-                timeout=10.0,
-            ))
         except Exception:  # noqa: BLE001
             pass
 

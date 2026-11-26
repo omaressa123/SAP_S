@@ -39,7 +39,6 @@ from ..models.admin_cameras import MonitoringAlert as MMonitoringAlert
 from .base import AgentInterface, AgentResult, AgentStatus
 from .registry import AgentRegistry
 from .events import AirportEvent, EventSystem, EventSource, EventSeverity
-from .twin_publisher import TwinPublisher, TwinDeliveryResult
 
 
 class WorkflowStatus(str, Enum):
@@ -133,11 +132,9 @@ class AgentOrchestrator:
         self,
         registry: AgentRegistry,
         event_system: EventSystem,
-        twin_publisher: Optional[TwinPublisher] = None,
     ):
         self.registry = registry
         self.event_system = event_system
-        self.twin_publisher = twin_publisher
         self._workflows: Dict[str, WorkflowContext] = {}
         self._running_tasks: Dict[str, asyncio.Task] = {}
         self._step_guard: set = set()  # (workflow_id, task_id) to prevent loops
@@ -534,48 +531,6 @@ class AgentOrchestrator:
             flight_id=event.flight_id,
         )
         self.event_system.publish(twin_event)
-
-        # Push the structured state change to the Digital Twin REST API
-        # (airport-twin :8100). Failure here is non-fatal: the twin is
-        # visualization-only and the agent workflow continues.
-        twin_delivery = {"delivered": False, "error": None, "auth_error": False}
-        if self.twin_publisher is not None:
-            import asyncio as _asyncio
-
-            try:
-                result = await _asyncio.wait_for(
-                    self.twin_publisher.publish_agent_event(
-                        asset_code=f"bag-{event.bag_id}" if event.bag_id else "bag-unknown",
-                        event_type=f"{event.event_type}.completed",
-                        payload=data,
-                    ),
-                    timeout=10.0,
-                )
-                if isinstance(result, TwinDeliveryResult):
-                    twin_delivery = {
-                        "delivered": result.delivered,
-                        "error": result.error,
-                        "auth_error": result.auth_error,
-                    }
-                else:
-                    # Backward compatibility with bool return
-                    twin_delivery = {"delivered": bool(result), "error": None, "auth_error": False}
-            except Exception as exc:  # noqa: BLE001
-                msg = str(exc)
-                twin_delivery["error"] = msg
-                if "401" in msg or "403" in msg or "unauthorized" in msg.lower():
-                    twin_delivery["auth_error"] = True
-
-        # Merge twin delivery status into workflow output for auditability
-        if ctx.output_payload:
-            try:
-                existing = json.loads(ctx.output_payload)
-            except Exception:
-                existing = {}
-        else:
-            existing = {}
-        existing["twin_delivery"] = twin_delivery
-        ctx.output_payload = json.dumps(existing)
 
         # Update the persisted workflow output
         db = SessionLocal()

@@ -30,9 +30,7 @@ const NAV_GROUPS = [
   {
     label: 'AI & Infrastructure',
     items: [
-      { to: '/ai', label: 'AI Center', icon: 'BrainCircuit' },
       { to: '/ai-monitor', label: 'AI Monitoring', icon: 'Activity' },
-      { to: '/iot', label: 'IoT Center', icon: 'Wifi' },
       { to: '/events', label: 'Event Center', icon: 'Bell' },
       { to: '/workflows', label: 'Workflows', icon: 'GitBranch' },
       { to: '/digital-twin', label: 'Digital Twin', icon: 'Monitor' },

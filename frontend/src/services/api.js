@@ -128,7 +128,6 @@ function toQuery(params) {
 }
 
 export const AiApi = {
-  registry: () => api('/api/v1/ai/registry'),
   faceVerify: (data) => api('/api/v1/ai/face/verify', { method: 'POST', body: JSON.stringify(data) }),
   baggageAnalyze: (data) => api('/api/v1/ai/baggage/analyze', { method: 'POST', body: JSON.stringify(data) }),
   smokeFire: (data) => api('/api/v1/ai/smoke-fire/analyze', { method: 'POST', body: JSON.stringify(data) }),

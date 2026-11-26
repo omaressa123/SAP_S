@@ -26,13 +26,11 @@ const Passengers = lazy(() => import('../pages/Passengers'))
 // Admin & AI Governance Pages (Module 3)
 const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Reports = lazy(() => import('../pages/Reports'))
-const AiCenter = lazy(() => import('../pages/AiCenter'))
 const AIMonitor = lazy(() => import('../pages/AIMonitor'))
 const FaceKiosk = lazy(() => import('../pages/FaceKiosk'))
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const BaggagePersonDetection = lazy(() => import('../pages/BaggagePersonDetection'))
-const IoTCenter = lazy(() => import('../pages/IoTCenter'))
 const EventCenter = lazy(() => import('../pages/EventCenter'))
 const WorkflowMonitor = lazy(() => import('../pages/WorkflowMonitor'))
 const DisruptionPlanner = lazy(() => import('../pages/DisruptionPlanner'))
@@ -75,7 +73,6 @@ export default function AppRoutes() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="ai" element={<AiCenter />} />
           <Route path="ai/baggage" element={<BaggageAI />} />
           <Route path="ai/face" element={<FaceKiosk />} />
           <Route path="ai/smoke-fire" element={<SmokeFire />} />
@@ -85,7 +82,6 @@ export default function AppRoutes() {
           <Route path="workflows" element={<WorkflowMonitor />} />
           <Route path="events" element={<EventCenter />} />
           <Route path="disruption" element={<DisruptionPlanner />} />
-          <Route path="iot" element={<IoTCenter />} />
         </Route>
 
         {/* Backward-compatible redirects for legacy URLs */}
@@ -99,13 +95,10 @@ export default function AppRoutes() {
         <Route path="/passengers" element={<Navigate to="/staff/passengers" replace />} />
         <Route path="/baggage" element={<Navigate to="/staff/baggage" replace />} />
         <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
-        <Route path="/ai" element={<Navigate to="/admin/ai" replace />} />
-        <Route path="/ai/*" element={<Navigate to="/admin/ai" replace />} />
         <Route path="/ai-monitor" element={<Navigate to="/admin/ai-monitor" replace />} />
         <Route path="/workflows" element={<Navigate to="/admin/workflows" replace />} />
         <Route path="/events" element={<Navigate to="/admin/events" replace />} />
         <Route path="/disruption" element={<Navigate to="/admin/disruption" replace />} />
-        <Route path="/iot" element={<Navigate to="/admin/iot" replace />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

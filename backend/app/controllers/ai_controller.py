@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import httpx
 
-from ..ai_registry import get_registry, AI_MODULES
+from ..ai_registry import AI_MODULES
 from ..database import get_db
 from ..utils.response_envelope import success_response, error_response
 from ..utils.auth import verify_api_key
@@ -158,11 +158,6 @@ async def _try_service(url: str, path: str, payload: dict, timeout: float = 4.0)
             return {"service_error": r.text[:500], "status_code": r.status_code}
     except Exception as exc:
         return {"service_unavailable": str(exc)[:300]}
-
-
-@router.get("/registry")
-def registry():
-    return success_response(data=get_registry())
 
 
 @router.post("/face/verify", dependencies=[Depends(verify_api_key)])

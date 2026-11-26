@@ -54,7 +54,7 @@ def check(verbose=True):
         print(f"FAIL: connected to '{db}', expected '{EXPECTED_DB}'")
         ok = False
     if engine.dialect.name != "postgresql" or engine.dialect.driver != "psycopg":
-        print("FAIL: expected postgresql+psycopg dialect/driver")
+        print(f"FAIL: expected postgresql+psycopg dialect/driver")
         ok = False
     insp = inspect(engine)
     actual = set(insp.get_table_names(schema="public"))
@@ -73,23 +73,11 @@ def check(verbose=True):
     return ok
 
 
-def seed():
-    """check -> create_all -> seed_demo_data -> validate counts."""
-    Base.metadata.create_all(bind=engine)
-    if not check(verbose=True):
-        return False
-    from seed_demo_data import seed_all  # noqa: E402 (needs tables first)
-    seed_all()
-    return check(verbose=False)
-
-
 def main():
     ap = argparse.ArgumentParser(description="Smart Airport DB setup")
-    g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--check", action="store_true")
-    g.add_argument("--seed", action="store_true")
+    ap.add_argument("--check", action="store_true", help="verify reachability, schema + model metadata match")
     args = ap.parse_args()
-    ok = check() if args.check else seed()
+    ok = check() if args.check else True
     raise SystemExit(0 if ok else 1)
 
 
