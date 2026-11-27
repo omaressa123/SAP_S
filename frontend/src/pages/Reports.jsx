@@ -1,296 +1,345 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BarChart as BarChartIcon } from 'lucide-react'
-import Card from '../components/Card'
+/**
+ * Operational Analytics Dashboards:
+ *   1. Passengers (/admin/reports/passengers)
+ *   2. Flights    (/admin/reports/flights)
+ *   3. Baggage    (/admin/reports/baggage)
+ *   4. Operations (/admin/reports/operations)
+ *
+ * Every KPI card and chart (Pie, Histogram, Bar, Trend) renders strictly from
+ * real PostgreSQL data via /api/v1/reports/*.
+ */
+import { useCallback, useEffect, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import useApi from '../hooks/useApi'
-import { EmptyState, ErrorState, Loading } from '../components/States'
-import { AiModuleLayout, EventTimeline } from '../components/ai/AiVisuals'
-import { HBarList, Donut, LineChart, ZoneHeat, Histogram } from '../components/ai/Charts'
-import { KPIGrid, ReportSummary, ReportFilters, PassengerFlowVisualization } from '../components/ai/Reusable'
-import { buildHistogram, countBy, presetRange, summarizeReport } from '../utils/reportAdapters'
+import { Loading, ErrorState } from '../components/States'
+import { Donut, Histogram, LineChart } from '../components/ai/Charts'
+import Card from '../components/Card'
 
-const TABS = ['passengers', 'flights', 'baggage', 'security', 'ai', 'iot', 'operations']
+const PALETTE = ['#1d4ed8', '#0e7c4a', '#d97706', '#dc2626', '#7c3aed', '#0891b2']
 
-function buildPath(tab, f) {
-  if (tab === 'passengers' && f.preset && f.preset !== 'all') {
-    const r = presetRange(f.preset, f)
-    const q = new URLSearchParams(Object.fromEntries(Object.entries(r).filter(([, v]) => v))).toString()
-    return `/api/v1/reports/passengers${q ? `?${q}` : ''}`
-  }
-  if (tab === 'flights' && f.status) return `/api/v1/reports/flights?status=${encodeURIComponent(f.status)}`
-  if (tab === 'baggage' && f.status) return `/api/v1/reports/baggage?status=${encodeURIComponent(f.status)}`
-  return `/api/v1/reports/${tab}`
+const SECTION_META = {
+  passengers: {
+    title: 'Passengers Analytics',
+    subtitle: 'Passenger volume, check-in, boarding, and identity verification activity.',
+    endpoint: '/api/v1/reports/passengers',
+  },
+  flights: {
+    title: 'Flights Analytics',
+    subtitle: 'Flight schedule distribution and operational status tracking.',
+    endpoint: '/api/v1/reports/flights',
+  },
+  baggage: {
+    title: 'Baggage Analytics',
+    subtitle: 'Baggage processing stages, throughput, and operational exceptions.',
+    endpoint: '/api/v1/reports/baggage',
+  },
+  operations: {
+    title: 'Operations Analytics',
+    subtitle: 'Airport-wide operational activities, completion rates, and exceptions.',
+    endpoint: '/api/v1/reports/operations',
+  },
 }
 
-function rangeLabel(tab, f) {
-  if (tab === 'passengers') {
-    if (!f.preset || f.preset === 'all') return 'all time'
-    if (f.preset === 'custom') return `${f.from || '?'} → ${f.to || '?'}`
-    return f.preset
-  }
-  if ((tab === 'flights' || tab === 'baggage') && f.status) return `status = ${f.status}`
-  return 'live snapshot'
+function pct(part, total) {
+  if (!total) return '0.0%'
+  return `${((Number(part || 0) / Number(total)) * 100).toFixed(1)}%`
 }
 
-export default function Reports() {
-  const [tab, setTab] = useState('passengers')
-  const [filters, setFilters] = useState({})
+function MetricCard({ label, value, sub, accent = '#071739' }) {
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderTop: `3px solid ${accent}`,
+      borderRadius: 12,
+      padding: '14px 16px',
+      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
+    }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
+        {Number(value ?? 0).toLocaleString()}
+      </div>
+      {sub && (
+        <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: 4 }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ColoredBarChart({ title, rows = [] }) {
+  if (!rows.length || !rows.some((r) => Number(r.count) > 0)) {
+    return (
+      <Card title={title}>
+        <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>No operational records available.</p>
+      </Card>
+    )
+  }
+  const max = Math.max(...rows.map((r) => Number(r.count) || 0), 1)
+  return (
+    <Card title={title}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {rows.map((r, i) => {
+          const val = Number(r.count) || 0
+          const color = PALETTE[i % PALETTE.length]
+          return (
+            <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 56px', alignItems: 'center', gap: 10, fontSize: '0.84rem' }}>
+              <span style={{ color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {r.label}
+              </span>
+              <div style={{ height: 12, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${(val / max) * 100}%`, height: '100%', background: color, borderRadius: 999 }} />
+              </div>
+              <strong style={{ textAlign: 'right', color: '#0f172a' }}>{val.toLocaleString()}</strong>
+            </div>
+          )
+        })}
+      </div>
+    </Card>
+  )
+}
+
+export default function Reports({ section = 'passengers' }) {
+  const meta = SECTION_META[section] || SECTION_META.passengers
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [applied, setApplied] = useState({ from: '', to: '' })
   const [nonce, setNonce] = useState(0)
-  const [updatedAt, setUpdatedAt] = useState(null)
-  const path = buildPath(tab, filters)
-  const { data, error, loading } = useApi(path, [tab, JSON.stringify(filters), nonce])
 
-  useEffect(() => { if (data) setUpdatedAt(new Date().toLocaleTimeString()) }, [data])
-  useEffect(() => { setFilters({}) }, [tab])
+  const params = new URLSearchParams()
+  if (applied.from) params.set('date_from', applied.from)
+  if (applied.to) params.set('date_to', applied.to)
+  const qs = params.toString()
+  const url = `${meta.endpoint}${qs ? `?${qs}` : ''}`
 
-  const memo = useMemo(() => {
-    if (!data) return {}
-    if (tab === 'baggage') {
-      const items = data.detected_items || []
-      return {
-        itemTypes: countBy(items, 'item_type').slice(0, 8),
-        confHist: buildHistogram(items.map((d) => d.confidence_score).filter((v) => v != null), 8, 0, 100),
-      }
-    }
-    if (tab === 'ai') {
-      const sims = (data.recent_verifications || []).map((v) => v.cosine_similarity).filter((v) => v !== null && v !== undefined)
-      return { sims, simHist: buildHistogram(sims, 10, 0, 1) }
-    }
-    if (tab === 'operations') {
-      return {
-        alertsBySeverity: countBy(data.alerts || [], 'severity'),
-        alertsByStatus: countBy(data.alerts || [], 'status'),
-        emergByType: countBy(data.emergencies || [], 'event_type'),
-      }
-    }
-    if (tab === 'iot') {
-      return {
-        healthCells: (data.recent_health || []).slice(0, 12).map((h) => ({
-          label: `#${h.equipment_id}`, value: h.value ?? 1, severity: h.status_result === 'ok' ? 'low' : 'high',
-        })),
-      }
-    }
-    return {}
-  }, [data, tab])
+  const { data, error, loading } = useApi(url, [url, nonce])
 
-  const insights = useMemo(() => summarizeReport(tab, data), [tab, data])
-  const resetFilters = () => setFilters({})
+  useEffect(() => {
+    const timer = setInterval(() => setNonce((n) => n + 1), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const applyFilter = (e) => {
+    e.preventDefault()
+    setApplied({ from: dateFrom, to: dateTo })
+  }
+
+  const resetFilter = () => {
+    setDateFrom('')
+    setDateTo('')
+    setApplied({ from: '', to: '' })
+  }
+
+  const refresh = useCallback(() => setNonce((n) => n + 1), [])
+
+  if (loading && !data) {
+    return (
+      <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+        <h1>{meta.title}</h1>
+        <Loading label={`Loading ${meta.title.toLowerCase()}…`} />
+      </div>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+        <h1>{meta.title}</h1>
+        <ErrorState error={error} onRetry={refresh} />
+      </div>
+    )
+  }
+
+  // Build KPIs & 4 chart datasets per section from real backend response
+  let kpis = []
+  let pieTitle = ''
+  let pieSegments = []
+  let histTitle = ''
+  let histBins = []
+  let barTitle = ''
+  let barRows = []
+  let trendTitle = ''
+  let trendPoints = []
+
+  if (section === 'passengers' && data) {
+    const total = data.total ?? 0
+    const checkedIn = data.checked_in ?? 0
+    const boarded = data.boarded ?? 0
+    const verified = data.verified ?? 0
+    kpis = [
+      { label: 'Total Passengers', value: total, sub: 'Registered in period', accent: '#1d4ed8' },
+      { label: 'Checked-in Passengers', value: checkedIn, sub: `${pct(checkedIn, total)} of total`, accent: '#0e7c4a' },
+      { label: 'Boarded Passengers', value: boarded, sub: `${pct(boarded, total)} of total`, accent: '#7c3aed' },
+      { label: 'Verified Passengers', value: verified, sub: `${pct(verified, total)} of total`, accent: '#0891b2' },
+    ]
+    pieTitle = 'Passenger Distribution by Operational Status'
+    pieSegments = (data.status_distribution || []).map((s) => ({ label: s.status, value: s.count }))
+    histTitle = 'Passenger Activity Over Time (Histogram)'
+    histBins = (data.activity_series || []).slice(-12)
+    barTitle = 'Checked-in vs. Boarded vs. Verified'
+    barRows = [
+      { label: 'Checked-in', count: checkedIn },
+      { label: 'Boarded', count: boarded },
+      { label: 'Verified', count: verified },
+    ]
+    trendTitle = 'Passenger Processing Trend'
+    trendPoints = (data.activity_series || []).map((p) => p.count)
+  } else if (section === 'flights' && data) {
+    const total = data.total ?? 0
+    const byStatus = Object.fromEntries((data.by_status || []).map((s) => [String(s.status).toLowerCase(), s.count]))
+    const active = (byStatus.active || 0) + (byStatus.boarding || 0) + (byStatus.in_air || 0)
+    const scheduled = byStatus.scheduled || 0
+    const departed = byStatus.departed || 0
+    const arrived = byStatus.arrived || 0
+    const delayed = byStatus.delayed || 0
+    kpis = [
+      { label: 'Total Flights', value: total, sub: 'All flight records', accent: '#1d4ed8' },
+      { label: 'Active Flights', value: active, sub: `${pct(active, total)} of total`, accent: '#0e7c4a' },
+      { label: 'Scheduled Flights', value: scheduled, sub: `${pct(scheduled, total)} of total`, accent: '#0891b2' },
+      { label: 'Departed Flights', value: departed, sub: `${pct(departed, total)} of total`, accent: '#7c3aed' },
+      { label: 'Arrived Flights', value: arrived, sub: `${pct(arrived, total)} of total`, accent: '#0f766e' },
+      { label: 'Delayed Flights', value: delayed, sub: `${pct(delayed, total)} of total`, accent: '#dc2626' },
+    ]
+    pieTitle = 'Flight Distribution by Operational Status'
+    pieSegments = (data.by_status || []).map((s) => ({ label: s.status, value: s.count }))
+    histTitle = 'Flight Activity Over Time (Histogram)'
+    histBins = (data.activity_series || []).slice(-12)
+    barTitle = 'Flights by Operational Status'
+    barRows = (data.by_status || []).map((s) => ({ label: s.status, count: s.count }))
+    trendTitle = 'Flight Operational Trend'
+    trendPoints = (data.activity_series || []).map((p) => p.count)
+  } else if (section === 'baggage' && data) {
+    const total = data.total_bags ?? 0
+    const byStatus = Object.fromEntries((data.by_status || []).map((s) => [String(s.status).toLowerCase(), s.count]))
+    const checkedIn = byStatus.checked_in || 0
+    const inProcessing = (byStatus.screening || 0) + (byStatus.in_transit || 0) + (byStatus.stationary || 0) + (byStatus.processing || 0)
+    const loaded = byStatus.loaded || 0
+    const delivered = byStatus.delivered || byStatus.claimed || 0
+    const exceptions = (data.by_result || []).filter((r) => r.result !== 'SAFE').reduce((a, r) => a + r.count, 0)
+    kpis = [
+      { label: 'Total Baggage Items', value: total, sub: `${data.inspections_total ?? 0} total inspections`, accent: '#1d4ed8' },
+      { label: 'Baggage Checked-in', value: checkedIn, sub: `${pct(checkedIn, total)} of total`, accent: '#0e7c4a' },
+      { label: 'In Processing', value: inProcessing, sub: `${pct(inProcessing, total)} of total`, accent: '#d97706' },
+      { label: 'Baggage Loaded', value: loaded, sub: `${pct(loaded, total)} of total`, accent: '#7c3aed' },
+      { label: 'Baggage Delivered', value: delivered, sub: `${pct(delivered, total)} of total`, accent: '#0891b2' },
+      { label: 'Baggage Exceptions', value: exceptions, sub: 'Non-SAFE inspections', accent: '#dc2626' },
+    ]
+    pieTitle = 'Baggage Distribution by Processing Status'
+    pieSegments = (data.by_status || []).map((s) => ({ label: s.status, value: s.count }))
+    histTitle = 'Baggage Processing Volume Over Time'
+    histBins = (data.activity_series || []).slice(-12)
+    barTitle = 'Baggage Processing Stages'
+    barRows = [
+      { label: 'Checked-in', count: checkedIn },
+      { label: 'In Processing', count: inProcessing },
+      { label: 'Loaded', count: loaded },
+      { label: 'Delivered', count: delivered },
+      { label: 'Exceptions', count: exceptions },
+    ]
+    trendTitle = 'Baggage Processing Trend'
+    trendPoints = (data.activity_series || []).map((p) => p.count)
+  } else if (section === 'operations' && data) {
+    const ops = data.operations_summary || {}
+    const total = ops.total_activities ?? 0
+    const completed = ops.completed ?? 0
+    const inProgress = ops.in_progress ?? 0
+    const pending = ops.pending ?? 0
+    const exceptions = ops.exceptions ?? 0
+    kpis = [
+      { label: 'Total Operational Activities', value: total, sub: 'Check-ins, boardings, inspections, workflows', accent: '#1d4ed8' },
+      { label: 'Completed Operations', value: completed, sub: `${pct(completed, total)} completion rate`, accent: '#0e7c4a' },
+      { label: 'In-Progress Operations', value: inProgress, sub: `${pct(inProgress, total)} of total`, accent: '#d97706' },
+      { label: 'Pending Operations', value: pending, sub: `${pct(pending, total)} of total`, accent: '#0891b2' },
+      { label: 'Operational Exceptions', value: exceptions, sub: `${pct(exceptions, total)} of total`, accent: '#dc2626' },
+    ]
+    pieTitle = 'Overall Operational Status Distribution'
+    pieSegments = (ops.by_status || []).map((s) => ({ label: s.status, value: s.count }))
+    histTitle = 'Operational Activity Over Time'
+    histBins = (ops.activity_series || []).slice(-12)
+    barTitle = 'Operational Activities by Category'
+    barRows = (ops.by_category || []).map((c) => ({ label: c.category, count: c.count }))
+    trendTitle = 'Operational Activity Trend'
+    trendPoints = (ops.activity_series || []).map((p) => p.count)
+  }
 
   return (
-    <AiModuleLayout
-      icon={<BarChartIcon size={22} />}
-      title="Reports & Analytics"
-      description="Every figure below is computed from live API responses and visualized — raw payloads are never shown."
-      aiStatus={error ? 'offline' : 'online'}
-      systemNote={loading ? 'updating…' : error ? 'backend unreachable' : `updated ${updatedAt || 'just now'}`}
-      stats={[]}
-    >
-      {/* REPORT HEADER */}
-      <div className="report-head">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="tablist" aria-label="Report scope">
-          {TABS.map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={t === tab} className="btn" style={t === tab ? {} : { opacity: 0.55 }} onClick={() => setTab(t)}>{t}</button>
-          ))}
+    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+      {/* Header + Date Range Filter */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#071739' }}>{meta.title}</h1>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>{meta.subtitle}</p>
         </div>
-        <span className="spacer" />
-        <span className="report-meta">Range: {rangeLabel(tab, filters)} · {loading ? 'refreshing…' : error ? 'offline' : `refreshed ${updatedAt || ''}`}</span>
-        <button type="button" className="btn" onClick={() => setNonce((n) => n + 1)} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
+
+        <form onSubmit={applyFilter} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="date"
+            aria-label="Date from"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+          />
+          <input
+            type="date"
+            aria-label="Date to"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+          />
+          <button
+            type="submit"
+            style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: '#071739', color: '#fff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer' }}
+          >
+            Apply
+          </button>
+          {(applied.from || applied.to) && (
+            <button
+              type="button"
+              onClick={resetFilter}
+              style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.84rem', cursor: 'pointer' }}
+            >
+              Reset
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={refresh}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+              borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', fontWeight: 600, fontSize: '0.84rem', cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </form>
       </div>
 
-      <Card title="Report scope & filters">
-        <ReportFilters tab={tab} value={filters} onChange={setFilters} />
-      </Card>
+      {/* KPI Row */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 14,
+        marginBottom: 20,
+      }}>
+        {kpis.map((k) => (
+          <MetricCard key={k.label} label={k.label} value={k.value} sub={k.sub} accent={k.accent} />
+        ))}
+      </div>
 
-      {loading && <Loading />}
-      {error && <ErrorState error={error} onRetry={() => setNonce((n) => n + 1)} />}
-      {!loading && !error && !data && <EmptyState />}
-      {!loading && !error && data && (
-        <>
-          {tab === 'passengers' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Total passengers', value: data.total },
-                { label: 'Verified', value: data.verified },
-                { label: 'Failed', value: data.failed },
-                { label: 'Checked in', value: data.checked_in },
-                { label: 'Boarded', value: data.boarded },
-              ]} />
-              <PassengerFlowVisualization entering={data.checked_in || 0} leaving={data.boarded || 0} peak={data.total || 0} />
-              <div className="dash-grid-2">
-                <Donut title="Verification outcome" segments={[
-                  { label: 'Verified', value: data.verified }, { label: 'Failed', value: data.failed },
-                ]} />
-                <HBarList title="Passengers by nationality" rows={(data.by_nationality || []).map((r) => ({ label: r.code || 'unknown', count: r.count }))} />
-              </div>
-              <ReportSummary insights={insights} />
-            </>
-          )}
-
-          {tab === 'flights' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Flights (filtered)', value: data.total },
-                ...(data.by_status || []).map((r) => ({ label: r.status, value: r.count })),
-              ]} />
-              {!(data.by_status || []).length && <EmptyState title="No flights in scope" hint="try clearing the status filter" icon="✈️" action={<button type="button" className="btn" onClick={resetFilters}>Reset filters</button>} />}
-              <div className="dash-grid-2">
-                <HBarList title="Flights by status" rows={(data.by_status || []).map((r) => ({ label: r.status, count: r.count }))} />
-                <Donut title="Status share" segments={(data.by_status || []).map((r) => ({ label: r.status, value: r.count }))} />
-              </div>
-              <ReportSummary insights={insights} />
-              <Card title="Flight schedule — recent events">
-                <EventTimeline
-                  emptyHint="No flights match this filter."
-                  events={(data.flights || []).slice(0, 10).map((f) => ({
-                    title: `${f.flight_number} — ${f.status}`, time: f.scheduled_departure,
-                    severity: /cancelled|delayed/.test(f.status) ? 'high' : 'low',
-                    badge: f.status?.toUpperCase(), tone: f.status === 'cancelled' ? 'bad' : f.status === 'delayed' ? 'warn' : 'good',
-                  }))}
-                />
-              </Card>
-            </>
-          )}
-
-          {tab === 'baggage' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Total bags', value: data.total_bags },
-                { label: 'Inspections', value: data.inspections_total },
-                ...((data.by_result || []).map((r) => ({ label: `Result: ${r.result}`, value: r.count }))),
-              ]} />
-              <div className="dash-grid-2">
-                <HBarList title="Bags by status" rows={(data.by_status || []).map((r) => ({ label: r.status, count: r.count }))} />
-                <Donut title="Inspection results" segments={(data.by_result || []).map((r) => ({ label: r.result, value: r.count }))} />
-              </div>
-              <div className="dash-grid-2">
-                <Histogram title="Threat confidence distribution" bins={memo.confHist || []} emptyHint="no scored detections yet" />
-                <HBarList title="Detected threat types" rows={memo.itemTypes || []} labelKey="label" valueKey="count" />
-              </div>
-              <ReportSummary insights={insights} />
-              <Card title="Recent inspections — timeline">
-                <EventTimeline
-                  emptyHint="No inspections logged."
-                  events={(data.recent_inspections || []).slice(0, 10).map((i) => ({
-                    title: `Bag ${i.bag_id} — ${i.result}`, detail: `Inspection #${i.inspection_id} · ${i.ai_model_version || ''}`,
-                    time: i.scan_time, severity: i.result === 'SAFE' ? 'low' : 'high',
-                    badge: i.result, tone: i.result === 'SAFE' ? 'good' : 'bad',
-                  }))}
-                />
-              </Card>
-            </>
-          )}
-
-          {tab === 'security' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Verifications', value: data.verifications_total },
-                { label: 'Verified', value: data.verified },
-                { label: 'Failed', value: data.failed },
-                { label: 'Verification rate', value: (data.verification_rate || 0) * 100, decimals: 1, suffix: '%' },
-                { label: 'Gate authorized', value: data.gate_authorized },
-                { label: 'Gate denied', value: data.gate_denied },
-              ]} />
-              <div className="dash-grid-2">
-                <Donut title="Verification outcome" segments={[
-                  { label: 'Verified', value: data.verified }, { label: 'Failed', value: data.failed },
-                ]} />
-                <HBarList title="Gate decisions" rows={[
-                  { label: 'authorized', count: data.gate_authorized },
-                  { label: 'denied', count: data.gate_denied },
-                ]} />
-              </div>
-              <ReportSummary insights={insights} />
-            </>
-          )}
-
-          {tab === 'ai' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Face attempts', value: data.face_attempts },
-                { label: 'Avg similarity', value: data.avg_similarity, decimals: 3 },
-                { label: 'Inspections', value: data.inspections },
-                { label: 'Detected items', value: data.detected_items },
-                { label: 'Monitoring alerts', value: data.monitoring_alerts },
-              ]} />
-              <div className="dash-grid-2">
-                <LineChart title="Recent match scores (cosine similarity)" points={memo.sims || []} formatY={(v) => v.toFixed(2)} />
-                <Histogram title="Similarity distribution" bins={memo.simHist || []} emptyHint="no scored verifications yet" />
-              </div>
-              <div className="dash-grid-2">
-                <Donut title="AI workload" segments={[
-                  { label: 'Face attempts', value: data.face_attempts },
-                  { label: 'Inspections', value: data.inspections },
-                  { label: 'Alerts', value: data.monitoring_alerts },
-                ]} />
-              </div>
-              <ReportSummary insights={insights} />
-              <Card title="Recent verifications — timeline">
-                <EventTimeline
-                  emptyHint="No verifications logged."
-                  events={(data.recent_verifications || []).slice(0, 10).map((v) => ({
-                    title: `Passenger ${v.passenger_id} — ${v.verification_status}`,
-                    detail: v.cosine_similarity !== null && v.cosine_similarity !== undefined ? `similarity ${Number(v.cosine_similarity).toFixed(3)}` : 'no model score',
-                    time: v.timestamp, severity: v.verification_status === 'verified' ? 'low' : 'high',
-                    badge: v.verification_status?.toUpperCase(), tone: v.verification_status === 'verified' ? 'good' : 'bad',
-                  }))}
-                />
-              </Card>
-            </>
-          )}
-
-          {tab === 'iot' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Devices', value: data.devices_total },
-                ...((data.by_status || []).map((r) => ({ label: r.status, value: r.count }))),
-              ]} />
-              <div className="dash-grid-2">
-                <HBarList title="Devices by status" rows={(data.by_status || []).map((r) => ({ label: r.status, count: r.count }))} />
-                <ZoneHeat title="Latest equipment readings" cells={memo.healthCells || []} emptyHint="no health checks returned by API" />
-              </div>
-              <ReportSummary insights={insights} />
-              <Card title="Recent health checks — timeline">
-                <EventTimeline
-                  emptyHint="No health checks logged."
-                  events={(data.recent_health || []).slice(0, 10).map((h) => ({
-                    title: `Equipment ${h.equipment_id} — ${h.metric_type}: ${h.value}`,
-                    detail: h.status_result, time: h.check_time,
-                    severity: h.status_result === 'ok' ? 'low' : 'high',
-                    badge: h.status_result?.toUpperCase(), tone: h.status_result === 'ok' ? 'good' : 'bad',
-                  }))}
-                />
-              </Card>
-            </>
-          )}
-
-          {tab === 'operations' && (
-            <>
-              <KPIGrid items={[
-                { label: 'Emergencies', value: data.emergencies_total },
-                { label: 'Alerts', value: data.alerts_total },
-              ]} />
-              <div className="dash-grid-2">
-                <HBarList title="Alerts by severity" rows={memo.alertsBySeverity || []} />
-                <HBarList title="Emergencies by type" rows={memo.emergByType || []} />
-              </div>
-              <div className="dash-grid-2">
-                <Donut title="Alert status" segments={(memo.alertsByStatus || []).map((r) => ({ label: r.label, value: r.count }))} />
-                <HBarList title="Zone analysis — alert volume by severity" rows={memo.alertsBySeverity || []} />
-              </div>
-              <ReportSummary insights={insights} />
-              <Card title="Alert timeline — recent events">
-                <EventTimeline
-                  emptyHint="No alerts in database."
-                  events={(data.alerts || []).slice(0, 10).map((a) => ({
-                    title: `${a.behavior_type} — ${a.severity}`, detail: `#${a.alert_id} · ${a.status}`,
-                    time: a.timestamp, severity: a.severity,
-                    badge: a.status?.toUpperCase(), tone: a.status === 'open' ? 'warn' : 'good',
-                  }))}
-                />
-              </Card>
-            </>
-          )}
-        </>
-      )}
-    </AiModuleLayout>
+      {/* 4 Visualizations: Pie, Histogram, Bar, Trend */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+        gap: 16,
+      }}>
+        <Donut title={pieTitle} segments={pieSegments} />
+        <ColoredBarChart title={barTitle} rows={barRows} />
+        <Histogram title={histTitle} bins={histBins} />
+        <LineChart title={trendTitle} points={trendPoints} />
+      </div>
+    </div>
   )
 }

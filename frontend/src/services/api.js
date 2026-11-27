@@ -155,24 +155,30 @@ export const AirportApi = {
   })
 }
 
-export const DisruptionApi = {
-  listPlans: () => api('/api/v1/agents/disruption/plans'),
-  getPlan: (id) => api(`/api/v1/agents/disruption/plan/${id}`),
-  createPlan: (payload) => api('/api/v1/agents/disruption/plan', {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  }),
-  approvePlan: (id, reason) => api(`/api/v1/agents/disruption/plan/${id}/approve`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
-  }),
-  executePlan: (id) => api(`/api/v1/agents/disruption/plan/${id}/execute`, {
-    method: 'POST'
-  }),
-  rejectPlan: (id, reason) => api(`/api/v1/agents/disruption/plan/${id}/reject`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
-  }),
+export const OrchestrationApi = {
+  getModels: () => api('/api/v1/agents/models'),
+  getDevices: () => api('/api/v1/agents/devices'),
+  registerDevice: (payload) => api('/api/v1/agents/devices', { method: 'POST', body: JSON.stringify(payload) }),
+  getDeployments: (sync = true) => api(`/api/v1/agents/deployments?sync=${sync}`),
+  createDeployment: (payload) => api('/api/v1/agents/deployments', { method: 'POST', body: JSON.stringify(payload) }),
+  stopDeployment: (id) => api(`/api/v1/agents/deployments/${id}/stop`, { method: 'POST' }),
+  restartDeployment: (id) => api(`/api/v1/agents/deployments/${id}/restart`, { method: 'POST' }),
+  repairDeployment: (id) => api(`/api/v1/agents/deployments/${id}/repair`, { method: 'POST' }),
+  duplicateDeployment: (id, payload) => api(`/api/v1/agents/deployments/${id}/duplicate`, { method: 'POST', body: JSON.stringify(payload) }),
+  removeDeployment: (id) => api(`/api/v1/agents/deployments/${id}`, { method: 'DELETE' }),
+}
+
+export const AgentNotificationApi = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== false))
+    ).toString()
+    return api(`/api/v1/agents/notifications${qs ? `?${qs}` : ''}`)
+  },
+  markRead: (id) => api(`/api/v1/agents/notifications/${id}/read`, { method: 'POST' }),
+  acknowledge: (id) => api(`/api/v1/agents/notifications/${id}/acknowledge`, { method: 'POST' }),
+  resolve: (id) => api(`/api/v1/agents/notifications/${id}/resolve`, { method: 'POST' }),
+  markAllRead: () => api('/api/v1/agents/notifications/mark-all-read', { method: 'POST' }),
 }
 
 export const BaggageDropApi = {

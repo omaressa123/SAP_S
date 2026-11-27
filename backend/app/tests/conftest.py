@@ -74,11 +74,11 @@ def clean_tables():
     db = SessionLocal()
     try:
         # Delete in dependency order
-        for tbl in ["disruptionproposal", "hitlreview", "sagacompensation", "sagastep", "sagainstance",
+        for tbl in ["hitlreview", "sagacompensation", "sagastep", "sagainstance",
                     "decisionaudit", "agenteexecution", "agenttask", "airportevent",
                     "workflowexecution", "agentdefinition", "staffrole", "staff",
                     "role", "department", "booking", "flight", "boardinggate", "equipment",
-                    "zone", "airline", "airport", "passengers"]:
+                    "zone", "airline", "airport", "passenger"]:
             db.execute(text(f"DELETE FROM {tbl}"))
         db.commit()
     finally:

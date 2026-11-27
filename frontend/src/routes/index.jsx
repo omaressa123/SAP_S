@@ -31,9 +31,7 @@ const FaceKiosk = lazy(() => import('../pages/FaceKiosk'))
 const SmokeFire = lazy(() => import('../pages/SmokeFire'))
 const FullDetection = lazy(() => import('../pages/FullDetection'))
 const BaggagePersonDetection = lazy(() => import('../pages/BaggagePersonDetection'))
-const EventCenter = lazy(() => import('../pages/EventCenter'))
 const WorkflowMonitor = lazy(() => import('../pages/WorkflowMonitor'))
-const DisruptionPlanner = lazy(() => import('../pages/DisruptionPlanner'))
 
 export default function AppRoutes() {
   return (
@@ -72,7 +70,11 @@ export default function AppRoutes() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="reports" element={<Navigate to="/admin/reports/passengers" replace />} />
+          <Route path="reports/passengers" element={<Reports section="passengers" />} />
+          <Route path="reports/flights" element={<Reports section="flights" />} />
+          <Route path="reports/baggage" element={<Reports section="baggage" />} />
+          <Route path="reports/operations" element={<Reports section="operations" />} />
           <Route path="ai/baggage" element={<BaggageAI />} />
           <Route path="ai/face" element={<FaceKiosk />} />
           <Route path="ai/smoke-fire" element={<SmokeFire />} />
@@ -80,8 +82,6 @@ export default function AppRoutes() {
           <Route path="ai/baggage-person" element={<BaggagePersonDetection />} />
           <Route path="ai-monitor" element={<AIMonitor />} />
           <Route path="workflows" element={<WorkflowMonitor />} />
-          <Route path="events" element={<EventCenter />} />
-          <Route path="disruption" element={<DisruptionPlanner />} />
         </Route>
 
         {/* Backward-compatible redirects for legacy URLs */}
@@ -94,11 +94,9 @@ export default function AppRoutes() {
         <Route path="/flights" element={<Navigate to="/staff/flights" replace />} />
         <Route path="/passengers" element={<Navigate to="/staff/passengers" replace />} />
         <Route path="/baggage" element={<Navigate to="/staff/baggage" replace />} />
-        <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/reports" element={<Navigate to="/admin/reports/passengers" replace />} />
         <Route path="/ai-monitor" element={<Navigate to="/admin/ai-monitor" replace />} />
         <Route path="/workflows" element={<Navigate to="/admin/workflows" replace />} />
-        <Route path="/events" element={<Navigate to="/admin/events" replace />} />
-        <Route path="/disruption" element={<Navigate to="/admin/disruption" replace />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

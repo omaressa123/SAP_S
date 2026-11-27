@@ -31,11 +31,9 @@ const NAV_GROUPS = [
     label: 'AI & Infrastructure',
     items: [
       { to: '/ai-monitor', label: 'AI Monitoring', icon: 'Activity' },
-      { to: '/events', label: 'Event Center', icon: 'Bell' },
       { to: '/workflows', label: 'Workflows', icon: 'GitBranch' },
       { to: '/digital-twin', label: 'Digital Twin', icon: 'Monitor' },
       { to: '/reports', label: 'Reports', icon: 'FileText' },
-      { to: '/disruption', label: 'Disruption Planner', icon: 'AlertTriangle' },
     ],
   },
 ]

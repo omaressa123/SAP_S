@@ -1,262 +1,310 @@
 /**
- * AI Monitoring page — real status of AI microservices behind the
- * agent registry, with last successful inference, failure/timeout
- * detection, and latency where measured.
+ * AI Monitoring — Agent Notifications & Operational Alerts Only.
  *
- * All data comes from existing backend endpoints:
- *   GET /api/v1/agents/registry   — agent capabilities + health
- *   GET /api/v1/reports/ai        — face verification attempts, avg similarity
- *   GET /api/v1/reports/security  — gate auth stats
- *   GET /api/v1/agents/workflows  — agent task executions (latency, retries)
+ * Displays real-time notifications from deployed AI agents across airport devices:
+ *   - Offline / unavailable / disconnected from device
+ *   - Crashes, model init/execution failures, performance degradation, stalled processing
+ *   - Recovery after failure
  *
- * No model retraining, no fake data. When a service is unreachable the
- * panel states "service unavailable" honestly — never SAFE.
+ * Strict scope: Notifications and operational alerts ONLY.
  */
-import { useCallback, useState } from 'react'
-import { BrainCircuit, ShieldAlert, Timer, Activity, Clock, Mail, Users } from 'lucide-react'
-import Card from '../components/Card'
-import useApi from '../hooks/useApi'
-import { Loading, EmptyState, ErrorState, StatCard } from '../components/States'
-import PulseDot from '../components/animations/PulseDot'
-import { api } from '../services/api'
-import FadeIn from '../components/animations/FadeIn'
+import { useCallback, useEffect, useState } from 'react'
+import { Bell, Check, CheckCheck, RefreshCw, ShieldAlert, AlertTriangle, Info, Wrench } from 'lucide-react'
+import { AgentNotificationApi } from '../services/api'
+import { Loading, ErrorState } from '../components/States'
 
-const SERVICE_MAP = [
-  { id: 'face_recognition', label: 'Face Recognition', model: 'face_reco', icon: Users },
-  { id: 'baggage_threat_detection', label: 'Baggage Threat Detection', model: 'BTD YOLO11', icon: Mail },
-  { id: 'smoke_fire_detection', label: 'Smoke & Fire Detection', model: 'training pipeline only', icon: Activity },
-  { id: 'full_scene_detection', label: 'Full Scene Detection', model: 'YOLO + fall RF', icon: BrainCircuit },
-]
+const SEVERITY_META = {
+  critical: { label: 'Critical', bg: '#fef2f2', border: '#fecaca', text: '#b91c1c', Icon: ShieldAlert },
+  warning: { label: 'Warning', bg: '#fffbeb', border: '#fde68a', text: '#b45309', Icon: AlertTriangle },
+  info: { label: 'Info', bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8', Icon: Info },
+}
 
-const STATUS_COLOR = {
-  online: '#0e7c4a',
-  offline: '#d64550',
+const STATUS_BADGE = {
+  open: { label: 'Open', bg: '#fee2e2', text: '#991b1b' },
+  acknowledged: { label: 'Acknowledged', bg: '#fef3c7', text: '#92400e' },
+  resolved: { label: 'Resolved', bg: '#dcfce7', text: '#166534' },
 }
 
 export default function AIMonitor() {
-  const [nonce, setNonce] = useState(0)
-  const retry = useCallback(() => setNonce((n) => n + 1), [])
-  const registry = useApi('/api/v1/agents/registry', [nonce])
-  const aiReport = useApi('/api/v1/reports/ai', [nonce])
-  const securityReport = useApi('/api/v1/reports/security', [nonce])
-  const workflows = useApi('/api/v1/agents/workflows?limit=50', [nonce])
+  const [notifications, setNotifications] = useState([])
+  const [agents, setAgents] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [severityFilter, setSeverityFilter] = useState('')
+  const [agentFilter, setAgentFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
-  if (registry.loading || aiReport.loading || securityReport.loading || workflows.loading) {
-    return (
-      <div className="ops-bg">
-        <h1>AI Monitoring</h1>
-        <Loading />
-      </div>
-    )
-  }
-  if (registry.error) {
-    return (
-      <div className="ops-bg">
-        <h1>AI Monitoring</h1>
-        <ErrorState error={registry.error} onRetry={retry} />
-      </div>
-    )
-  }
-
-  const reg = registry.data || {}
-  const agents = reg.agents || []
-  const aiData = aiReport.data || {}
-  const secData = securityReport.data || {}
-  const wfs = workflows.data || []
-
-  const agentStats = {}
-  ;(wfs || []).forEach((w) => {
-    const name = w.name || 'unknown'
-    if (!agentStats[name]) {
-      agentStats[name] = { runs: 0, successes: 0, failures: 0, latencies: [], reviews: 0 }
+  const loadNotifications = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true)
+    try {
+      const res = await AgentNotificationApi.list({
+        severity: severityFilter,
+        agent_name: agentFilter,
+        status: statusFilter,
+        sync: true,
+      })
+      const data = res?.data || res || {}
+      setNotifications(data.notifications || [])
+      setAgents(data.agents || [])
+      setUnreadCount(data.unread_count ?? 0)
+      setError(null)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
     }
-    agentStats[name].runs += 1
-    if (w.status === 'completed') agentStats[name].successes += 1
-    else if (w.status === 'failed') agentStats[name].failures += 1
-    const steps = w.steps || []
-    steps.forEach((s) => {
-      if (s.result && s.result.metadata) {
-        const execTime = s.result.metadata?.duration_ms
-        if (typeof execTime === 'number') agentStats[name].latencies.push(execTime)
-      }
-      if (s.result && s.result.requires_human_review) agentStats[name].reviews += 1
-    })
-  })
+  }, [severityFilter, agentFilter, statusFilter])
 
-  const avgLatency = (arr) => {
-    if (!arr.length) return null
-    return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
+  useEffect(() => {
+    loadNotifications(true)
+    const timer = setInterval(() => loadNotifications(false), 10000)
+    return () => clearInterval(timer)
+  }, [loadNotifications])
+
+  const handleAction = async (id, fn) => {
+    setBusyId(id)
+    try {
+      await fn(id)
+      await loadNotifications(false)
+    } finally {
+      setBusyId(null)
+    }
   }
 
-  const totalRuns = Object.values(agentStats).reduce((s, a) => s + a.runs, 0)
-  const totalSuccess = Object.values(agentStats).reduce((s, a) => s + a.successes, 0)
-  const totalFail = Object.values(agentStats).reduce((s, a) => s + a.failures, 0)
-  const totalReviews = Object.values(agentStats).reduce((s, a) => s + a.reviews, 0)
+  const handleMarkAllRead = async () => {
+    setBusyId('all')
+    try {
+      await AgentNotificationApi.markAllRead()
+      await loadNotifications(false)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
-  const onlineAgents = agents.filter((a) => a.status === 'active').length
+  if (loading && notifications.length === 0) {
+    return (
+      <div style={{ padding: 24 }}>
+        <h1>AI Agent Notifications</h1>
+        <Loading label="Loading agent notifications…" />
+      </div>
+    )
+  }
+
+  if (error && notifications.length === 0) {
+    return (
+      <div style={{ padding: 24 }}>
+        <h1>AI Agent Notifications</h1>
+        <ErrorState error={error} onRetry={() => loadNotifications(true)} />
+      </div>
+    )
+  }
 
   return (
-    <div className="dashboard-page">
-      <FadeIn delay={0}>
-        <div className="dash-top-row">
-          <div className="dash-welcome">
-            <h1>AI Monitoring</h1>
-            <p>Real-time status of AI microservices, agent health, and workflow performance.</p>
+    <div style={{ padding: '20px 24px', maxWidth: 1120, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+        <div>
+          <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: '1.5rem' }}>
+            <Bell size={22} />
+            AI Agent Notifications
+            {unreadCount > 0 && (
+              <span style={{
+                background: '#dc2626', color: '#fff', fontSize: '0.75rem', fontWeight: 700,
+                padding: '2px 9px', borderRadius: 999,
+              }}>
+                {unreadCount} unread
+              </span>
+            )}
+          </h1>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+            Real-time operational alerts for deployed AI agents across airport devices.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleMarkAllRead}
+            disabled={busyId === 'all' || unreadCount === 0}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+              borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer',
+              fontSize: '0.85rem', fontWeight: 600, opacity: unreadCount === 0 ? 0.5 : 1,
+            }}
+          >
+            <CheckCheck size={15} /> Mark all read
+          </button>
+          <button
+            type="button"
+            onClick={() => loadNotifications(false)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+              borderRadius: 8, border: 'none', background: '#071739', color: '#fff', cursor: 'pointer',
+              fontSize: '0.85rem', fontWeight: 600,
+            }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{
+        display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center',
+        background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', marginBottom: 16,
+      }}>
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+          Severity:{' '}
+          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} style={{ marginLeft: 6, padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+          Agent:{' '}
+          <select value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)} style={{ marginLeft: 6, padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
+            <option value="">All Agents</option>
+            {agents.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+          Alert Status:{' '}
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ marginLeft: 6, padding: '5px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="acknowledged">Acknowledged</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
+      </div>
+
+      {/* Notification List */}
+      {notifications.length === 0 ? (
+        <div style={{
+          padding: 40, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: 12,
+          color: '#64748b', background: '#fff',
+        }}>
+          <Bell size={28} style={{ opacity: 0.4, marginBottom: 8 }} />
+          <div style={{ fontWeight: 600, color: '#334155' }}>No agent notifications match the current filters</div>
+          <div style={{ fontSize: '0.85rem', marginTop: 4 }}>
+            Notifications appear automatically when deployed AI agents go offline, fail, degrade, disconnect, or recover.
           </div>
         </div>
-      </FadeIn>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {notifications.map((n) => {
+            const sev = SEVERITY_META[n.severity] || SEVERITY_META.info
+            const st = STATUS_BADGE[n.status] || STATUS_BADGE.open
+            const SevIcon = sev.Icon
+            const isBusy = busyId === n.notification_id
+            return (
+              <div
+                key={n.notification_id}
+                style={{
+                  background: '#fff',
+                  border: `1px solid ${n.is_read ? '#e2e8f0' : sev.border}`,
+                  borderLeft: `4px solid ${sev.text}`,
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  boxShadow: n.is_read ? 'none' : '0 2px 8px rgba(15, 23, 42, 0.05)',
+                  opacity: n.status === 'resolved' ? 0.78 : 1,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`,
+                      padding: '2px 8px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700,
+                    }}>
+                      <SevIcon size={13} /> {sev.label}
+                    </span>
+                    <strong style={{ fontSize: '0.98rem', color: '#0f172a' }}>{n.agent_name}</strong>
+                    {!n.is_read && (
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} title="Unread" />
+                    )}
+                    <span style={{ background: st.bg, color: st.text, padding: '2px 8px', borderRadius: 6, fontSize: '0.74rem', fontWeight: 600 }}>
+                      {st.label}
+                    </span>
+                  </div>
 
-      {/* KPI row */}
-      <FadeIn delay={60}>
-        <div className="kpi-row">
-          <StatCard label="AI Services Online" value={onlineAgents} sub={`of ${agents.length} registered agents`} />
-          <StatCard label="Total Workflow Runs" value={totalRuns} sub="agent task executions" />
-          <StatCard label="Successful" value={totalSuccess} sub={totalRuns > 0 ? `${Math.round(100 * totalSuccess / totalRuns)}%` : '—'} />
-          <StatCard label="Failed / Review" value={totalFail + totalReviews} sub="requires attention" />
-        </div>
-      </FadeIn>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {n.created_at ? new Date(n.created_at).toLocaleString() : '—'}
+                  </span>
+                </div>
 
-      <FadeIn delay={120}>
-        <div className="dash-grid">
-          <div className="main-column">
-            {/* AI Service Health */}
-            <Card className="lift" title="AI Service Health">
-              <div style={{ marginBottom: 10 }}>
-                <span style={{ fontSize: '0.7rem', color: '#4a5a75', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Service status from agent registry
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
-                {SERVICE_MAP.map((svc) => {
-                  const agent = agents.find((a) =>
-                    a.agent_id.includes(svc.id.replace(/_/g, '_')) ||
-                    a.capabilities.some((c) => c.name === svc.id)
-                  )
-                  const isUp = agent?.status === 'active'
-                  return (
-                    <div
-                      key={svc.id}
-                      style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: '#ffffff' }}
-                    >
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eef0fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <svc.icon size={16} color="#071739" />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: '#071739', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{svc.label}</div>
-                        <div style={{ color: '#4a5a75', fontSize: '0.72rem' }}>{svc.model}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <PulseDot status={isUp ? 'online' : 'offline'} pulse={false} />
-                        <span style={{ color: STATUS_COLOR[isUp ? 'online' : 'offline'] || '#4a5a75', fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                          {isUp ? 'Online' : 'Unreachable'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              {SERVICE_MAP.length === 0 && <EmptyState title="No AI services" hint="No services are registered in the agent registry." />}
-            </Card>
+                <p style={{ margin: '8px 0', color: '#1e293b', fontSize: '0.92rem' }}>{n.description}</p>
 
-            {/* Per-Agent Performance */}
-            <Card className="lift" title="Per-Agent Performance">
-              <div style={{ marginBottom: 10 }}>
-                <span style={{ fontSize: '0.7rem', color: '#4a5a75', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Workflow execution summary per agent
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {Object.entries(agentStats).length === 0 ? (
-                  <p style={{ color: '#4a5a75', fontSize: '0.8rem', padding: '16px', textAlign: 'center' }}>No agent workflows recorded yet.</p>
-                ) : (
-                  Object.entries(agentStats).map(([name, stats]) => {
-                    const avg = avgLatency(stats.latencies)
-                    return (
-                      <div
-                        key={name}
-                        style={{ display: 'flex', gap: 10, alignItems: 'start', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: '#ffffff' }}
-                      >
-                        <div style={{ flex: 0.3, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, color: '#071739', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name.replace(/_/g, ' ')}</div>
-                          <div style={{ color: '#4a5a75', fontSize: '0.72rem', marginTop: 2 }}>{stats.runs} runs</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 10, fontSize: '0.78rem', minWidth: 0 }}>
-                          <div style={{ flex: 1, color: '#0e7c4a', fontWeight: 600 }}>{stats.successes} ✓</div>
-                          <div style={{ flex: 1, color: '#d64550', fontWeight: 600 }}>{stats.failures} ✗</div>
-                          <div style={{ flex: 1, color: '#c77b1a', fontWeight: 600 }}>{stats.reviews} ⚠</div>
-                          <div style={{ flex: 1, color: '#4a5a75', fontWeight: 600, fontSize: '0.75rem' }}>{avg ?? '—'} ms</div>
-                        </div>
-                      </div>
-                    )
-                  })
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.82rem', color: '#475569', marginBottom: n.recommended_action ? 8 : 0 }}>
+                  <span><strong>Model / Task:</strong> {n.model_name}</span>
+                  <span><strong>Device ID:</strong> {n.device_id != null ? `#${n.device_id}${n.device_label ? ` (${n.device_label})` : ''}` : 'Host'}</span>
+                  <span><strong>Agent Status:</strong> {n.agent_status}</span>
+                </div>
+
+                {n.recommended_action && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem',
+                    color: '#0f172a', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, marginTop: 6,
+                  }}>
+                    <Wrench size={14} color="#475569" />
+                    <span><strong>Recommended Action:</strong> {n.recommended_action}</span>
+                  </div>
                 )}
-              </div>
-            </Card>
-          </div>
 
-          <div className="side-column">
-            {/* Agent Registry */}
-            <Card className="lift" title="Agent Registry">
-              <div style={{ marginBottom: 10 }}>
-                <span style={{ fontSize: '0.7rem', color: '#4a5a75', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Registered autonomous agents
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {agents.length === 0 ? (
-                  <p style={{ color: '#4a5a75', fontSize: '0.8rem', padding: '16px', textAlign: 'center' }}>No agents registered</p>
-                ) : (
-                  agents.map((a) => (
-                    <div
-                      key={a.agent_id}
-                      style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: '#ffffff', border: '1px solid var(--color-border)', fontSize: '0.82rem' }}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  {!n.is_read && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleAction(n.notification_id, AgentNotificationApi.markRead)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+                        borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '0.78rem',
+                      }}
                     >
-                      <PulseDot status={a.status} pulse={false} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: '#071739', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.agent_id.replace(/_/g, ' ')}</div>
-                        <div style={{ color: '#4a5a75', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {(a.capabilities || []).map((c) => c.name).join(', ') || 'no capabilities'}
-                        </div>
-                      </div>
-                      <span style={{ color: STATUS_COLOR[a.status === 'active' ? 'online' : 'offline'] || '#4a5a75', fontWeight: 600, fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{a.status}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-
-            {/* Core Metrics */}
-            <Card className="lift" title="Core Metrics">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Face verification attempts</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{aiData.face_attempts ?? 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Avg similarity</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{aiData.avg_similarity !== undefined ? aiData.avg_similarity.toFixed(3) : '—'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Gate authorized</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{secData.gate_authorized ?? 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Gate denied</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{secData.gate_denied ?? 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Inspections</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{aiData.inspections ?? 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ color: '#4a5a75' }}>Detected items</span>
-                  <span style={{ fontWeight: 600, color: '#071739' }}>{aiData.detected_items ?? 0}</span>
+                      <Check size={13} /> Mark Read
+                    </button>
+                  )}
+                  {n.status === 'open' && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleAction(n.notification_id, AgentNotificationApi.acknowledge)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 6, border: '1px solid #f59e0b',
+                        background: '#fffbeb', color: '#92400e', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                      }}
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+                  {n.status !== 'resolved' && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleAction(n.notification_id, AgentNotificationApi.resolve)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 6, border: '1px solid #16a34a',
+                        background: '#f0fdf4', color: '#166534', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                      }}
+                    >
+                      Resolve
+                    </button>
+                  )}
                 </div>
               </div>
-            </Card>
-          </div>
+            )
+          })}
         </div>
-      </FadeIn>
+      )}
     </div>
   )
 }

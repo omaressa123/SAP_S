@@ -1,1071 +1,621 @@
 /**
- * Operational Workflow & Saga Orchestrator
+ * Multi-Agent Workflow Management — Central AI Orchestration.
  *
- * Real-time monitoring of autonomous multi-agent pipelines, passenger sagas,
- * deterministic DAG steps, and Human-In-The-Loop (HITL) checkpoints.
- *
- * Endpoints:
- *   GET  /api/v1/agents/workflows        - Orchestrator executions
- *   GET  /api/v1/agents/workflows/{id}   - Execution detail & task steps
- *   GET  /api/v1/sagas                   - Resumable passenger sagas
- *   POST /api/v1/sagas/journey/start     - Initiate test journey saga
- *   POST /api/v1/sagas/{id}/steps/{step}/approve - HITL resolve
+ * Interactive visual workflow canvas representing real deployed AI agents,
+ * their underlying models, assigned airport devices, directional data-flow
+ * connections, and lifecycle controls (Create, Stop, Restart, Repair, Duplicate, Remove).
  */
-import { useCallback, useState, useMemo, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  Activity,
-  ShieldAlert,
-  Clock,
-  RefreshCw,
-  Play,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  ArrowRight,
-  Search,
-  Copy,
-  Check,
-  RotateCcw,
-  Sliders,
-  Cpu,
-  Layers,
-  FileCode,
-  UserCheck,
-  Luggage,
-  PlaneTakeoff,
-  Sparkles,
-  Terminal,
-  ExternalLink,
-  ChevronRight,
-  CheckCheck
+  GitBranch, Plus, RefreshCw, Play, Square, Wrench, Copy, Trash2,
+  HardDrive, Cpu, AlertTriangle, CheckCircle2,
 } from 'lucide-react'
+import { OrchestrationApi } from '../services/api'
 import { Loading, ErrorState } from '../components/States'
-import useApi from '../hooks/useApi'
-import { api } from '../services/api'
 import '../styles/WorkflowMonitor.css'
 
-// Built-in realistic airport operational sagas for instant fallback / demo
-const FALLBACK_WORKFLOWS = [
-  {
-    workflow_id: 'wf-pax-qr082-8491',
-    name: 'passenger_journey_saga',
-    display_name: 'Passenger Journey Saga (QR-082)',
-    category: 'journey',
-    status: 'running',
-    correlation_id: 'corr-pax-8812-seat14b',
-    current_step: 3,
-    total_steps: 4,
-    started_at: new Date(Date.now() - 48000).toISOString(),
-    completed_at: null,
-    error_message: null,
-    latency_ms: 636,
-    initiator: 'Kiosk #4 (Biometrics Terminal 1)',
-    steps: [
-      {
-        step_index: 0,
-        task_id: 'task-ocr-01',
-        agent_id: 'identity_agent',
-        task_type: 'passport_ocr',
-        title: 'Passport MRZ & OCR Verification',
-        status: 'completed',
-        latency_ms: 114,
-        result: {
-          mrz_valid: true,
-          passport_number: 'P982301A',
-          passenger: 'ALEX MERCER',
-          nationality: 'USA',
-          confidence: 0.994
-        }
-      },
-      {
-        step_index: 1,
-        task_id: 'task-face-02',
-        agent_id: 'identity_agent',
-        task_type: 'face_match',
-        title: 'Biometric 1:N Facial Match',
-        status: 'completed',
-        latency_ms: 182,
-        result: {
-          matched: true,
-          similarity_score: 0.962,
-          liveness_score: 0.998,
-          threshold: 0.850,
-          token_issued: 'BIO-TK-8812-QR'
-        }
-      },
-      {
-        step_index: 2,
-        task_id: 'task-bag-03',
-        agent_id: 'baggage_agent',
-        task_type: 'baggage_xray_scan',
-        title: 'Baggage X-Ray Density Analysis',
-        status: 'running',
-        latency_ms: 340,
-        result: {
-          status: 'analyzing',
-          belt_id: 'BELT-04-NORTH',
-          bag_tag: 'BAG-QR-99014',
-          yolo_inference_fps: 28.4
-        }
-      },
-      {
-        step_index: 3,
-        task_id: 'task-gate-04',
-        agent_id: 'safety_agent',
-        task_type: 'egate_clearance',
-        title: 'Security E-Gate Clearance',
-        status: 'pending',
-        latency_ms: null,
-        result: null
-      }
-    ]
-  },
-  {
-    workflow_id: 'wf-btd-conveyor4-4011',
-    name: 'baggage_threat_handling',
-    display_name: 'Baggage Threat Protocol (Conveyor 4)',
-    category: 'baggage',
-    status: 'needs_review',
-    correlation_id: 'corr-bag-xr-8812',
-    current_step: 3,
-    total_steps: 4,
-    started_at: new Date(Date.now() - 124000).toISOString(),
-    completed_at: null,
-    error_message: 'High anomaly density flagged on Bag #BAG-8812. Human authorization checkpoint active.',
-    latency_ms: 400,
-    initiator: 'X-Ray Scanner #3 (Level 2 Conveyor)',
-    steps: [
-      {
-        step_index: 0,
-        task_id: 'task-seg-01',
-        agent_id: 'baggage_agent',
-        task_type: 'dl_segmentation',
-        title: 'Deep Learning Object Segmentation',
-        status: 'completed',
-        latency_ms: 210,
-        result: {
-          objects_detected: 4,
-          organic_mass_ratio: 0.42,
-          metallic_mass_ratio: 0.18
-        }
-      },
-      {
-        step_index: 1,
-        task_id: 'task-ano-02',
-        agent_id: 'baggage_agent',
-        task_type: 'anomaly_scoring',
-        title: 'Anomaly Density Scoring',
-        status: 'completed',
-        latency_ms: 190,
-        result: {
-          density_score: 0.942,
-          threat_type: 'dense_aerosol_canister',
-          confidence: 0.912,
-          action_required: 'MANUAL_INSPECTION'
-        }
-      },
-      {
-        step_index: 2,
-        task_id: 'task-hitl-03',
-        agent_id: 'hitl_service',
-        task_type: 'operator_review',
-        title: 'Supervisor HITL Authorization',
-        status: 'needs_review',
-        latency_ms: null,
-        result: {
-          requires_staff: true,
-          alert_code: 'HITL_ANOMALY_94',
-          recommended_lane: 'REJECT_SHUTTLE_B'
-        }
-      },
-      {
-        step_index: 3,
-        task_id: 'task-div-04',
-        agent_id: 'iot_bridge',
-        task_type: 'diverter_actuation',
-        title: 'Automatic Conveyor Diverter',
-        status: 'pending',
-        latency_ms: null,
-        result: null
-      }
-    ]
-  },
-  {
-    workflow_id: 'wf-egate-clear-1049',
-    name: 'egate_biometric_clearance',
-    display_name: 'Biometric E-Gate Authorization (Gate B3)',
-    category: 'gate',
-    status: 'completed',
-    correlation_id: 'corr-egate-pax-104',
-    current_step: 4,
-    total_steps: 4,
-    started_at: new Date(Date.now() - 320000).toISOString(),
-    completed_at: new Date(Date.now() - 319720).toISOString(),
-    error_message: null,
-    latency_ms: 280,
-    initiator: 'Boarding Gate B3 Turnstile',
-    steps: [
-      {
-        step_index: 0,
-        task_id: 'task-tok-01',
-        agent_id: 'identity_agent',
-        task_type: 'token_validation',
-        title: 'Token & Boarding Pass Validation',
-        status: 'completed',
-        latency_ms: 42,
-        result: { flight: 'AF-104', seat: '03A', verified: true }
-      },
-      {
-        step_index: 1,
-        task_id: 'task-liveness-02',
-        agent_id: 'identity_agent',
-        task_type: 'anti_spoofing',
-        title: '3D Anti-Spoofing Camera Scan',
-        status: 'completed',
-        latency_ms: 135,
-        result: { genuine_face: true, liveness_prob: 0.999 }
-      },
-      {
-        step_index: 2,
-        task_id: 'task-elig-03',
-        agent_id: 'flight_ops_agent',
-        task_type: 'flight_eligibility',
-        title: 'Boarding Eligibility Check',
-        status: 'completed',
-        latency_ms: 78,
-        result: { status: 'BOARDING_ACTIVE', cabin_zone: 1 }
-      },
-      {
-        step_index: 3,
-        task_id: 'task-act-04',
-        agent_id: 'iot_bridge',
-        task_type: 'turnstile_release',
-        title: 'Motorized Turnstile Release',
-        status: 'completed',
-        latency_ms: 25,
-        result: { relay_open_duration_ms: 5000, state: 'PASSED' }
-      }
-    ]
-  },
-  {
-    workflow_id: 'wf-disrupt-weath-7701',
-    name: 'disruption_recovery_plan',
-    display_name: 'Runway Fog Gate Reassignment',
-    category: 'flight',
-    status: 'completed',
-    correlation_id: 'corr-disrupt-runway-fog',
-    current_step: 3,
-    total_steps: 3,
-    started_at: new Date(Date.now() - 840000).toISOString(),
-    completed_at: new Date(Date.now() - 838780).toISOString(),
-    error_message: null,
-    latency_ms: 825,
-    initiator: 'Airport Disruption Planner (AgentOps)',
-    steps: [
-      {
-        step_index: 0,
-        task_id: 'task-impact-01',
-        agent_id: 'flight_ops_agent',
-        task_type: 'impact_assessment',
-        title: 'Disruption Impact Assessment',
-        status: 'completed',
-        latency_ms: 420,
-        result: { impacted_flights: 4, runway_visibility: '250m' }
-      },
-      {
-        step_index: 1,
-        task_id: 'task-alloc-02',
-        agent_id: 'flight_ops_agent',
-        task_type: 'heuristic_reallocation',
-        title: 'Heuristic Gate Allocation Algorithm',
-        status: 'completed',
-        latency_ms: 310,
-        result: { proposed_gates: { 'QR-082': 'Gate 14', 'BA-112': 'Gate 16' } }
-      },
-      {
-        step_index: 2,
-        task_id: 'task-notif-03',
-        agent_id: 'orchestrator',
-        task_type: 'broadcast_twin',
-        title: 'Passenger App & Twin Broadcast',
-        status: 'completed',
-        latency_ms: 95,
-        result: { twin_event_published: true, notifications_sent: 342 }
-      }
-    ]
-  },
-  {
-    workflow_id: 'wf-smoke-sensor-0023',
-    name: 'zone2_smoke_incident_protocol',
-    display_name: 'Zone 2 HVAC Fire Alarm Routine',
-    category: 'safety',
-    status: 'completed',
-    correlation_id: 'corr-sensor-hvac-z2',
-    current_step: 3,
-    total_steps: 3,
-    started_at: new Date(Date.now() - 1420000).toISOString(),
-    completed_at: new Date(Date.now() - 1419780).toISOString(),
-    error_message: null,
-    latency_ms: 220,
-    initiator: 'Optical Smoke Detector #09 (T1 Concourse)',
-    steps: [
-      {
-        step_index: 0,
-        task_id: 'task-tel-01',
-        agent_id: 'iot_bridge',
-        task_type: 'sensor_telemetry',
-        title: 'Optical Smoke Telemetry Check',
-        status: 'completed',
-        latency_ms: 12,
-        result: { ppm: 14, threshold: 30, verified_dust_spike: true }
-      },
-      {
-        step_index: 1,
-        task_id: 'task-cctv-02',
-        agent_id: 'safety_agent',
-        task_type: 'thermal_cctv_verify',
-        title: 'Thermal CCTV Computer Vision',
-        status: 'completed',
-        latency_ms: 160,
-        result: { heat_signature_normal: true, flame_detected: false }
-      },
-      {
-        step_index: 2,
-        task_id: 'task-damper-03',
-        agent_id: 'iot_bridge',
-        task_type: 'hvac_status',
-        title: 'Duct Damper Normal Operating Mode',
-        status: 'completed',
-        latency_ms: 48,
-        result: { ventilation_airflow_cfm: 2400, mode: 'NORMAL' }
-      }
-    ]
-  }
-]
+const STATUS_STYLE = {
+  running: { bg: '#dcfce7', text: '#166534', conn: '#16a34a', label: 'Running' },
+  active: { bg: '#dcfce7', text: '#166534', conn: '#16a34a', label: 'Running' },
+  idle: { bg: '#fef3c7', text: '#92400e', conn: '#d97706', label: 'Idle' },
+  degraded: { bg: '#fef3c7', text: '#92400e', conn: '#d97706', label: 'Degraded' },
+  failed: { bg: '#fee2e2', text: '#991b1b', conn: '#dc2626', label: 'Failed' },
+  offline: { bg: '#f1f5f9', text: '#475569', conn: '#94a3b8', label: 'Offline' },
+  stopped: { bg: '#f1f5f9', text: '#475569', conn: '#94a3b8', label: 'Stopped' },
+}
+
+const CONN_COLOR = {
+  active: '#16a34a',
+  warning: '#d97706',
+  failed: '#dc2626',
+  inactive: '#94a3b8',
+}
+
+function DirectionalArrow({ state = 'inactive' }) {
+  const color = CONN_COLOR[state] || CONN_COLOR.inactive
+  const dashed = state === 'inactive' || state === 'warning'
+  return (
+    <svg width="46" height="24" viewBox="0 0 46 24" aria-hidden>
+      <line
+        x1="2" y1="12" x2="36" y2="12"
+        stroke={color} strokeWidth="2.5"
+        strokeDasharray={dashed ? '4 3' : undefined}
+      />
+      <polygon points="36,7 45,12 36,17" fill={color} />
+    </svg>
+  )
+}
 
 export default function WorkflowMonitor() {
-  const [nonce, setNonce] = useState(0)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedWfId, setSelectedWfId] = useState(null)
-  const [activeTab, setActiveTab] = useState('payload')
-  const [activeStepIndex, setActiveStepIndex] = useState(0)
-  const [copiedId, setCopiedId] = useState(null)
-  const [reviewNote, setReviewNote] = useState('')
-  const [actionNotice, setActionNotice] = useState(null)
-  const [isSimulating, setIsSimulating] = useState(false)
+  const [deployments, setDeployments] = useState([])
+  const [runtimeAgents, setRuntimeAgents] = useState([])
+  const [connections, setConnections] = useState([])
+  const [models, setModels] = useState([])
+  const [devices, setDevices] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState(null)
 
-  // API Call to fetch live agent workflows
-  const workflowsApi = useApi('/api/v1/agents/workflows?limit=50', [nonce])
+  // Modals
+  const [showCreate, setShowCreate] = useState(false)
+  const [showDeviceModal, setShowDeviceModal] = useState(false)
+  const [showDupModal, setShowDupModal] = useState(false)
 
-  const refresh = useCallback(() => {
-    setNonce((n) => n + 1)
+  // Create Agent form
+  const [formModel, setFormModel] = useState('')
+  const [formDevice, setFormDevice] = useState('')
+  const [formName, setFormName] = useState('')
+  const [formLocation, setFormLocation] = useState('')
+  const [formInput, setFormInput] = useState('')
+  const [formOutput, setFormOutput] = useState('')
+
+  // Register Device form
+  const [devLabel, setDevLabel] = useState('')
+  const [devType, setDevType] = useState('camera')
+  const [devSerial, setDevSerial] = useState('')
+  const [devLocation, setDevLocation] = useState('')
+
+  // Duplicate form
+  const [dupDeviceId, setDupDeviceId] = useState('')
+  const [dupName, setDupName] = useState('')
+
+  const loadAll = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true)
+    try {
+      const [depRes, modRes, devRes] = await Promise.all([
+        OrchestrationApi.getDeployments(true),
+        OrchestrationApi.getModels(),
+        OrchestrationApi.getDevices(),
+      ])
+      const depData = depRes?.data || depRes || {}
+      const list = depData.deployments || []
+      setDeployments(list)
+      setRuntimeAgents(depData.runtime_agents || [])
+      setConnections(depData.connections || [])
+      setModels(modRes?.data || modRes || [])
+      setDevices(devRes?.data || devRes || [])
+      setSelectedId((prev) => (prev && list.some((d) => d.deployment_id === prev) ? prev : list[0]?.deployment_id || null))
+      setError(null)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  // Auto-refresh timer (every 6 seconds if enabled)
   useEffect(() => {
-    if (!autoRefresh) return
-    const interval = setInterval(() => {
-      setNonce((n) => n + 1)
-    }, 6000)
-    return () => clearInterval(interval)
-  }, [autoRefresh])
+    loadAll(true)
+    const timer = setInterval(() => loadAll(false), 12000)
+    return () => clearInterval(timer)
+  }, [loadAll])
 
-  // Merge backend data with fallback demo data if backend list is empty
-  const rawList = workflowsApi.data || []
-  const allWorkflows = useMemo(() => {
-    if (rawList.length > 0) {
-      return rawList.map((w, idx) => {
-        // Normalize backend fields
-        const completedSteps = Array.isArray(w.steps)
-          ? w.steps
-          : (() => {
-              try {
-                return JSON.parse(w.steps_completed || '[]')
-              } catch {
-                return []
-              }
-            })()
+  const selected = deployments.find((d) => d.deployment_id === selectedId) || null
+  const failedDeployments = deployments.filter((d) => d.status === 'failed' || d.status === 'offline')
 
-        const totalSteps = Math.max(completedSteps.length || 1, 3)
-        return {
-          workflow_id: w.workflow_id || `wf-${idx}`,
-          name: w.name || 'agent_saga_workflow',
-          display_name: (w.name || 'agent_saga_workflow').replace(/_/g, ' '),
-          category: (w.name || '').includes('bag')
-            ? 'baggage'
-            : (w.name || '').includes('egate') || (w.name || '').includes('gate')
-            ? 'gate'
-            : (w.name || '').includes('disrupt')
-            ? 'flight'
-            : 'journey',
-          status: w.status || 'running',
-          correlation_id: w.correlation_id || `corr-${w.workflow_id?.slice(0, 8)}`,
-          current_step: w.current_step || completedSteps.length || 1,
-          total_steps: totalSteps,
-          started_at: w.started_at || new Date().toISOString(),
-          completed_at: w.completed_at || null,
-          error_message: w.error_message || null,
-          latency_ms: w.latency_ms || Math.floor(Math.random() * 400 + 150),
-          initiator: w.initiator || 'Airport Multi-Agent Orchestrator',
-          steps: Array.isArray(w.steps) && w.steps.length > 0
-            ? w.steps
-            : [
-                {
-                  step_index: 0,
-                  task_id: `${w.workflow_id}-01`,
-                  agent_id: 'orchestrator_agent',
-                  task_type: 'pipeline_init',
-                  title: 'Pipeline Initialization',
-                  status: 'completed',
-                  latency_ms: 84,
-                  result: { initialized: true, workflow: w.name }
-                },
-                {
-                  step_index: 1,
-                  task_id: `${w.workflow_id}-02`,
-                  agent_id: 'domain_agent',
-                  task_type: 'event_execution',
-                  title: 'Domain Agent Execution',
-                  status: w.status === 'failed' ? 'failed' : w.status === 'needs_review' ? 'needs_review' : 'completed',
-                  latency_ms: 165,
-                  result: { execution_state: w.status, error: w.error_message }
-                }
-              ]
-        }
-      })
-    }
-    // Return rich realistic workflows
-    return FALLBACK_WORKFLOWS
-  }, [rawList])
-
-  // Select initial workflow if none selected
-  useEffect(() => {
-    if (!selectedWfId && allWorkflows.length > 0) {
-      setSelectedWfId(allWorkflows[0].workflow_id)
-    }
-  }, [selectedWfId, allWorkflows])
-
-  // Filtered list based on search and status
-  const filteredWorkflows = useMemo(() => {
-    return allWorkflows.filter((w) => {
-      const matchesSearch =
-        searchQuery === '' ||
-        w.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        w.correlation_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        w.workflow_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (w.initiator && w.initiator.toLowerCase().includes(searchQuery.toLowerCase()))
-
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'running' && (w.status === 'running' || w.status === 'initiated')) ||
-        (statusFilter === 'needs_review' && (w.status === 'needs_review' || w.status === 'human_review_required')) ||
-        (statusFilter === 'completed' && w.status === 'completed') ||
-        (statusFilter === 'failed' && (w.status === 'failed' || w.status === 'cancelled' || w.status === 'compensated'))
-
-      return matchesSearch && matchesStatus
-    })
-  }, [allWorkflows, searchQuery, statusFilter])
-
-  // Currently selected workflow object
-  const selectedWorkflow = useMemo(() => {
-    return allWorkflows.find((w) => w.workflow_id === selectedWfId) || allWorkflows[0] || null
-  }, [allWorkflows, selectedWfId])
-
-  // Reset active step when selecting another workflow
-  useEffect(() => {
-    setActiveStepIndex(0)
-  }, [selectedWfId])
-
-  // Summary Metrics
-  const stats = useMemo(() => {
-    const total = allWorkflows.length
-    const running = allWorkflows.filter((w) => w.status === 'running' || w.status === 'initiated').length
-    const needsReview = allWorkflows.filter((w) => w.status === 'needs_review' || w.status === 'human_review_required').length
-    const completed = allWorkflows.filter((w) => w.status === 'completed').length
-    const successRate = total > 0 ? Math.round((completed / total) * 100) : 100
-    const avgLatency = total > 0 ? Math.round(allWorkflows.reduce((acc, cur) => acc + (cur.latency_ms || 250), 0) / total) : 240
-    return { total, running, needsReview, completed, successRate, avgLatency }
-  }, [allWorkflows])
-
-  // Copy to clipboard helper
-  const handleCopy = (text, id) => {
-    navigator.clipboard.writeText(text)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
+  const openCreateModal = () => {
+    const firstModel = models[0]
+    setFormModel(firstModel?.id || '')
+    setFormDevice(devices[0]?.equipment_id ? String(devices[0].equipment_id) : '')
+    setFormName(firstModel ? `${firstModel.agent_type} #${deployments.length + 1}` : '')
+    setFormLocation('')
+    setFormInput(firstModel?.default_input || '')
+    setFormOutput(firstModel?.default_output || '')
+    setShowCreate(true)
   }
 
-  // Simulate new Journey Saga trigger
-  const handleSimulateSaga = async () => {
-    setIsSimulating(true)
-    setActionNotice('Dispatching new Passenger Journey Saga to Multi-Agent Orchestrator...')
+  const onModelChange = (modelId) => {
+    setFormModel(modelId)
+    const m = models.find((x) => x.id === modelId)
+    if (m) {
+      setFormName(`${m.agent_type} #${deployments.length + 1}`)
+      setFormInput(m.default_input || '')
+      setFormOutput(m.default_output || '')
+    }
+  }
+
+  const handleCreateAgent = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setNotice(null)
     try {
-      // Attempt backend API call if live
-      await api('/api/v1/agents/events', {
-        method: 'POST',
-        body: JSON.stringify({
-          event_type: 'face_verify',
-          source: 'kiosk',
-          severity: 'info',
-          payload: {
-            passenger_id: 104,
-            gate: 'Gate 14',
-            flight_number: 'QR-082',
-            mode: 'biometric_saga_test'
-          }
-        })
-      }).catch(() => null)
-
-      refresh()
-      setActionNotice('Saga dispatched successfully! Active multi-agent journey orchestrated.')
-    } catch {
-      setActionNotice('Simulated journey saga triggered.')
+      const res = await OrchestrationApi.createDeployment({
+        agent_name: formName,
+        model_id: formModel,
+        device_id: formDevice ? Number(formDevice) : null,
+        location: formLocation || null,
+        input_source: formInput || null,
+        output_destination: formOutput || null,
+      })
+      const created = res?.data || res
+      setShowCreate(false)
+      setNotice({ ok: true, text: `Agent "${created.agent_name}" deployed (${created.status}).` })
+      await loadAll(false)
+      if (created?.deployment_id) setSelectedId(created.deployment_id)
+    } catch (err) {
+      setNotice({ ok: false, text: err.message || 'Failed to deploy agent.' })
     } finally {
-      setIsSimulating(false)
-      setTimeout(() => setActionNotice(null), 4000)
+      setBusy(false)
     }
   }
 
-  // Handle HITL Review resolution
-  const handleResolveHitl = (action) => {
-    setActionNotice(
-      action === 'approve'
-        ? `Step authorized by Staff ID #104. Reason: "${reviewNote || 'Identity and luggage cleared visually'}". Resuming saga progression.`
-        : `Step rejected by Supervisor. Saga compensation triggered: diverting baggage to manual inspection lane.`
+  const handleRegisterDevice = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setNotice(null)
+    try {
+      const res = await OrchestrationApi.registerDevice({
+        label: devLabel,
+        equipment_type: devType,
+        serial_number: devSerial,
+        location: devLocation || null,
+        status: 'operational',
+      })
+      const created = res?.data || res
+      setShowDeviceModal(false)
+      setDevLabel('')
+      setDevSerial('')
+      setDevLocation('')
+      setNotice({ ok: true, text: `Device "${created.label}" (#${created.equipment_id}) registered.` })
+      await loadAll(false)
+    } catch (err) {
+      setNotice({ ok: false, text: err.message || 'Failed to register device.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleLifecycle = async (action, dep) => {
+    if (!dep) return
+    setBusy(true)
+    setNotice(null)
+    try {
+      if (action === 'stop') {
+        await OrchestrationApi.stopDeployment(dep.deployment_id)
+        setNotice({ ok: true, text: `Stopped "${dep.agent_name}".` })
+      } else if (action === 'restart') {
+        const res = await OrchestrationApi.restartDeployment(dep.deployment_id)
+        const d = res?.data || res
+        setNotice({ ok: d.status === 'running', text: `Restarted "${dep.agent_name}" → ${d.status}.` })
+      } else if (action === 'repair') {
+        const res = await OrchestrationApi.repairDeployment(dep.deployment_id)
+        const r = res?.data || res
+        setNotice({
+          ok: !!r.repaired,
+          text: r.repaired
+            ? `Agent "${dep.agent_name}" repaired and running.`
+            : `Manual intervention required: ${(r.issues || []).join('; ')}`,
+        })
+      } else if (action === 'remove') {
+        if (!window.confirm(`Remove agent "${dep.agent_name}" from this device? (Underlying AI model is preserved.)`)) {
+          setBusy(false)
+          return
+        }
+        await OrchestrationApi.removeDeployment(dep.deployment_id)
+        setNotice({ ok: true, text: `Removed agent "${dep.agent_name}".` })
+        setSelectedId(null)
+      }
+      await loadAll(false)
+    } catch (err) {
+      setNotice({ ok: false, text: err.message || `Action "${action}" failed.` })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDuplicate = async (e) => {
+    e.preventDefault()
+    if (!selected || !dupDeviceId) return
+    setBusy(true)
+    setNotice(null)
+    try {
+      const res = await OrchestrationApi.duplicateDeployment(selected.deployment_id, {
+        device_id: Number(dupDeviceId),
+        agent_name: dupName || undefined,
+      })
+      const created = res?.data || res
+      setShowDupModal(false)
+      setNotice({ ok: true, text: `Deployed "${created.agent_name}" to device #${dupDeviceId}.` })
+      await loadAll(false)
+      if (created?.deployment_id) setSelectedId(created.deployment_id)
+    } catch (err) {
+      setNotice({ ok: false, text: err.message || 'Duplicate/deploy failed.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading && deployments.length === 0 && models.length === 0) {
+    return (
+      <div className="wf-page">
+        <Loading label="Loading Multi-Agent Workflow…" />
+      </div>
     )
-    if (selectedWorkflow) {
-      selectedWorkflow.status = action === 'approve' ? 'running' : 'failed'
-    }
-    setReviewNote('')
-    setTimeout(() => setActionNotice(null), 6000)
   }
-
-  const getCategoryIcon = (cat) => {
-    switch (cat) {
-      case 'journey':
-        return <UserCheck size={14} />
-      case 'baggage':
-        return <Luggage size={14} />
-      case 'gate':
-        return <CheckCheck size={14} />
-      case 'flight':
-        return <PlaneTakeoff size={14} />
-      default:
-        return <Activity size={14} />
-    }
+  if (error && models.length === 0) {
+    return (
+      <div className="wf-page">
+        <ErrorState error={error} onRetry={() => loadAll(true)} />
+      </div>
+    )
   }
 
   return (
-    <div className="wf-monitor-shell">
-      {/* Header Banner */}
-      <div className="wf-header-banner">
-        <div className="wf-header-top">
-          <div className="wf-title-area">
-            <h1>
-              <Cpu size={26} color="#00c2ff" />
-              Autonomous Workflow & Saga Orchestrator
-            </h1>
-            <p>
-              Real-time multi-agent saga tracking, deterministic DAG pipeline visualizer,
-              and Human-In-The-Loop (HITL) checkpoints across Terminal 1.
-            </p>
-          </div>
-          <div className="wf-header-actions">
-            <span className="wf-version-pill">
-              <Sparkles size={12} color="#00c2ff" />
-              Agent Engine v2.4 Active
-            </span>
-            <button
-              className="wf-btn wf-btn-glass"
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              title={autoRefresh ? 'Pause Auto-Refresh' : 'Enable Auto-Refresh'}
-            >
-              <Clock size={15} />
-              {autoRefresh ? 'Live Sync (6s)' : 'Paused'}
-            </button>
-            <button className="wf-btn wf-btn-glass" onClick={refresh} title="Refresh Workflows">
-              <RefreshCw size={15} />
-              Refresh
-            </button>
-            <button
-              className="wf-btn wf-btn-primary"
-              onClick={handleSimulateSaga}
-              disabled={isSimulating}
-            >
-              <Play size={15} />
-              {isSimulating ? 'Dispatching...' : 'Dispatch Journey Saga'}
-            </button>
-          </div>
+    <div className="wf-page">
+      {/* Header */}
+      <div className="wf-header">
+        <div>
+          <h1><GitBranch size={22} /> Multi-Agent Workflow Orchestration</h1>
+          <p>
+            Visual deployment topology across airport devices · {models.length} AI models · {devices.length} devices · {deployments.length} deployed agents
+          </p>
         </div>
-
-        {/* Action Notice Toast */}
-        {actionNotice && (
-          <div style={{
-            background: 'rgba(0, 194, 255, 0.15)',
-            border: '1px solid rgba(0, 194, 255, 0.35)',
-            borderRadius: 8,
-            padding: '10px 14px',
-            fontSize: '0.82rem',
-            color: '#e0f7ff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10
-          }}>
-            <Sparkles size={16} color="#00c2ff" />
-            <span>{actionNotice}</span>
-          </div>
-        )}
-      </div>
-
-      {/* KPI Metrics Summary Strip */}
-      <div className="wf-kpi-grid">
-        <div className="wf-kpi-card">
-          <div className="wf-kpi-icon blue">
-            <Activity size={22} />
-          </div>
-          <div className="wf-kpi-body">
-            <div className="wf-kpi-label">Active Sagas</div>
-            <div className="wf-kpi-val">
-              {stats.running}
-              <span style={{ fontSize: '0.78rem', color: '#0070f3', fontWeight: 600 }}>Executing</span>
-            </div>
-            <div className="wf-kpi-sub">Total {stats.total} registered flows</div>
-          </div>
-        </div>
-
-        <div className="wf-kpi-card">
-          <div className="wf-kpi-icon amber">
-            <ShieldAlert size={22} />
-          </div>
-          <div className="wf-kpi-body">
-            <div className="wf-kpi-label">Pending HITL Review</div>
-            <div className="wf-kpi-val" style={{ color: stats.needsReview > 0 ? '#d97706' : '#071739' }}>
-              {stats.needsReview}
-              {stats.needsReview > 0 && (
-                <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>Action Needed</span>
-              )}
-            </div>
-            <div className="wf-kpi-sub">Operator checkpoints active</div>
-          </div>
-        </div>
-
-        <div className="wf-kpi-card">
-          <div className="wf-kpi-icon green">
-            <CheckCircle2 size={22} />
-          </div>
-          <div className="wf-kpi-body">
-            <div className="wf-kpi-label">Completion Rate</div>
-            <div className="wf-kpi-val">
-              {stats.successRate}%
-              <span style={{ fontSize: '0.78rem', color: '#0e7c4a', fontWeight: 600 }}>
-                {stats.completed} Done
-              </span>
-            </div>
-            <div className="wf-kpi-sub">Zero unhandled exceptions</div>
-          </div>
-        </div>
-
-        <div className="wf-kpi-card">
-          <div className="wf-kpi-icon purple">
-            <Clock size={22} />
-          </div>
-          <div className="wf-kpi-body">
-            <div className="wf-kpi-label">Avg Step Latency</div>
-            <div className="wf-kpi-val">
-              {stats.avgLatency}
-              <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>ms</span>
-            </div>
-            <div className="wf-kpi-sub">Sub-second multi-agent DAG</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search & Filter Pills Bar */}
-      <div className="wf-filter-bar">
-        <div className="wf-search-box">
-          <Search size={16} color="#8b93a7" />
-          <input
-            type="text"
-            placeholder="Search by workflow, correlation ID, passenger, or flight..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b93a7' }}
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        <div className="wf-filter-pills">
-          <button
-            className={`wf-pill ${statusFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('all')}
-          >
-            All Workflows <span className="wf-pill-badge">{allWorkflows.length}</span>
+        <div className="wf-toolbar">
+          <button type="button" className="wf-btn" onClick={() => setShowDeviceModal(true)}>
+            <HardDrive size={15} /> Register Device
           </button>
-          <button
-            className={`wf-pill ${statusFilter === 'running' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('running')}
-          >
-            <Activity size={12} /> Running <span className="wf-pill-badge">{stats.running}</span>
+          <button type="button" className="wf-btn wf-btn-primary" onClick={openCreateModal}>
+            <Plus size={15} /> Create &amp; Deploy Agent
           </button>
-          <button
-            className={`wf-pill ${statusFilter === 'needs_review' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('needs_review')}
-          >
-            <AlertTriangle size={12} /> Needs Review <span className="wf-pill-badge">{stats.needsReview}</span>
-          </button>
-          <button
-            className={`wf-pill ${statusFilter === 'completed' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('completed')}
-          >
-            <CheckCircle2 size={12} /> Completed <span className="wf-pill-badge">{stats.completed}</span>
-          </button>
-          <button
-            className={`wf-pill ${statusFilter === 'failed' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('failed')}
-          >
-            <XCircle size={12} /> Failed / Rolled Back <span className="wf-pill-badge">0</span>
+          <button type="button" className="wf-btn" onClick={() => loadAll(false)} disabled={busy}>
+            <RefreshCw size={15} /> Refresh
           </button>
         </div>
       </div>
 
-      {/* Master - Detail Split Grid */}
-      <div className="wf-main-grid">
-        {/* Left Column: Workflow Directory List */}
-        <div className="wf-list-column">
-          <div className="wf-list-header">
-            <h3>
-              <Layers size={16} color="#00587e" />
-              Saga Executions
-            </h3>
-            <span className="wf-list-counter">
-              Showing {filteredWorkflows.length} of {allWorkflows.length}
-            </span>
+      {/* Action feedback */}
+      {notice && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+          background: notice.ok ? '#f0fdf4' : '#fef2f2',
+          border: `1px solid ${notice.ok ? '#bbf7d0' : '#fecaca'}`,
+          color: notice.ok ? '#166534' : '#991b1b',
+          fontSize: '0.86rem', fontWeight: 600,
+        }}>
+          {notice.ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <span>{notice.text}</span>
+        </div>
+      )}
+
+      {/* Intelligent Failure Alert Banner */}
+      {failedDeployments.length > 0 && (
+        <div className="wf-alert-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertTriangle size={17} />
+            <strong>{failedDeployments.length} agent(s) require attention:</strong>
+            <span>{failedDeployments.map((d) => `${d.agent_name} (${d.status})`).join(', ')}</span>
+          </div>
+          <button
+            type="button"
+            className="wf-btn wf-btn-warn"
+            onClick={() => handleLifecycle('repair', failedDeployments[0])}
+            disabled={busy}
+          >
+            <Wrench size={14} /> Attempt Auto-Repair
+          </button>
+        </div>
+      )}
+
+      {/* Main Canvas + Details Panel */}
+      <div className="wf-workspace">
+        <div className="wf-canvas-card">
+          <div className="wf-legend">
+            <span className="wf-legend-item"><span className="wf-dot" style={{ background: '#16a34a' }} /> Active</span>
+            <span className="wf-legend-item"><span className="wf-dot" style={{ background: '#d97706' }} /> Warning / Idle</span>
+            <span className="wf-legend-item"><span className="wf-dot" style={{ background: '#dc2626' }} /> Failed</span>
+            <span className="wf-legend-item"><span className="wf-dot" style={{ background: '#94a3b8' }} /> Inactive / Offline</span>
           </div>
 
-          <div className="wf-list-scroll">
-            {filteredWorkflows.length === 0 ? (
-              <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b' }}>
-                <Clock size={28} style={{ opacity: 0.4, marginBottom: 8 }} />
-                <p style={{ fontSize: '0.85rem' }}>No workflows match the selected criteria.</p>
-              </div>
-            ) : (
-              filteredWorkflows.map((w) => {
-                const isSelected = selectedWfId === w.workflow_id
-                const pct = Math.min(100, Math.round((w.current_step / (w.total_steps || 1)) * 100))
-
+          {deployments.length === 0 ? (
+            <div style={{ padding: 36, textAlign: 'center', background: '#fff', borderRadius: 10, border: '1px dashed #cbd5e1' }}>
+              <Cpu size={28} style={{ opacity: 0.45, marginBottom: 8 }} />
+              <div style={{ fontWeight: 700, color: '#0f172a' }}>No device-bound agents deployed yet</div>
+              <p style={{ color: '#64748b', fontSize: '0.86rem', margin: '6px 0 14px' }}>
+                Register an airport device and deploy any of the {models.length} existing AI models to visualize its workflow pipeline.
+              </p>
+              <button type="button" className="wf-btn wf-btn-primary" onClick={openCreateModal}>
+                <Plus size={15} /> Create First Agent
+              </button>
+            </div>
+          ) : (
+            <div className="wf-pipeline-rows">
+              {deployments.map((dep) => {
+                const st = STATUS_STYLE[dep.status] || STATUS_STYLE.offline
+                const conn = connections.find((c) => c.deployment_id === dep.deployment_id)
+                const connState = conn?.state || 'inactive'
+                const isSelected = dep.deployment_id === selectedId
                 return (
-                  <div
-                    key={w.workflow_id}
-                    className={`wf-item-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setSelectedWfId(w.workflow_id)}
-                  >
-                    <div className="wf-item-top">
-                      <div className="wf-item-name">
-                        <span className="wf-type-icon">{getCategoryIcon(w.category)}</span>
-                        <span>{w.display_name}</span>
+                  <div key={dep.deployment_id} className="wf-row">
+                    <div className="wf-endpoint-box">
+                      <div className="wf-endpoint-tag">Input Source</div>
+                      <div className="wf-endpoint-title">{dep.input_source || `Device #${dep.device_id ?? 'Host'}`}</div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                        {dep.location || (dep.device_id != null ? `Device #${dep.device_id}` : 'Host')}
                       </div>
-                      <span className={`wf-badge ${w.status}`}>
-                        {w.status === 'running' && <Activity size={10} className="anim-spin" />}
-                        {w.status === 'needs_review' && <AlertTriangle size={10} />}
-                        {w.status === 'completed' && <CheckCircle2 size={10} />}
-                        {w.status === 'failed' && <XCircle size={10} />}
-                        {w.status.replace(/_/g, ' ')}
-                      </span>
                     </div>
 
-                    <div className="wf-item-meta">
-                      <span className="wf-corr-id" title={w.correlation_id}>
-                        {w.correlation_id}
-                      </span>
-                      <span>{new Date(w.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                    </div>
+                    <DirectionalArrow state={connState} />
 
-                    <div className="wf-progress-container">
-                      <div className="wf-progress-bar-bg">
-                        <div className="wf-progress-bar-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="wf-progress-labels">
-                        <span>
-                          Step {w.current_step} of {w.total_steps || w.steps?.length || 4}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedId(dep.deployment_id)}
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedId(dep.deployment_id)}
+                      className={`wf-node ${isSelected ? 'wf-node-selected' : ''} ${dep.status === 'failed' ? 'wf-node-failed' : ''} ${dep.status === 'offline' ? 'wf-node-offline' : ''}`}
+                    >
+                      <div className="wf-node-top">
+                        <span className="wf-node-name">{dep.agent_name}</span>
+                        <span className="wf-status-pill" style={{ background: st.bg, color: st.text }}>
+                          {st.label}
                         </span>
-                        <span>{w.latency_ms ? `${w.latency_ms}ms` : 'Active'}</span>
                       </div>
+                      <div className="wf-node-meta">
+                        <span><strong>Model:</strong> {dep.model_name}</span>
+                        <span><strong>Type:</strong> {dep.agent_type}</span>
+                        <span>
+                          <strong>Device:</strong>{' '}
+                          {dep.device_id != null ? `#${dep.device_id} (${dep.device_label || 'Registered'})` : 'Host'}
+                          {dep.location ? ` · ${dep.location}` : ''}
+                        </span>
+                        <span><strong>Processing:</strong> {dep.processing_status}</span>
+                      </div>
+                    </div>
+
+                    <DirectionalArrow state={connState} />
+
+                    <div className="wf-endpoint-box">
+                      <div className="wf-endpoint-tag">Output Destination</div>
+                      <div className="wf-endpoint-title">{dep.output_destination || 'Processing Output'}</div>
                     </div>
                   </div>
                 )
-              })
-            )}
+              })}
+            </div>
+          )}
+
+          {/* Core Runtime Agents discovered in AgentRegistry */}
+          <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid #cbd5e1' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 8 }}>
+              CORE BACKEND ORCHESTRATOR AGENTS ({runtimeAgents.length})
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {runtimeAgents.map((ra) => {
+                const st = STATUS_STYLE[ra.status] || STATUS_STYLE.offline
+                return (
+                  <div
+                    key={ra.agent_id}
+                    style={{
+                      background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8,
+                      padding: '6px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 8,
+                    }}
+                  >
+                    <strong>{ra.name}</strong>
+                    <span className="wf-status-pill" style={{ background: st.bg, color: st.text }}>{ra.status}</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Deep Execution Inspector & Interactive DAG Pipeline */}
-        <div className="wf-detail-column">
-          {selectedWorkflow ? (
+        {/* Agent Details & Controls Panel */}
+        <aside className="wf-details-panel">
+          <h2>Agent Details &amp; Controls</h2>
+          {!selected ? (
+            <p style={{ color: '#64748b', fontSize: '0.86rem' }}>
+              Select an agent node on the workflow canvas to inspect its deployment and run lifecycle controls.
+            </p>
+          ) : (
             <>
-              {/* Detail Hero Section */}
-              <div className="wf-detail-hero">
-                <div className="wf-hero-top">
-                  <div className="wf-hero-title-area">
-                    <h2>
-                      <span className="wf-type-icon" style={{ width: 32, height: 32 }}>
-                        {getCategoryIcon(selectedWorkflow.category)}
-                      </span>
-                      {selectedWorkflow.display_name}
-                    </h2>
-                    <div className="wf-hero-sub">
-                      <span>
-                        Workflow ID: <strong>{selectedWorkflow.workflow_id}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Initiated By: <strong>{selectedWorkflow.initiator}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Started: <strong>{new Date(selectedWorkflow.started_at).toLocaleTimeString()}</strong>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="wf-hero-actions">
-                    <span className={`wf-badge ${selectedWorkflow.status}`} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-                      {selectedWorkflow.status === 'running' && <Activity size={12} />}
-                      {selectedWorkflow.status === 'needs_review' && <AlertTriangle size={12} />}
-                      {selectedWorkflow.status === 'completed' && <CheckCircle2 size={12} />}
-                      {selectedWorkflow.status.replace(/_/g, ' ')}
-                    </span>
-                    <button
-                      className="wf-btn wf-btn-glass"
-                      style={{ color: '#071739', border: '1px solid #cbd5e1' }}
-                      onClick={() => handleCopy(JSON.stringify(selectedWorkflow, null, 2), 'trace')}
-                    >
-                      {copiedId === 'trace' ? <Check size={14} color="#0e7c4a" /> : <Copy size={14} />}
-                      {copiedId === 'trace' ? 'Copied' : 'Copy Trace'}
-                    </button>
-                  </div>
+              <div className="wf-kv">
+                <div className="wf-kv-row"><span>Agent Name</span><strong>{selected.agent_name}</strong></div>
+                <div className="wf-kv-row"><span>Deployment ID</span><strong>{selected.deployment_id}</strong></div>
+                <div className="wf-kv-row"><span>AI Model</span><strong>{selected.model_name}</strong></div>
+                <div className="wf-kv-row"><span>Agent Type</span><strong>{selected.agent_type}</strong></div>
+                <div className="wf-kv-row">
+                  <span>Assigned Device</span>
+                  <strong>{selected.device_id != null ? `#${selected.device_id} (${selected.device_label || '—'})` : 'Host'}</strong>
                 </div>
-
-                {/* Metadata Tile Grid */}
-                <div className="wf-meta-grid">
-                  <div className="wf-meta-tile">
-                    <div className="wf-meta-tile-label">Correlation ID</div>
-                    <div className="wf-meta-tile-val" title={selectedWorkflow.correlation_id}>
-                      {selectedWorkflow.correlation_id}
-                    </div>
-                  </div>
-                  <div className="wf-meta-tile">
-                    <div className="wf-meta-tile-label">Execution Status</div>
-                    <div className="wf-meta-tile-val" style={{ textTransform: 'capitalize' }}>
-                      {selectedWorkflow.status.replace(/_/g, ' ')}
-                    </div>
-                  </div>
-                  <div className="wf-meta-tile">
-                    <div className="wf-meta-tile-label">End-to-End Latency</div>
-                    <div className="wf-meta-tile-val">
-                      {selectedWorkflow.latency_ms ? `${selectedWorkflow.latency_ms} ms` : 'In Progress'}
-                    </div>
-                  </div>
-                  <div className="wf-meta-tile">
-                    <div className="wf-meta-tile-label">Steps Completed</div>
-                    <div className="wf-meta-tile-val">
-                      {selectedWorkflow.current_step} / {selectedWorkflow.total_steps || selectedWorkflow.steps?.length}
-                    </div>
-                  </div>
-                </div>
+                <div className="wf-kv-row"><span>Location / Gate</span><strong>{selected.location || '—'}</strong></div>
+                <div className="wf-kv-row"><span>Status</span><strong>{selected.status}</strong></div>
+                <div className="wf-kv-row"><span>Processing</span><strong>{selected.processing_status}</strong></div>
+                <div className="wf-kv-row"><span>Health Endpoint</span><strong>{selected.health_url || '—'}</strong></div>
               </div>
 
-              {/* Human-In-The-Loop (HITL) Alert Banner */}
-              {(selectedWorkflow.status === 'needs_review' ||
-                selectedWorkflow.status === 'human_review_required' ||
-                selectedWorkflow.steps?.some((s) => s.status === 'needs_review')) && (
-                <div className="wf-hitl-banner">
-                  <div className="wf-hitl-header">
-                    <ShieldAlert size={20} color="#c2410c" />
-                    <span>Human-In-The-Loop (HITL) Authorization Required</span>
-                  </div>
-                  <div className="wf-hitl-desc">
-                    {selectedWorkflow.error_message ||
-                      'Automated policy paused this saga execution. A certified operator must verify the AI inference findings before downstream actuators are triggered.'}
-                  </div>
-                  <div className="wf-hitl-controls">
-                    <input
-                      type="text"
-                      className="wf-hitl-input"
-                      placeholder="Enter verification notes or staff ID (e.g. Cleared manual inspection by Staff #104)..."
-                      value={reviewNote}
-                      onChange={(e) => setReviewNote(e.target.value)}
-                    />
-                    <button
-                      className="wf-btn wf-btn-success"
-                      onClick={() => handleResolveHitl('approve')}
-                    >
-                      <UserCheck size={14} />
-                      Approve & Resume Saga
-                    </button>
-                    <button
-                      className="wf-btn wf-btn-danger"
-                      onClick={() => handleResolveHitl('reject')}
-                    >
-                      <XCircle size={14} />
-                      Reject & Rollback
-                    </button>
-                  </div>
+              {selected.last_error && (
+                <div style={{
+                  background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                  padding: '8px 10px', borderRadius: 6, fontSize: '0.8rem', marginBottom: 12,
+                }}>
+                  <strong>Error:</strong> {selected.last_error}
                 </div>
               )}
 
-              {/* Interactive Visual DAG Pipeline Section */}
-              <div className="wf-dag-section">
-                <div className="wf-section-title">
-                  <Cpu size={16} color="#00587e" />
-                  <span>Interactive Pipeline DAG (Click node to inspect)</span>
-                </div>
-
-                <div className="wf-dag-timeline">
-                  {(selectedWorkflow.steps || []).map((step, idx) => {
-                    const isStepActive = activeStepIndex === idx
-                    return (
-                      <div
-                        key={step.task_id || idx}
-                        className={`wf-step-node ${step.status} ${isStepActive ? 'active-step' : ''}`}
-                        onClick={() => setActiveStepIndex(idx)}
-                      >
-                        <div className="wf-step-node-top">
-                          <span className="wf-step-index-pill">{idx + 1}</span>
-                          <span className={`wf-badge ${step.status}`}>
-                            {step.status === 'completed' && <CheckCircle2 size={10} />}
-                            {step.status === 'running' && <Activity size={10} />}
-                            {step.status === 'needs_review' && <AlertTriangle size={10} />}
-                            {step.status === 'pending' && <Clock size={10} />}
-                            {step.status}
-                          </span>
-                        </div>
-                        <div className="wf-step-node-name">{step.title || step.task_type || `Step ${idx + 1}`}</div>
-                        <div className="wf-step-agent">
-                          <Cpu size={11} />
-                          <span>{step.agent_id || 'system'}</span>
-                        </div>
-                        {step.latency_ms && (
-                          <div className="wf-step-latency">{step.latency_ms} ms</div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Deep Step Inspector & Code Box */}
-              <div className="wf-inspector-card">
-                <div className="wf-inspector-tabs">
-                  <button
-                    className={`wf-inspector-tab ${activeTab === 'payload' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('payload')}
-                  >
-                    <FileCode size={13} style={{ marginRight: 6 }} />
-                    Step Payload & Inferences
-                  </button>
-                  <button
-                    className={`wf-inspector-tab ${activeTab === 'audit' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('audit')}
-                  >
-                    <ShieldAlert size={13} style={{ marginRight: 6 }} />
-                    Decision Audit & Policy
-                  </button>
-                  <button
-                    className={`wf-inspector-tab ${activeTab === 'raw' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('raw')}
-                  >
-                    <Terminal size={13} style={{ marginRight: 6 }} />
-                    Raw Workflow JSON
-                  </button>
-                </div>
-
-                {activeTab === 'payload' && (
-                  <div className="wf-code-box">
-                    <button
-                      className="wf-code-copy-btn"
-                      onClick={() =>
-                        handleCopy(
-                          JSON.stringify(
-                            selectedWorkflow.steps?.[activeStepIndex]?.result || { status: 'pending' },
-                            null,
-                            2
-                          ),
-                          'step_payload'
-                        )
-                      }
-                    >
-                      {copiedId === 'step_payload' ? <Check size={12} /> : <Copy size={12} />}
-                      {copiedId === 'step_payload' ? 'Copied' : 'Copy Payload'}
-                    </button>
-                    <pre>
-                      {JSON.stringify(
-                        {
-                          step_index: activeStepIndex,
-                          step_title: selectedWorkflow.steps?.[activeStepIndex]?.title,
-                          task_id: selectedWorkflow.steps?.[activeStepIndex]?.task_id,
-                          agent: selectedWorkflow.steps?.[activeStepIndex]?.agent_id,
-                          status: selectedWorkflow.steps?.[activeStepIndex]?.status,
-                          latency_ms: selectedWorkflow.steps?.[activeStepIndex]?.latency_ms,
-                          result: selectedWorkflow.steps?.[activeStepIndex]?.result || 'No payload output yet'
-                        },
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </div>
-                )}
-
-                {activeTab === 'audit' && (
-                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-                      <strong>Audit Verification Trail:</strong> Each agent interaction conforms to the
-                      Airport Multi-Agent contract with cryptographic correlation IDs, deterministic state
-                      transitions, and idempotent re-executions.
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 8, fontSize: '0.8rem' }}>
-                        <div style={{ color: '#64748b', fontSize: '0.7rem' }}>Saga Rollback Guarantee</div>
-                        <div style={{ fontWeight: 700, color: '#0e7c4a', marginTop: 2 }}>Guaranteed Compensable</div>
-                      </div>
-                      <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 8, fontSize: '0.8rem' }}>
-                        <div style={{ color: '#64748b', fontSize: '0.7rem' }}>Digital Twin Ingestion</div>
-                        <div style={{ fontWeight: 700, color: '#0070f3', marginTop: 2 }}>Synchronized Live</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'raw' && (
-                  <div className="wf-code-box">
-                    <button
-                      className="wf-code-copy-btn"
-                      onClick={() => handleCopy(JSON.stringify(selectedWorkflow, null, 2), 'raw_json')}
-                    >
-                      {copiedId === 'raw_json' ? <Check size={12} /> : <Copy size={12} />}
-                      {copiedId === 'raw_json' ? 'Copied' : 'Copy Full JSON'}
-                    </button>
-                    <pre>{JSON.stringify(selectedWorkflow, null, 2)}</pre>
-                  </div>
-                )}
+              <div className="wf-actions-grid">
+                <button
+                  type="button"
+                  className="wf-btn wf-btn-warn"
+                  disabled={busy || selected.status === 'stopped'}
+                  onClick={() => handleLifecycle('stop', selected)}
+                >
+                  <Square size={14} /> Stop
+                </button>
+                <button
+                  type="button"
+                  className="wf-btn wf-btn-ok"
+                  disabled={busy}
+                  onClick={() => handleLifecycle('restart', selected)}
+                >
+                  <Play size={14} /> Restart
+                </button>
+                <button
+                  type="button"
+                  className="wf-btn"
+                  disabled={busy}
+                  onClick={() => handleLifecycle('repair', selected)}
+                >
+                  <Wrench size={14} /> Repair
+                </button>
+                <button
+                  type="button"
+                  className="wf-btn"
+                  disabled={busy || devices.length === 0}
+                  onClick={() => {
+                    setDupDeviceId(devices[0]?.equipment_id ? String(devices[0].equipment_id) : '')
+                    setDupName(`${selected.agent_name} (Copy)`)
+                    setShowDupModal(true)
+                  }}
+                >
+                  <Copy size={14} /> Duplicate
+                </button>
+                <button
+                  type="button"
+                  className="wf-btn wf-btn-danger"
+                  style={{ gridColumn: '1 / -1' }}
+                  disabled={busy}
+                  onClick={() => handleLifecycle('remove', selected)}
+                >
+                  <Trash2 size={14} /> Remove Agent Instance
+                </button>
               </div>
             </>
-          ) : (
-            <div className="wf-detail-empty">
-              <div className="wf-detail-empty-icon">
-                <Layers size={32} />
-              </div>
-              <h3>Select a Workflow</h3>
-              <p>Choose an execution from the left directory to inspect its DAG timeline, latency, and step payloads.</p>
-            </div>
           )}
-        </div>
+        </aside>
       </div>
+
+      {/* Create & Deploy Agent Modal */}
+      {showCreate && (
+        <div className="wf-modal-backdrop" role="dialog" aria-modal="true">
+          <form className="wf-modal" onSubmit={handleCreateAgent}>
+            <h3>Create &amp; Deploy AI Agent</h3>
+            <div className="wf-field">
+              <label>AI Model (Existing)</label>
+              <select value={formModel} onChange={(e) => onModelChange(e.target.value)} required>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.health?.reachable ? 'Online' : 'Offline'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="wf-field">
+              <label>Target Airport Device</label>
+              <select value={formDevice} onChange={(e) => setFormDevice(e.target.value)}>
+                <option value="">Host / Unassigned</option>
+                {devices.map((d) => (
+                  <option key={d.equipment_id} value={d.equipment_id}>
+                    #{d.equipment_id} · {d.label} ({d.equipment_type}) — {d.status}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="wf-field">
+              <label>Agent Name</label>
+              <input value={formName} onChange={(e) => setFormName(e.target.value)} required />
+            </div>
+            <div className="wf-field">
+              <label>Gate / Location (optional)</label>
+              <input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="e.g. Gate B22" />
+            </div>
+            <div className="wf-field">
+              <label>Input Source</label>
+              <input value={formInput} onChange={(e) => setFormInput(e.target.value)} />
+            </div>
+            <div className="wf-field">
+              <label>Output Destination</label>
+              <input value={formOutput} onChange={(e) => setFormOutput(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button type="button" className="wf-btn" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button type="submit" className="wf-btn wf-btn-primary" disabled={busy}>Deploy Agent</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Register New Device Modal */}
+      {showDeviceModal && (
+        <div className="wf-modal-backdrop" role="dialog" aria-modal="true">
+          <form className="wf-modal" onSubmit={handleRegisterDevice}>
+            <h3>Register New Airport Device</h3>
+            <div className="wf-field">
+              <label>Device Label</label>
+              <input value={devLabel} onChange={(e) => setDevLabel(e.target.value)} placeholder="e.g. Gate B22 Face Camera" required />
+            </div>
+            <div className="wf-field">
+              <label>Device Type</label>
+              <select value={devType} onChange={(e) => setDevType(e.target.value)}>
+                <option value="camera">camera</option>
+                <option value="kiosk">kiosk</option>
+                <option value="security_gate">security_gate</option>
+                <option value="boarding_gate">boarding_gate</option>
+                <option value="xray">xray</option>
+                <option value="sensor">sensor</option>
+              </select>
+            </div>
+            <div className="wf-field">
+              <label>Serial Number</label>
+              <input value={devSerial} onChange={(e) => setDevSerial(e.target.value)} placeholder="e.g. CAM-B22-001" required />
+            </div>
+            <div className="wf-field">
+              <label>Gate / Location</label>
+              <input value={devLocation} onChange={(e) => setDevLocation(e.target.value)} placeholder="e.g. Terminal 1 · Gate B22" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button type="button" className="wf-btn" onClick={() => setShowDeviceModal(false)}>Cancel</button>
+              <button type="submit" className="wf-btn wf-btn-primary" disabled={busy}>Register Device</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Duplicate / Redeploy Modal */}
+      {showDupModal && selected && (
+        <div className="wf-modal-backdrop" role="dialog" aria-modal="true">
+          <form className="wf-modal" onSubmit={handleDuplicate}>
+            <h3>Duplicate &amp; Deploy "{selected.agent_name}"</h3>
+            <div className="wf-field">
+              <label>Target Device</label>
+              <select value={dupDeviceId} onChange={(e) => setDupDeviceId(e.target.value)} required>
+                {devices.map((d) => (
+                  <option key={d.equipment_id} value={d.equipment_id}>
+                    #{d.equipment_id} · {d.label} ({d.equipment_type}) — {d.status}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="wf-field">
+              <label>New Agent Name</label>
+              <input value={dupName} onChange={(e) => setDupName(e.target.value)} required />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button type="button" className="wf-btn" onClick={() => setShowDupModal(false)}>Cancel</button>
+              <button type="submit" className="wf-btn wf-btn-primary" disabled={busy}>Deploy Copy</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

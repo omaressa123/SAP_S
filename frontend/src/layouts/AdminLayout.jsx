@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, FileText, Activity, GitBranch, Bell,
-  AlertTriangle, Moon, Sun, ChevronLeft, ChevronRight, LayoutGrid,
+  LayoutDashboard, Users, Plane, Luggage, BarChart3, Activity, GitBranch,
+  Moon, Sun, ChevronLeft, ChevronRight, LayoutGrid,
   ExternalLink, ShieldCheck
 } from 'lucide-react'
 
@@ -23,7 +23,15 @@ export default function AdminLayout() {
       group: 'Executive Command',
       items: [
         { path: '/admin/dashboard', label: 'Executive Dashboard', icon: LayoutDashboard },
-        { path: '/admin/reports', label: 'Reports & Analytics', icon: FileText },
+      ],
+    },
+    {
+      group: 'Operational Analytics',
+      items: [
+        { path: '/admin/reports/passengers', label: 'Passengers', icon: Users },
+        { path: '/admin/reports/flights', label: 'Flights', icon: Plane },
+        { path: '/admin/reports/baggage', label: 'Baggage', icon: Luggage },
+        { path: '/admin/reports/operations', label: 'Operations', icon: BarChart3 },
       ],
     },
     {
@@ -31,8 +39,6 @@ export default function AdminLayout() {
       items: [
         { path: '/admin/ai-monitor', label: 'AI Live Monitoring', icon: Activity, badge: 'Realtime' },
         { path: '/admin/workflows', label: 'Multi-Agent Workflows', icon: GitBranch },
-        { path: '/admin/events', label: 'Airport Event Stream', icon: Bell },
-        { path: '/admin/disruption', label: 'Disruption Planner', icon: AlertTriangle },
       ],
     },
   ]

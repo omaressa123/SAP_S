@@ -9,7 +9,6 @@ const links = [
   { to: '/baggage', label: 'Baggage' },
   { to: '/monitoring', label: 'Security' },
   { to: '/ai-monitor', label: 'AI Monitor' },
-  { to: '/events', label: 'Event Center' },
   { to: '/workflows', label: 'Workflows' },
   { to: '/digital-twin', label: 'Digital Twin' },
   { to: '/reports', label: 'Reports' },

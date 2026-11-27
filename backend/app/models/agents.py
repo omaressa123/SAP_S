@@ -121,3 +121,49 @@ class DecisionAudit(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     workflow = relationship('WorkflowExecution', back_populates='decisions')
+
+
+class AgentDeployment(Base):
+    """Persistent deployment of an AI agent instance onto an airport device."""
+    __tablename__ = 'agentdeployment'
+
+    deployment_id = Column(String, primary_key=True, index=True)
+    agent_name = Column(String, nullable=False)
+    agent_type = Column(String, nullable=False, index=True)
+    model_id = Column(String, nullable=False, index=True)
+    model_name = Column(String, nullable=False)
+    device_id = Column(Integer, ForeignKey('equipment.equipment_id'), index=True, nullable=True)
+    device_label = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    input_source = Column(String, nullable=True)
+    output_destination = Column(String, nullable=True)
+    status = Column(String, nullable=False, default='running')  # running, idle, stopped, failed, offline
+    processing_status = Column(String, nullable=False, default='ready')  # processing, ready, degraded, halted, disconnected
+    health_url = Column(String, nullable=True)
+    config_json = Column(Text, nullable=True)
+    last_error = Column(Text, nullable=True)
+    last_heartbeat = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AgentNotification(Base):
+    """Operational notifications and alerts for deployed AI agents."""
+    __tablename__ = 'agentnotification'
+
+    notification_id = Column(String, primary_key=True, index=True)
+    deployment_id = Column(String, ForeignKey('agentdeployment.deployment_id', ondelete='SET NULL'), index=True, nullable=True)
+    agent_name = Column(String, nullable=False, index=True)
+    model_name = Column(String, nullable=False)
+    device_id = Column(Integer, nullable=True)
+    device_label = Column(String, nullable=True)
+    severity = Column(String, nullable=False, default='info', index=True)  # critical, warning, info
+    event_kind = Column(String, nullable=False, default='operational_issue')  # offline, crash, model_init_failed, degraded, stalled, device_disconnected, operational_issue, recovered
+    description = Column(Text, nullable=False)
+    agent_status = Column(String, nullable=False)
+    recommended_action = Column(Text, nullable=True)
+    is_read = Column(Boolean, nullable=False, default=False)
+    status = Column(String, nullable=False, default='open', index=True)  # open, acknowledged, resolved
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)

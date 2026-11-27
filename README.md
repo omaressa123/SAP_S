@@ -95,9 +95,10 @@ docker compose up --build
 | Service | Container | URL / Port |
 |---|---|---|
 | Dashboard (React + nginx) | `smart-airport-frontend` | http://localhost |
-| Core API (FastAPI) | `smart-airport-backend` | http://localhost:8000 |
-| API health | — | http://localhost:8000/health |
-| Digital Twin API | `smart-airport-twin` | http://localhost:8100 |
+| Core API (FastAPI) | `smart-airport-backend` | http://localhost:8000 (Health: `/health`, Docs: `/docs`) |
+| AI Face Reco | `smart-airport-face-reco` | http://localhost:8001/health |
+| AI BTD (X-Ray) | `smart-airport-btd` | http://localhost:8002/health |
+| AI Unified Detect | `smart-airport-unified-detection` | http://localhost:8004/health |
 | PostgreSQL 18 | `smart-airport-postgres` | `postgres:5432` (Docker) / `localhost:5432` (host tools) |
 
 ```bash
@@ -139,13 +140,12 @@ Routers (`backend/app/controllers/`):
 | `/api/v1/baggage-tracking` | Baggage tracking |
 | `/api/v1/security-gate` | Biometric security gate |
 | `/api/v1/boarding-gate` | Biometric boarding gate |
-| `/api/v1/monitoring` | CCTV monitoring |
+| `/api/v1/monitoring` | CCTV monitoring & live camera feeds |
 | `/api/v1/k9-patrols` | K9 units |
 | `/api/v1/maintenance` | Maintenance |
-| `/api/v1/digital-twin` | Digital twin |
-| `/api/v1/reports` | Reports & analytics |
-| `/api/v1/ai` | AI Center |
-| `/api/v1/agents` | Agent System (registry, tasks, workflows, events, health) |
+| `/api/v1/reports` | Operational analytics (`passengers`, `flights`, `baggage`, `operations`) |
+| `/api/v1/ai` | AI model inference endpoints (face, baggage, smoke/fire, scene) |
+| `/api/v1/agents` | Agent system (registry, models, devices, deployments, notifications, workflows, sagas, HITL) |
 
 Health: `GET /health`.
 
@@ -153,21 +153,21 @@ Health: `GET /health`.
 
 React 18 + Vite admin dashboard (`frontend/src/App.jsx`, `main.jsx`).
 
-**Pages:**
+**Admin & Operations Pages:**
 
 | Page | Route | Purpose |
 |---|---|---|
-| Dashboard | `/` | System overview: KPIs, flight strip, zone occupancy, agent/twin health |
-| Flights | `/flights` | Flight schedule & status |
-| Passengers | `/passengers` | Passenger registry & verification |
-| Baggage | `/baggage` | Baggage tracking & screening |
-| Monitoring | `/monitoring` | CCTV & security monitoring |
-| Digital Twin | `/digital-twin` | 3D twin position push |
-| Reports | `/reports` | Analytics reports |
-| AI Center | `/ai` | AI module registry |
-| AI Monitor | `/ai-monitor` | AI service health, inference results, latency |
-| Event Center | `/events` | Event log with filtering |
-| Workflow Monitor | `/workflows` | Agent workflow states & decisions |
+| Executive Command Dashboard | `/admin/dashboard` | 6 operational KPIs (Passengers, Active Flights, Baggage Processing, Open Alerts, Active Agents, System Health) + Live Airport Feeds |
+| Operational Analytics — Passengers | `/admin/reports/passengers` | Passenger KPIs & Pie/Bar/Histogram/Trend charts |
+| Operational Analytics — Flights | `/admin/reports/flights` | Flight status KPIs & Pie/Bar/Histogram/Trend charts |
+| Operational Analytics — Baggage | `/admin/reports/baggage` | Baggage stage KPIs & Pie/Bar/Histogram/Trend charts |
+| Operational Analytics — Operations | `/admin/reports/operations` | Overall operational activities KPIs & charts |
+| AI Live Monitoring | `/admin/ai-monitor` | Notifications-only alert center for deployed AI agents (read, acknowledge, resolve) |
+| Multi-Agent Workflows | `/admin/workflows` | Visual Multi-Agent Workflow canvas, device registration, and agent lifecycle (Create, Stop, Restart, Repair, Duplicate, Remove) |
+| Staff Operations | `/staff/*` | Flights, Passengers, Baggage, Baggage AI, CCTV Monitoring |
+| Passenger Terminals | `/terminals/*` | E-Gate Kiosk, Baggage Drop, Boarding Gate, Mobile Info |
+
+*(Removed legacy pages/endpoints: `/admin/ai`, `/admin/iot`, `/admin/events`, `/admin/disruption`, `GET /api/v1/ai/registry`, `/api/v1/agents/disruption/*`, and orphan DB tables `iotcommandlog`, `iottelemetrylog`, `disruptionproposal`.)*
 
 Shared `components/` (Navbar, Card, Table, Button), `hooks/` (useApi), `layouts/` (MainLayout), `services/` (API client), `routes/`.
 
@@ -231,6 +231,7 @@ Design principles:
 | Baggage security | `baggage_inspection`, `detected_item` | AI baggage scan results + flagged threat items |
 | Security & boarding logs | `security_gate_log`, `boarding_log` | Gate authorization + boarding event audit |
 | Admin, cameras & twin | `user_account`, `camera`, `emergency_event`, `monitoring_alert`, `digital_twin_position`, `audit_log` | Auth, CCTV, emergencies, digital twin positions, audit trail |
+| Multi-agent orchestration | `agentdefinition`, `agenttask`, `agenteexecution`, `airportevent`, `workflowexecution`, `decisionaudit`, `agentdeployment`, `agentnotification` | Agent registry, device-bound agent deployments, workflow tracking, operational agent notifications |
 | Sustainability & power | `power_source`, `solar_installation`, `energy_generation_log`, `energy_storage`, `energy_consumption_log` | Solar/battery generation & consumption telemetry |
 
 Key relationships (highlights):

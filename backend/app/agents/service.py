@@ -10,7 +10,6 @@ from .events import EventSystem
 from .orchestrator import AgentOrchestrator
 from .saga import SagaWorkflowEngine
 from .hitl import HitlManager
-from .disruption_planner import DisruptionPlanner
 from .identity_agent import IdentityAgent
 from .baggage_agent import BaggageAgent
 from .safety_agent import SafetyAgent
@@ -39,7 +38,6 @@ class AgentService:
         self.sustainability_agent: Optional[SustainabilityAgent] = None
         self.saga_engine: Optional[SagaWorkflowEngine] = None
         self.hitl_manager: Optional[HitlManager] = None
-        self.disruption_planner: Optional[DisruptionPlanner] = None
         self.initialized = False
 
     def init(
@@ -57,8 +55,6 @@ class AgentService:
         self.registry = AgentRegistry()
         self.event_system = EventSystem(db_session_factory=SessionLocal)
 
-        # Disruption recovery planner (M2.8)
-        self.disruption_planner = DisruptionPlanner(registry=self.registry)
         self.orchestrator = AgentOrchestrator(
             registry=self.registry,
             event_system=self.event_system,
@@ -133,11 +129,6 @@ class AgentService:
         if not self.initialized or self.hitl_manager is None:
             raise RuntimeError("HITL manager not initialized")
         return self.hitl_manager
-
-    def get_disruption_planner(self) -> DisruptionPlanner:
-        if not self.initialized or self.disruption_planner is None:
-            raise RuntimeError("Disruption planner not initialized")
-        return self.disruption_planner
 
     def snapshot(self) -> dict:
         if not self.initialized:
