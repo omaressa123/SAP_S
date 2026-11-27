@@ -6,16 +6,23 @@ import { AnimatedProgress, Enter, LiveDot, Pulse } from '../components/anim';
 import { useApp } from '../store/AppStore';
 import type { Bag } from '../data/mock';
 
-const STAGES = ['Check-in', 'Security', 'Sorting', 'Aircraft', 'Arrived'] as const;
+const STAGES = [
+  'Registered',
+  'Accepted at Baggage Drop',
+  'In Processing',
+  'Security Screening',
+  'Loaded',
+  'In Transit',
+  'Arrived at Destination',
+  'Transferred to Baggage Carousel',
+  'Ready for Collection',
+  'Collected',
+] as const;
 
 function stageIndex(b: Bag): number {
-  switch (b.status) {
-    case 'Checked-in': return 0;
-    case 'In Transit': return 2;
-    case 'Loading': return 3;
-    case 'On Belt 4': return 4;
-    default: return 1;
-  }
+  const idx = STAGES.findIndex((s) => s.toLowerCase() === String(b.status).toLowerCase());
+  if (idx >= 0) return idx;
+  return Math.min(STAGES.length - 1, Math.max(0, Math.round(b.progress * (STAGES.length - 1))));
 }
 
 function BagTimeline({ bag, index }: { bag: Bag; index: number }) {
@@ -25,7 +32,7 @@ function BagTimeline({ bag, index }: { bag: Bag; index: number }) {
   useEffect(() => {
     const anim = Animated.timing(lineAnim, {
       toValue: active / (STAGES.length - 1),
-      duration: 1000,
+      duration: 800,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     });
@@ -34,18 +41,18 @@ function BagTimeline({ bag, index }: { bag: Bag; index: number }) {
   }, [lineAnim, active]);
 
   const lineHeight = lineAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+  const isReady = bag.status === 'Ready for Collection' || bag.status === 'Collected';
 
   return (
     <Enter delay={index * 120}>
       <Card style={{ marginBottom: spacing.md }}>
         <View style={styles.headRow}>
-          <StatusPill label={bag.status} tone={bag.status === 'On Belt 4' ? 'ok' : 'info'} />
-          <LiveDot color={bag.status === 'On Belt 4' ? colors.success : colors.info} />
+          <StatusPill label={bag.status} tone={isReady ? 'ok' : 'info'} />
+          <LiveDot color={isReady ? colors.success : colors.info} />
         </View>
         <Text style={styles.tag}>{bag.tag} · {bag.flightNo}</Text>
         <Text style={styles.loc}>{bag.location} · {bag.lastSeen}</Text>
 
-        {/* Animated vertical journey */}
         <View style={styles.timeline}>
           <View style={styles.rail}>
             <Animated.View style={[styles.railFill, { height: lineHeight }]} />
@@ -77,27 +84,29 @@ function BagTimeline({ bag, index }: { bag: Bag; index: number }) {
         </View>
 
         <AnimatedProgress value={bag.progress} color={colors.info} />
-        <Text style={styles.pct}>{Math.round(bag.progress * 100)}% to aircraft</Text>
+        <Text style={styles.pct}>{Math.round(bag.progress * 100)}% journey progress</Text>
       </Card>
     </Enter>
   );
 }
 
 export default function BaggageScreen() {
-  const { bags } = useApp();
+  const { bags, journey } = useApp();
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Enter delay={0}>
-        <SectionTitle title="Baggage Tracker" right="Live status" />
+        <SectionTitle
+          title="Baggage Tracker"
+          right={journey?.baggage_carousel ? `Carousel ${journey.baggage_carousel}` : `${bags.length} Bag(s)`}
+        />
       </Enter>
-      {bags.map((b, i) => (
-        <BagTimeline key={b.tag} bag={b} index={i} />
-      ))}
-      <Enter delay={bags.length * 120 + 80}>
+      {bags.length === 0 ? (
         <Card>
-          <Text style={styles.note}>Checked-in → Security → Sorting → Aircraft → Arrived. Updates arrive via realtime events + push.</Text>
+          <Text style={styles.note}>No checked baggage registered yet. Drop your bags at AeroGate Self-Drop to begin tracking.</Text>
         </Card>
-      </Enter>
+      ) : (
+        bags.map((b, i) => <BagTimeline key={b.tag} bag={b} index={i} />)
+      )}
     </ScrollView>
   );
 }
@@ -114,15 +123,15 @@ const styles = StyleSheet.create({
   rail: { width: 4, borderRadius: 4, backgroundColor: 'rgba(7,23,57,0.10)', marginLeft: 14, overflow: 'hidden' },
   railFill: { width: 4, borderRadius: 4, backgroundColor: colors.info },
   stages: { flex: 1, marginLeft: 12 },
-  stageRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  stageRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   node: {
-    width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center',
+    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.divider,
   },
   nodeDone: { backgroundColor: '#DFF0E7', borderColor: colors.success },
   nodeCurrent: { backgroundColor: '#DCE4EF', borderColor: colors.info, borderWidth: 2 },
-  nodeIcon: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
-  stageLabel: { ...typography.body, color: colors.textMuted, marginLeft: 10 },
+  nodeIcon: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
+  stageLabel: { ...typography.caption, color: colors.textMuted, marginLeft: 10 },
   stageCurrent: { color: colors.textPrimary, fontWeight: '800' },
   stageDone: { color: colors.textSecondary },
 });

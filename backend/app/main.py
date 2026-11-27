@@ -10,7 +10,7 @@ from .controllers import (
     inspection_controller, baggage_tracking_controller, security_gate_controller,
     boarding_gate_controller, monitoring_controller, k9_patrols_controller,
     maintenance_controller, flight_controller,
-    reports_controller, ai_controller, agent_controller, orchestration_controller, saga_controller, hitl_controller,
+    reports_controller, ai_controller, agent_controller, orchestration_controller, saga_controller, hitl_controller, journey_controller,
 )
 
 # Agent service initialization
@@ -67,6 +67,7 @@ app.include_router(reports_controller.router, prefix="/api/v1/reports", tags=["1
 app.include_router(ai_controller.router, prefix="/api/v1/ai", tags=["14. AI Center"])
 app.include_router(agent_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
 app.include_router(orchestration_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
+app.include_router(journey_controller.router, prefix="/api/v1/journey", tags=["16. Passenger Journey & QR Pairing"])
 app.include_router(saga_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
 app.include_router(hitl_controller.router, prefix="/api/v1/agents", tags=["15. Agent System"])
 

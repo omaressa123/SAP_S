@@ -128,6 +128,25 @@ def verify_security_gate(payload: SecurityGateVerifyRequest, db: Session = Depen
         updated_at=now
     )
     db.add(gate_log)
+    if is_authorized and p_id:
+        try:
+            from ..services import journey_service as js
+            journey = js.get_or_create_journey(
+                db,
+                passenger_id=p_id,
+                booking_id=booking.booking_id if booking else None,
+                flight_id=flight.flight_id if flight else None,
+            )
+            js.record_touchpoint(
+                db,
+                journey=journey,
+                stage="security_gate",
+                status="completed",
+                location=f"Security Checkpoint #{payload.gateId or 22}",
+                details={"gate_log_id": gate_log.gate_log_id},
+            )
+        except Exception:
+            pass
     db.commit()
     db.refresh(gate_log)
 

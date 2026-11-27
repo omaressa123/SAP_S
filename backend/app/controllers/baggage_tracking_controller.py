@@ -40,6 +40,21 @@ def record_bag_checkpoint(payload: BagCheckpointRequest, db: Session = Depends(g
         updated_at=now
     )
     db.add(log)
+    if bag:
+        try:
+            from ..services import journey_service as js
+            journey = js.get_or_create_journey(db, passenger_id=bag.passenger_id, booking_id=bag.booking_id)
+            cp_lower = (payload.checkpointType or "").lower().replace(" ", "_")
+            if cp_lower in ("transferred_to_carousel", "ready_for_collection"):
+                journey.baggage_carousel = payload.location
+                js.record_touchpoint(db, journey=journey, stage="baggage_collection", status="in_progress", location=payload.location)
+            elif cp_lower == "collected":
+                js.record_touchpoint(db, journey=journey, stage="baggage_collection", status="completed", location=payload.location)
+                js.record_touchpoint(db, journey=journey, stage="journey_completed", status="completed", location=payload.location)
+            else:
+                js.journey_ws_manager.broadcast_sync(journey.journey_id, {"type": "journey_update", "journey": js.build_journey_snapshot(db, journey)})
+        except Exception:
+            pass
     db.commit()
     db.refresh(log)
 

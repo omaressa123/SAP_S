@@ -323,6 +323,19 @@ def dispatch_bag_to_flight(payload: DispatchBagRequest, db: Session = Depends(ge
             updated_at=now
         )
         db.add(log)
+        try:
+            from ..services import journey_service as js
+            journey = js.get_or_create_journey(db, passenger_id=p_id, booking_id=bag.booking_id)
+            js.record_touchpoint(
+                db,
+                journey=journey,
+                stage="baggage_drop",
+                status="completed",
+                location="AeroGate Self-Drop #04",
+                details={"bag_id": bag.bag_id, "rfid_tag": bag.rfid_tag, "qr_code": bag.qr_code},
+            )
+        except Exception:
+            pass
         db.commit()
 
     return success_response(data={

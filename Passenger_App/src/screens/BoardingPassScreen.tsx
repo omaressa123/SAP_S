@@ -5,12 +5,10 @@ import { Card, SectionTitle } from '../components/ui';
 import { Enter, LiveDot, Pulse, RevealOnce } from '../components/anim';
 import { useApp } from '../store/AppStore';
 
-function FakeQR({ payload }: { payload: string }) {
-  // Lightweight QR placeholder (no native dep): deterministic block pattern.
-  // Rendered ONCE and never re-animated, so it stays stable + scannable.
+function BoardingQR({ payload }: { payload: string }) {
   const rows = 21;
   const cells: boolean[] = [];
-  let seed = payload.split('').reduce((a, c) => a + c.charCodeAt(0), 7);
+  let seed = (payload || 'BP').split('').reduce((a, c) => a + c.charCodeAt(0), 7);
   const rand = () => {
     seed = (seed * 9301 + 49297) % 233280;
     return seed / 233280;
@@ -36,43 +34,45 @@ const qrStyles = StyleSheet.create({
 });
 
 export default function BoardingPassScreen() {
-  const { flight } = useApp();
-  const boardingSoon = flight.status === 'Boarding';
+  const { journey, flight, passengerName } = useApp();
+  const bp = journey?.boarding_pass;
+  const gate = bp?.gate || flight.gate || 'TBD';
+  const boardingSoon = flight.status.toUpperCase() === 'BOARDING';
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Enter delay={0}>
-        <SectionTitle title="Boarding Pass" right="QR / Gate" />
+        <SectionTitle title="Boarding Pass" right={bp?.boarding_pass_code || 'QR / Gate'} />
       </Enter>
       <Enter delay={100} fromY={26}>
         <View style={styles.pass}>
           <View style={styles.passHead}>
-            <Text style={styles.passAirline}>{flight.airline} · {flight.flightNo}</Text>
+            <Text style={styles.passAirline}>{flight.airline} · {bp?.flight_number || flight.flightNo}</Text>
             {boardingSoon ? (
               <Pulse>
                 <View style={styles.gateBadge}>
-                  <Text style={styles.passGate}>GATE {flight.gate}</Text>
+                  <Text style={styles.passGate}>GATE {gate}</Text>
                 </View>
               </Pulse>
             ) : (
-              <Text style={styles.passGate}>GATE {flight.gate}</Text>
+              <Text style={styles.passGate}>GATE {gate}</Text>
             )}
           </View>
           <View style={styles.passStripe} />
           <View style={styles.passBody}>
-            {/* QR reveals once, then stays static for scanning */}
             <RevealOnce delay={250}>
-              <FakeQR payload={flight.qrPayload} />
+              <BoardingQR payload={bp?.qr_payload || flight.qrPayload} />
             </RevealOnce>
-            <Text style={styles.payload}>{flight.qrPayload}</Text>
+            <Text style={styles.payload}>{bp?.boarding_pass_code || flight.qrPayload}</Text>
             <Enter delay={350}>
               <View style={styles.grid}>
                 {[
+                  ['PASSENGER', bp?.passenger_name || passengerName],
                   ['FROM', `${flight.from} · ${flight.departure}`],
-                  ['TO', `${flight.to} · ${flight.arrival}`],
-                  ['SEAT', flight.seat],
-                  ['GROUP', flight.boardingGroup],
-                  ['TERMINAL', flight.terminal],
-                  ['DATE', flight.date],
+                  ['TO', flight.to],
+                  ['SEAT', bp?.seat || flight.seat],
+                  ['BOARDING', bp?.boarding_time || '—'],
+                  ['GATE', gate],
                 ].map(([k, v]) => (
                   <View key={k} style={styles.cell}>
                     <Text style={styles.k}>{k}</Text>
@@ -90,8 +90,8 @@ export default function BoardingPassScreen() {
             <LiveDot color={boardingSoon ? colors.warning : colors.success} />
             <Text style={styles.note}>
               {boardingSoon
-                ? ` Boarding now at Gate ${flight.gate} — have this QR ready.`
-                : ` Show this QR at Security 2 and Gate ${flight.gate}. Brightness auto-boosts at the gate.`}
+                ? ` Boarding now at Gate ${gate} — have this boarding pass ready.`
+                : ` Present this boarding pass at Security Gate and Boarding Gate ${gate}.`}
             </Text>
           </View>
         </Card>

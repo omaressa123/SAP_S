@@ -398,6 +398,34 @@ def approve_passenger(db: Session, passenger_id: Optional[int], gate_flight: str
             updated_at=now
         )
         db.add(log_entry)
+        try:
+            from ..services import journey_service as js
+            gate_row = db.query(BoardingGate).filter(BoardingGate.boarding_gate_id == (gate_id or 22)).first()
+            dynamic_gate = gate_row.gate_number if gate_row and gate_row.gate_number else "B22"
+            journey = js.get_or_create_journey(
+                db,
+                passenger_id=p_id,
+                booking_id=booking.booking_id if booking else None,
+                flight_id=booking.flight_id if booking else None,
+            )
+            js.record_touchpoint(
+                db,
+                journey=journey,
+                stage="boarding_gate",
+                status="completed",
+                location=f"Gate {dynamic_gate}",
+                details={"flight": gate_flight, "gate": dynamic_gate},
+            )
+            js.record_touchpoint(
+                db,
+                journey=journey,
+                stage="boarded",
+                status="completed",
+                location=f"Gate {dynamic_gate}",
+                details={"flight": gate_flight, "seat": seat_num, "method": method},
+            )
+        except Exception:
+            pass
         db.commit()
         db.refresh(log_entry)
         boarding_id = log_entry.boarding_id

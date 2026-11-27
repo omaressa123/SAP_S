@@ -1,84 +1,199 @@
 import { CacheStore } from './storage';
-import { mockAlerts, mockBags, mockFlight, mockWaypoints } from '../data/mock';
+import { mockWaypoints } from '../data/mock';
 
 /**
- * NETWORK / REALTIME LAYER (mock-backed, gateway-ready)
- * - RestApi: REST API Client -> API Gateway -> backend services
- * - Realtime: WebSocket / SSE client (simulated with polling hooks in screens)
- * - Push: FCM/APNs handler stub
- *
- * Replace BASE_URL + fetch paths with the real gateway when backends are live.
- * Every call caches last-known data so Offline Mode + Sync keeps working.
+ * NETWORK / REALTIME LAYER — Connected to FastAPI Backend & WebSocket.
  */
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+const BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
-async function withCache<T>(key: string, fetcher: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    // In production: const res = await fetch(`${BASE_URL}...`);
-    // Here we resolve mock data through the same cache path.
-    const data = await fetcher();
-    await CacheStore.set(key, data);
-    return data;
-  } catch {
-    const cached = await CacheStore.get<T>(key);
-    return cached ?? fallback;
-  }
+export interface JourneyPassenger {
+  passenger_id: number;
+  full_name: string;
+  nationality?: string | null;
+  document_type?: string | null;
+  document_number_masked?: string | null;
+  biometric_consent?: boolean;
+  photo_url?: string | null;
 }
 
-async function getJson<T>(path: string): Promise<T> {
+export interface JourneyBooking {
+  booking_id?: number | null;
+  booking_reference?: string | null;
+  seat_number?: string | null;
+  booking_class?: string | null;
+  booking_status?: string | null;
+}
+
+export interface JourneyFlight {
+  flight_id?: number | null;
+  flight_number?: string | null;
+  airline?: string | null;
+  airline_iata?: string | null;
+  origin_iata?: string | null;
+  origin_city?: string | null;
+  destination_iata?: string | null;
+  destination_city?: string | null;
+  scheduled_departure?: string | null;
+  actual_departure?: string | null;
+  boarding_gate?: string | null;
+  boarding_time?: string | null;
+  status: string;
+}
+
+export interface JourneyBoardingPass {
+  boarding_pass_code?: string | null;
+  passenger_name: string;
+  flight_number?: string | null;
+  seat?: string | null;
+  gate?: string | null;
+  boarding_time?: string | null;
+  qr_payload?: string | null;
+}
+
+export interface JourneyBag {
+  bag_id: number;
+  rfid_tag?: string | null;
+  qr_code?: string | null;
+  weight_kg?: number | null;
+  status: string;
+  status_key: string;
+  progress: number;
+  location?: string | null;
+  carousel?: string | null;
+  checkpoints: Array<{ checkpoint_type: string; location: string; timestamp?: string | null }>;
+}
+
+export interface JourneyTimelineStage {
+  stage: string;
+  label: string;
+  status: 'completed' | 'in_progress' | 'upcoming' | 'delayed' | 'failed';
+  timestamp?: string | null;
+  location?: string | null;
+  details?: Record<string, unknown>;
+  next_action: string;
+}
+
+export interface JourneyNotification {
+  id: string;
+  type: string;
+  content: string;
+  sent_at?: string | null;
+  unread: boolean;
+}
+
+export interface JourneySnapshot {
+  journey_id: string;
+  current_stage: string;
+  journey_status: string;
+  baggage_carousel?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  passenger: JourneyPassenger;
+  booking: JourneyBooking;
+  flight: JourneyFlight;
+  boarding_pass: JourneyBoardingPass;
+  bags: JourneyBag[];
+  timeline: JourneyTimelineStage[];
+  notifications: JourneyNotification[];
+}
+
+export interface PairClaimResponse {
+  access_token: string;
+  token_type: string;
+  journey: JourneySnapshot;
+}
+
+async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'X-API-KEY': 'MOCK_API_KEY_123' },
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
   });
-  if (!res.ok) throw new Error(`API ${res.status} on ${path}`);
-  const body = await res.json();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.success === false) {
+    const msg = body?.error?.message || body?.detail || `HTTP ${res.status} on ${path}`;
+    throw new Error(msg);
+  }
   return (body?.data ?? body) as T;
 }
 
-const USE_MOCK = BASE_URL.includes('gateway.example.com');
-
 export const RestApi = {
   baseUrl: BASE_URL,
-  getFlight: () => withCache('flight',
-    async () => (USE_MOCK ? mockFlight : getJson<typeof mockFlight>('...')),
-    mockFlight),
-  getBags: () => withCache('bags',
-    async () => (USE_MOCK ? mockBags : getJson<typeof mockBags>('/api/v1/baggage-tracking/all')),
-    mockBags),
-  getAlerts: () => withCache('alerts',
-    async () => (USE_MOCK ? mockAlerts : getJson<typeof mockAlerts>('/api/v1/reports/operations')),
-    mockAlerts),
-  getWaypoints: () => withCache('waypoints', async () => mockWaypoints, mockWaypoints),
-  /** Passenger journey helpers (live when EXPO_PUBLIC_API_URL points at the core backend). */
-  getPassengers: () => withCache('passengers',
-    async () => (USE_MOCK ? [] as unknown[] : getJson<unknown[]>('/api/v1/passenger/all')),
-    [] as unknown[]),
-  getFlights: () => withCache('flights-list',
-    async () => (USE_MOCK ? [mockFlight] : getJson<typeof mockFlight | unknown[]>('/api/v1/flights/all')),
-    [mockFlight]),
-};
 
-export type RealtimeEvent =
-  | { type: 'flight-status'; status: string; gate: string }
-  | { type: 'bag-update'; tag: string; status: string; progress: number }
-  | { type: 'safety'; title: string; body: string };
+  pairWithQr: (token: string, deviceUuid: string, pushToken?: string): Promise<PairClaimResponse> =>
+    requestJson<PairClaimResponse>('/api/v1/journey/pair/claim', {
+      method: 'POST',
+      body: JSON.stringify({
+        token,
+        device_uuid: deviceUuid,
+        device_type: 'expo_mobile',
+        push_token: pushToken,
+        app_version: '1.0.0',
+      }),
+    }),
 
-/** Simulated realtime subscription (swap for WebSocket/SSE later). */
-export function subscribeRealtime(onEvent: (e: RealtimeEvent) => void): () => void {
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  timers.push(
-    setTimeout(() => onEvent({ type: 'bag-update', tag: 'BG-88210', status: 'Loading', progress: 0.86 }), 8000),
-  );
-  timers.push(
-    setTimeout(() => onEvent({ type: 'flight-status', status: 'Boarding', gate: 'B12' }), 14000),
-  );
-  return () => timers.forEach(clearTimeout);
-}
-
-export const PushHandler = {
-  /** Wire expo-notifications / FCM / APNs token registration here. */
-  async registerToken(token: string): Promise<void> {
-    // POST ${BASE_URL}/notifications/register { token }
-    await CacheStore.set('push_token', token);
+  getMyJourney: async (jwt: string): Promise<JourneySnapshot> => {
+    const snap = await requestJson<JourneySnapshot>('/api/v1/journey/me', {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    await CacheStore.set('journey_snapshot', snap);
+    return snap;
   },
+
+  registerPushToken: async (jwt: string, pushToken: string): Promise<void> => {
+    await requestJson('/api/v1/journey/device/push-token', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify({ push_token: pushToken }),
+    });
+  },
+
+  getWaypoints: () => CacheStore.get('waypoints').then((c) => c ?? mockWaypoints),
 };
+
+export function subscribeJourneyRealtime(
+  journeyId: string,
+  onJourneyUpdate: (snapshot: JourneySnapshot) => void,
+): () => void {
+  let closed = false;
+  let ws: WebSocket | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const connect = () => {
+    if (closed || !journeyId) return;
+    try {
+      const wsBase = BASE_URL.replace(/^http/i, 'ws');
+      ws = new WebSocket(`${wsBase}/api/v1/journey/ws/${encodeURIComponent(journeyId)}`);
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(String(evt.data));
+          if (msg?.type === 'journey_update' && msg.journey) {
+            onJourneyUpdate(msg.journey as JourneySnapshot);
+          }
+        } catch {
+          // ignore malformed frames
+        }
+      };
+      ws.onclose = () => {
+        if (!closed) {
+          retryTimer = setTimeout(connect, 5000);
+        }
+      };
+      ws.onerror = () => {
+        ws?.close();
+      };
+    } catch {
+      retryTimer = setTimeout(connect, 5000);
+    }
+  };
+
+  connect();
+  return () => {
+    closed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    ws?.close();
+  };
+}

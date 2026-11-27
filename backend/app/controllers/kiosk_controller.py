@@ -236,15 +236,60 @@ class IssueBoardingPassRequest(BaseModel):
     bagsToRegisterCount: int
 
 @router.post("/boarding-pass/issue", dependencies=[Depends(verify_api_key)])
-def issue_boarding_pass(payload: IssueBoardingPassRequest):
+def issue_boarding_pass(payload: IssueBoardingPassRequest, db: Session = Depends(get_db)):
+    """Create real CheckInRecord, PassengerJourney, boarding pass, and one-time QR pairing token."""
+    from ..models.check_in import CheckInRecord
+    from ..services import journey_service as js
+
+    now = datetime.utcnow()
+    booking = db.query(Booking).filter(Booking.booking_id == payload.bookingId).first()
+    if not booking:
+        booking = (
+            db.query(Booking)
+            .filter(Booking.passenger_id == payload.passengerId)
+            .order_by(Booking.booking_id.desc())
+            .first()
+        )
+
+    checkin = CheckInRecord(
+        booking_id=booking.booking_id if booking else None,
+        passenger_id=payload.passengerId,
+        equipment_id=payload.kioskEquipmentId,
+        checkin_time=now,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(checkin)
+    db.flush()
+
+    journey = js.get_or_create_journey(
+        db,
+        passenger_id=payload.passengerId,
+        booking_id=booking.booking_id if booking else None,
+        flight_id=booking.flight_id if booking else None,
+        checkin_id=checkin.checkin_id,
+    )
+    tok = js.generate_pairing_token(db, journey, ttl_minutes=15)
+    js.record_touchpoint(
+        db,
+        journey=journey,
+        stage="ekiosk_checkin",
+        status="completed",
+        location=f"eKiosk #{payload.kioskEquipmentId}",
+        details={"checkin_id": checkin.checkin_id, "bags_to_register": payload.bagsToRegisterCount},
+        idempotency_key=f"ekiosk-{journey.journey_id}-{checkin.checkin_id}",
+    )
+    db.commit()
+
     return success_response(data={
-        "checkinId": 8012,
-        "boardingPassQrCode": "BP_2048_MS777_12A_501",
-        "issuedBagTags": [
-            { "bagId": 901, "rfidTag": "RF-EGY-901-A", "qrCode": "QR-BAG-901" },
-            { "bagId": 902, "rfidTag": "RF-EGY-902-B", "qrCode": "QR-BAG-902" }
-        ],
-        "printerStatus": "PRINT_COMMAND_SENT"
+        "checkinId": checkin.checkin_id,
+        "journeyId": journey.journey_id,
+        "boardingPassQrCode": journey.boarding_pass_code,
+        "pairingToken": tok.token,
+        "pairingQrPayload": f"SA-PAIR:{tok.token}",
+        "expiresAt": tok.expires_at.isoformat() + "Z",
+        "issuedBagTags": [],
+        "printerStatus": "PRINT_COMMAND_SENT",
     })
 
 

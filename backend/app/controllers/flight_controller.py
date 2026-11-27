@@ -123,6 +123,25 @@ def update_flight_status(flight_id: int, payload: UpdateFlightStatusRequest, db:
         db.rollback()
         print("Note: AirportEvent broadcast warning:", e)
 
+    # 5. Synchronize all PassengerJourney records on this flight
+    try:
+        from ..models.journey import PassengerJourney
+        from ..services import journey_service as js
+        st_upper = (flight.status or "").upper()
+        journeys = db.query(PassengerJourney).filter(PassengerJourney.flight_id == flight.flight_id).all()
+        for j in journeys:
+            if st_upper in ("DEPARTED", "IN_FLIGHT", "IN FLIGHT"):
+                js.record_touchpoint(db, journey=j, stage="flight_departed", status="completed", location=flight.flight_number)
+            elif st_upper in ("LANDED", "ARRIVED"):
+                js.record_touchpoint(db, journey=j, stage="flight_arrived", status="completed", location=flight.flight_number)
+            elif st_upper == "DELAYED":
+                js.record_touchpoint(db, journey=j, stage="flight_departed", status="delayed", location=flight.flight_number, details={"delayMinutes": payload.delayMinutes})
+            else:
+                js.journey_ws_manager.broadcast_sync(j.journey_id, {"type": "journey_update", "journey": js.build_journey_snapshot(db, j)})
+        db.commit()
+    except Exception:
+        pass
+
     return success_response(data={
         "flightId": flight.flight_id,
         "flightNumber": flight.flight_number,

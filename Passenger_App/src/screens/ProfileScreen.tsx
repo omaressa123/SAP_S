@@ -6,19 +6,30 @@ import { Enter } from '../components/anim';
 import { useApp } from '../store/AppStore';
 
 export default function ProfileScreen() {
-  const { passengerName, flight, offline, setOffline, logout } = useApp();
+  const { journey, passengerName, flight, offline, setOffline, logout } = useApp();
   const [push, setPush] = React.useState(true);
   const [biometric, setBiometric] = React.useState(true);
+
+  const pax = journey?.passenger;
+  const booking = journey?.booking;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Enter delay={0}>
-        <SectionTitle title="Profile & Settings" right={flight.flightNo} />
+        <SectionTitle title="Passenger Profile" right={booking?.booking_reference || flight.flightNo} />
       </Enter>
       <Enter delay={90}>
         <Card>
           <Text style={styles.name}>{passengerName}</Text>
-          <Text style={styles.sub}>PAX-001 · {flight.from} → {flight.to} · Face enrolled ✓</Text>
+          <Text style={styles.sub}>
+            ID #{pax?.passenger_id ?? '—'} · PNR {booking?.booking_reference ?? '—'} · {flight.from} → {flight.to}
+          </Text>
+          <Text style={styles.sub}>
+            Document: {pax?.document_type || 'Passport'} {pax?.document_number_masked || '—'} · Gate {flight.gate} · Seat {flight.seat}
+          </Text>
+          <Text style={styles.sub}>
+            Journey Status: {(journey?.journey_status || 'in_progress').toUpperCase()} ({journey?.current_stage || '—'})
+          </Text>
         </Card>
       </Enter>
 
@@ -26,13 +37,13 @@ export default function ProfileScreen() {
         <Card style={{ marginTop: spacing.md }}>
           <Row label="Push notifications" value={push} onChange={setPush} />
           <Row label="Face ID boarding" value={biometric} onChange={setBiometric} />
-          <Row label="Offline mode (last known data)" value={offline} onChange={setOffline} />
+          <Row label="Offline mode (cached journey)" value={offline} onChange={setOffline} />
         </Card>
       </Enter>
 
       <Enter delay={260}>
-        <Text style={styles.logout} onPress={logout}>Log out / switch passenger</Text>
-        <Text style={styles.ver}>Passenger App 1.0.0 · Expo 57 · gateway: identity / flights / boarding / baggage / wayfinding / notifications</Text>
+        <Text style={styles.logout} onPress={logout}>Unpair / switch passenger</Text>
+        <Text style={styles.ver}>Passenger App 1.0.0 · Expo 57 · Journey ID: {journey?.journey_id || '—'}</Text>
       </Enter>
     </ScrollView>
   );
